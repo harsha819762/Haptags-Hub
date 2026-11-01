@@ -5,6 +5,7 @@ const { db } = require('../db');
 const { getItems } = require('./billing');
 const { getSettings } = require('./settings');
 const { toRupees } = require('./money');
+const { signatureDataUri } = require('./gst/profile');
 
 /** UPI intent link + QR so clients can pay from any UPI app with zero gateway fees. */
 async function upiFor(invoice, amountPaise) {
@@ -24,11 +25,15 @@ async function upiFor(invoice, amountPaise) {
   return { link, qr, id: s.upi_id };
 }
 
-/** Everything needed to render an invoice or quote document. */
+/**
+ * Everything needed to render an invoice or quote document. Invoices carry the authorised
+ * signature saved under GST Invoices → Business profile.
+ */
 async function loadDoc(type, row) {
   const client = await db('clients').where({ id: row.client_id }).first();
   const items = await getItems(type, row.id);
-  return { doc: row, client, items };
+  const signatureImage = type === 'invoice' ? await signatureDataUri() : null;
+  return { doc: row, client, items, signatureImage };
 }
 
 module.exports = { upiFor, loadDoc };

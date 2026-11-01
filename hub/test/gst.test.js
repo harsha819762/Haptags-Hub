@@ -382,6 +382,25 @@ test('invoices bill the Hub’s existing clients directly, picked by search', as
   assert.deepEqual([moved.segment, moved.state], ['business', 'Tamil Nadu']);
 });
 
+test('the Hub’s own invoices show the authorised signature once issued', async () => {
+  const { createInvoice, issueInvoice } = require('../src/lib/billing');
+  const [clientId] = await db('clients').insert({ name: 'Sign Test Ltd', segment: 'business', status: 'active', country: 'India', state: 'Karnataka', created_at: nowSql(), updated_at: nowSql() });
+  const make = () => db.transaction((trx) => createInvoice(trx, {
+    client_id: clientId, issue_date: today, due_date: addDays(today, 7), tax_mode: 'intra', gst_rate: 18, discount: 0,
+  }, [{ description: 'Training', quantity: 1, rate: 1200000 }]));
+  const issued = await make();
+  await db.transaction((trx) => issueInvoice(trx, issued));
+  const draft = await make();
+  const token = async (id) => (await db('invoices').where({ id }).first()).public_token;
+  const b = new Browser();
+  const pub = await b.get(`/i/${await token(issued)}`);
+  assert.match(pub.text, /<img class="doc-sign-img" src="data:image\/png;base64,/);
+  assert.match(pub.text, /Authorised signatory/);
+  assert.doesNotMatch((await b.get(`/i/${await token(draft)}`)).text, /doc-sign-img/);
+  await b.login('owner@test.local', 'owner-password-1');
+  assert.match((await b.get(`/admin/invoices/${issued}`)).text, /class="doc-sign-img"/);
+});
+
 test('documents and payments are never deleted, and numbers never change', async () => {
   const doc = await db('gst_documents').whereNotNull('number').first();
   await assert.rejects(() => db('gst_documents').where({ id: doc.id }).del(), /never deleted/);

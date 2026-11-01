@@ -15,6 +15,7 @@ const { nowSql, todayIST, addDays, int, str, isDate } = require('../../lib/util'
 const { paginate, clientOptions, idParam } = require('./_helpers');
 const { parseDocForm, formState } = require('./_docs');
 const { upiFor } = require('../../lib/docs');
+const { signatureDataUri } = require('../../lib/gst/profile');
 
 const router = express.Router();
 
@@ -144,6 +145,7 @@ router.get('/:id', async (req, res, next) => {
   res.render('admin/invoices/show', {
     title: `Invoice ${inv.number || '(draft)'}`, doc: inv, client, items, payments, activities, project, balance,
     link: invoiceUrl(inv), upi: inv.status !== 'draft' ? await upiFor(inv, balance) : null,
+    signatureImage: await signatureDataUri(),
   });
 });
 

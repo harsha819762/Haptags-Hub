@@ -95,6 +95,13 @@
   </div>
 
   <% if (doc.terms) { %><div class="doc-section"><h4>Terms</h4><%- h.nl2br(doc.terms) %></div><% } %>
-  <div class="doc-sign"><div>For <%= s.legal_name %><br><span class="muted small">Authorised signatory</span></div></div>
+  <%# The signed stamp from GST Invoices → Business profile, on every issued invoice (not drafts). %>
+  <% const signature = isInvoice && doc.status !== 'draft' ? locals.signatureImage : null; %>
+  <div class="doc-sign">
+    <div class="doc-sign-block">
+      <% if (signature) { %><img class="doc-sign-img" src="<%= signature %>" alt="Signature of the authorised signatory, <%= s.legal_name %>"><% } %>
+      <div class="doc-sign-line">For <%= s.legal_name %><br><span class="muted small">Authorised signatory</span></div>
+    </div>
+  </div>
   <% if (isInvoice && !gst) { %><p class="small muted mt-16 mb-0">This is a computer-generated invoice.</p><% } %>
 </article>
