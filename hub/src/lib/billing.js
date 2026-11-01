@@ -21,6 +21,12 @@ async function nextSequence(trx, name) {
 
 const formatNumber = (prefix, fy, seq) => `${prefix}/${fy}/${String(seq).padStart(4, '0')}`;
 
+/** The GST Invoices module (/invoices) issues from the same series, so check its numbers too. */
+async function numberUsed(trx, table, number) {
+  if (await trx(table).where({ number }).first()) return true;
+  return table === 'invoices' && Boolean(await trx('gst_documents').where({ number }).first());
+}
+
 /**
  * Next automatic number in a series. Numbers typed in by hand can sit anywhere in the series,
  * so any that are already taken are skipped rather than duplicated.
@@ -29,7 +35,7 @@ async function nextNumber(trx, prefix, dateYmd, table = 'invoices') {
   const fy = financialYear(dateYmd);
   for (let i = 0; i < 1000; i += 1) {
     const number = formatNumber(prefix, fy, await nextSequence(trx, `${prefix}:${fy}`));
-    if (!(await trx(table).where({ number }).first())) return number;
+    if (!(await numberUsed(trx, table, number))) return number;
   }
   throw new Error('Could not find a free number in this series.');
 }
@@ -39,7 +45,7 @@ async function previewNumber(prefix, dateYmd, trx = db) {
   const fy = financialYear(dateYmd);
   const row = await trx('sequences').where({ name: `${prefix}:${fy}` }).first();
   let seq = (row ? Number(row.value) : 0) + 1;
-  while (await trx('invoices').where({ number: formatNumber(prefix, fy, seq) }).first()) seq += 1;
+  while (await numberUsed(trx, 'invoices', formatNumber(prefix, fy, seq))) seq += 1;
   return formatNumber(prefix, fy, seq);
 }
 
@@ -58,7 +64,8 @@ function cleanNumber(value) {
 }
 
 async function numberTaken(number, exceptId = 0, trx = db) {
-  return Boolean(await trx('invoices').where({ number }).whereNot('id', exceptId || 0).first());
+  if (await trx('invoices').where({ number }).whereNot('id', exceptId || 0).first()) return true;
+  return Boolean(await trx('gst_documents').where({ number }).first());
 }
 
 /**

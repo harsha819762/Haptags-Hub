@@ -1,0 +1,269 @@
+<%
+  const C = g.C;
+  const cur = doc.currency;
+  const isInvoice = doc.kind === 'invoice';
+  const isNote = doc.kind === 'credit_note' || doc.kind === 'debit_note';
+  const final = Boolean(doc.number) && doc.status !== 'draft';
+  const draft = doc.status === 'draft' && !doc.discarded_at;
+  const open = isInvoice && ['unpaid', 'partially_paid'].includes(doc.status) && Number(doc.balance) > 0;
+  const activePayments = payments.filter(function (p) { return p.status === 'active'; });
+  const label = C.KINDS[doc.kind].label;
+  const pdf = '/invoices/docs/' + doc.id + '/pdf';
+%>
+<%- include('../_nav', { active: type }) %>
+<div class="crumbs"><a href="/invoices/docs?type=<%= type %>"><%= isNote ? 'Credit & debit notes' : C.KINDS[doc.kind].plural %></a> / <%= g.docLabel(doc) %></div>
+<div class="page-head">
+  <div>
+    <h1 class="gst-title"><span class="mono"><%= doc.number || 'Draft ' + label.toLowerCase() %></span> <%- g.badge(status) %><% if (final && doc.status !== 'cancelled') { %><span class="gst-lock" title="Finalised and locked"><%- h.icon('lock', 15) %> Locked</span><% } %></h1>
+    <div class="sub"><%= g.docTitle(doc) %> · <a href="/invoices/clients/<%= doc.client_id %>"><%= doc.bill_name %></a> · <%= h.date(doc.issue_date) %> · <%= g.supplyLabel(doc.supply_type) %></div>
+  </div>
+  <div class="actions">
+    <% if (doc.discarded_at) { %>
+      <span class="muted small">Discarded draft (kept for the record)</span>
+    <% } else if (draft) { %>
+      <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener"><%- h.icon('external', 16) %> Preview PDF</a>
+      <a class="btn btn-ghost" href="/invoices/docs/<%= doc.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+      <form method="post" action="/invoices/docs/<%= doc.id %>/finalise" class="inline" data-confirm="Finalise this <%= label.toLowerCase() %> as <%= nextNumber %>? It will be locked: after this it can only be cancelled or corrected with a note.">
+        <%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('lock', 16) %> Finalise as <%= nextNumber %></button>
+      </form>
+    <% } else { %>
+      <a class="btn btn-ghost" href="<%= pdf %>?download=1"><%- h.icon('download', 16) %> Download PDF</a>
+      <% if (doc.kind !== 'proforma') { %><a class="btn btn-ghost" href="<%= pdf %>?copies=both&amp;download=1" title="Original for recipient and duplicate for supplier"><%- h.icon('copy', 16) %> With duplicate</a><% } %>
+      <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener" title="Opens the PDF; print it from there"><%- h.icon('printer', 16) %> Print</a>
+      <% if (doc.status !== 'cancelled') { %><button class="btn btn-ghost" type="button" data-dialog="#email-dialog"><%- h.icon('mail', 16) %> Email</button><% } %>
+      <% if (open) { %><a class="btn" href="#payments"><%- h.icon('payments', 16) %> Record payment</a><% } %>
+      <% if (doc.kind === 'proforma' && doc.status === 'issued') { %>
+        <form method="post" action="/invoices/docs/<%= doc.id %>/convert" class="inline"><%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('retainers', 16) %> Convert to tax invoice</button></form>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<% if (doc.status === 'cancelled') { %>
+<div class="flash flash-error"><%- h.icon('ban') %><span><b>Cancelled</b> on <%= h.dateTime(doc.cancelled_at) %>: <%= doc.cancel_reason %>. The number <%= doc.number %> stays used and is never issued again.</span></div>
+<% } %>
+<% if (draft) { %>
+<div class="flash flash-info"><%- h.icon('info') %><span>This is a draft: it has no number and isn’t a valid tax document yet. Finalising gives it <b class="mono"><%= nextNumber %></b> and locks it.</span></div>
+<% } %>
+
+<div class="split gst-split-wide">
+  <article class="card gst-doc" aria-label="<%= g.docTitle(doc) %>">
+    <header class="gst-doc-head">
+      <div>
+        <div class="gst-doc-kicker"><%= isNote ? 'Recipient' : 'Bill to' %></div>
+        <b class="gst-doc-name"><%= doc.bill_name %></b>
+        <% if (doc.bill_address) { %><div class="small"><%- h.nl2br(doc.bill_address) %></div><% } %>
+        <div class="small"><%= doc.client_type === 'export' ? 'Country: ' + doc.bill_country : 'State: ' + (doc.bill_state_name || '—') + ' (' + (doc.bill_state_code || '—') + ')' %></div>
+        <div class="small"><%= doc.bill_gstin ? 'GSTIN: ' : '' %><span class="mono"><%= doc.bill_gstin || (doc.client_type === 'export' ? '' : 'Unregistered') %></span></div>
+      </div>
+      <dl class="dl gst-doc-meta">
+        <dt>Number</dt><dd class="mono"><%= doc.number || '—' %></dd>
+        <dt>Date</dt><dd><%= h.date(doc.issue_date) %></dd>
+        <% if (doc.due_date) { %><dt><%= doc.kind === 'proforma' ? 'Valid until' : 'Due' %></dt><dd><%= h.date(doc.due_date) %><%= doc.payment_terms ? ' (' + doc.payment_terms + ')' : '' %></dd><% } %>
+        <% if (original) { %><dt>Against</dt><dd><a class="mono" href="/invoices/docs/<%= original.id %>"><%= original.number %></a> dated <%= h.date(original.issue_date) %></dd><% } %>
+        <% if (doc.note_reason) { %><dt>Reason</dt><dd><%= doc.note_reason %></dd><% } %>
+        <dt>Place of supply</dt><dd><%= doc.pos_name %> (<%= doc.pos_code %>)</dd>
+        <dt>Reverse charge</dt><dd><%= doc.reverse_charge ? 'Yes' : 'No' %></dd>
+        <% if (cur !== 'INR') { %><dt>Currency</dt><dd><%= cur %> · 1 <%= cur %> = ₹<%= Number(doc.exchange_rate).toFixed(4) %></dd><% } %>
+      </dl>
+    </header>
+    <% if (doc.subject) { %><p class="gst-doc-subject"><b>Subject:</b> <%= doc.subject %></p><% } %>
+
+    <div class="table-wrap"><table class="table gst-doc-lines">
+      <thead><tr><th>#</th><th>Description</th><th>SAC</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Discount</th><th class="num">GST</th><th class="num">Taxable</th></tr></thead>
+      <tbody><% lines.forEach(function (l, i) { %>
+        <tr><td><%= i + 1 %></td><td><%= l.description %></td><td class="mono"><%= l.sac || '' %></td><td class="num"><%= g.qty(l.quantity) %><%= l.unit ? ' ' + l.unit : '' %></td><td class="num"><%= g.amount(l.rate, cur) %></td><td class="num"><%= Number(l.discount) ? g.amount(l.discount, cur) : '—' %></td><td class="num"><%= Number(l.gst_rate) %>%</td><td class="num"><%= g.amount(l.taxable, cur) %></td></tr>
+      <% }) %></tbody>
+    </table></div>
+
+    <div class="gst-doc-foot">
+      <div>
+        <div class="gst-words"><span class="gst-doc-kicker">Amount in words</span><%= words %></div>
+        <% if (doc.supply_type === 'export') { %><div class="gst-declaration">SUPPLY MEANT FOR EXPORT UNDER LUT WITHOUT PAYMENT OF IGST<span>LUT ARN: <%= doc.lut_number || profile.lut_number || '— (add it on the Business Profile page)' %></span></div><% } %>
+        <% if (doc.kind !== 'proforma') { %><p class="small muted">Whether tax is payable under reverse charge: <%= doc.reverse_charge ? 'Yes' : 'No' %></p><% } %>
+      </div>
+      <div class="totals">
+        <% if (Number(doc.discount)) { %><div class="row-between"><span>Gross value</span><span><%= g.amount(doc.gross, cur) %></span></div><div class="row-between"><span>Less: discount</span><span>(<%= g.amount(doc.discount, cur) %>)</span></div><% } %>
+        <div class="row-between"><span>Taxable value</span><span><%= g.amount(doc.taxable, cur) %></span></div>
+        <% if (doc.supply_type === 'intra') { %><div class="row-between"><span>CGST</span><span><%= g.amount(doc.cgst, cur) %></span></div><div class="row-between"><span>SGST</span><span><%= g.amount(doc.sgst, cur) %></span></div>
+        <% } else { %><div class="row-between"><span><%= doc.supply_type === 'export' ? 'IGST @ 0% (LUT)' : 'IGST' %></span><span><%= g.amount(doc.igst, cur) %></span></div><% } %>
+        <% if (cur === 'INR') { %><div class="row-between"><span>Round off</span><span><%= Number(doc.round_off) < 0 ? '(' + g.amount(-doc.round_off, cur) + ')' : g.amount(doc.round_off, cur) %></span></div><% } %>
+        <div class="row-between grand"><span><%= doc.kind === 'credit_note' ? 'Total credit' : doc.kind === 'debit_note' ? 'Total debit' : 'Grand total' %></span><span><%= g.money(doc.total, cur) %></span></div>
+        <% if (cur !== 'INR') { %><div class="row-between small muted"><span>INR equivalent</span><span><%= h.inr(doc.inr_total) %></span></div><% } %>
+      </div>
+    </div>
+
+    <h4 class="gst-doc-kicker mt-16">Tax summary by SAC</h4>
+    <div class="table-wrap"><table class="table gst-tax-table">
+      <thead><tr><th>SAC</th><th class="num">Taxable</th><% if (doc.supply_type === 'intra') { %><th class="num">CGST</th><th class="num">SGST</th><% } else { %><th class="num">IGST</th><% } %><th class="num">Total tax</th></tr></thead>
+      <tbody>
+        <% tax.forEach(function (t) { %><tr><td class="mono"><%= t.sac %></td><td class="num"><%= g.amount(t.taxable, cur) %></td>
+          <% if (doc.supply_type === 'intra') { %><td class="num"><%= g.amount(t.cgst, cur) %> <span class="muted">@<%= t.gst_rate / 2 %>%</span></td><td class="num"><%= g.amount(t.sgst, cur) %> <span class="muted">@<%= t.gst_rate / 2 %>%</span></td>
+          <% } else { %><td class="num"><%= g.amount(t.igst, cur) %> <span class="muted">@<%= t.gst_rate %>%</span></td><% } %><td class="num"><%= g.amount(t.tax, cur) %></td></tr><% }) %>
+      </tbody>
+    </table></div>
+    <% if (doc.notes || doc.terms) { %>
+    <div class="grid grid-2 mt-16 small">
+      <% if (doc.notes) { %><div><h4 class="gst-doc-kicker">Notes</h4><%- h.nl2br(doc.notes) %></div><% } %>
+      <% if (doc.terms) { %><div><h4 class="gst-doc-kicker">Terms &amp; conditions</h4><%- h.nl2br(doc.terms) %></div><% } %>
+    </div>
+    <% } %>
+  </article>
+
+  <div class="stack">
+    <% if (isInvoice && final) { %>
+    <section class="card">
+      <div class="card-head"><h3>Settlement</h3><%- g.badge(status) %></div>
+      <div class="card-body totals gst-settle">
+        <div class="row-between"><span>Invoice total</span><span><%= g.money(doc.total, cur) %></span></div>
+        <% if (Number(doc.debited)) { %><div class="row-between"><span>Add: debit notes</span><span><%= g.money(doc.debited, cur) %></span></div><% } %>
+        <% if (Number(doc.credited)) { %><div class="row-between"><span>Less: credit notes</span><span>(<%= g.money(doc.credited, cur) %>)</span></div><% } %>
+        <div class="row-between"><span>Less: received</span><span>(<%= g.money(doc.paid, cur) %>)</span></div>
+        <% if (Number(doc.tds)) { %><div class="row-between"><span>Less: TDS deducted</span><span>(<%= g.money(doc.tds, cur) %>)</span></div><% } %>
+        <div class="row-between grand"><span><%= Number(doc.balance) < 0 ? 'Refund due to client' : 'Balance due' %></span><span><%= g.money(Math.abs(doc.balance), cur) %></span></div>
+      </div>
+    </section>
+
+    <section class="card" id="payments">
+      <div class="card-head"><h3>Payments</h3><span class="small muted"><%= activePayments.length %> recorded</span></div>
+      <% if (payments.length) { %>
+      <ul class="list">
+        <% payments.forEach(function (p) { %>
+        <li class="<%= p.status === 'reversed' ? 'is-reversed' : '' %>">
+          <div class="grow">
+            <span class="title"><%= g.money(p.amount, cur) %><%= Number(p.tds) ? ' + TDS ' + g.money(p.tds, cur) : '' %><%= p.status === 'reversed' ? ' · reversed' : '' %></span>
+            <span class="meta"><%= h.date(p.paid_on) %> · <%= C.modeLabel(p.mode) %><%= p.reference ? ' · ' + p.reference : '' %><%= p.tds_section ? ' · TDS u/s ' + p.tds_section + (p.tds_rate ? ' @ ' + Number(p.tds_rate) + '%' : '') : '' %><%= cur !== 'INR' ? ' · ₹' + (p.inr_amount / 100).toFixed(2) + ' credited' : '' %></span>
+            <% if (p.status === 'reversed') { %><span class="meta">Reversed: <%= p.reverse_reason %></span><% } %>
+          </div>
+          <% if (p.status === 'active') { %>
+          <details class="gst-inline-details">
+            <summary class="small muted">Reverse</summary>
+            <form method="post" action="/invoices/payments/<%= p.id %>/reverse" class="mt-8" data-confirm="Reverse this payment? It stays on record and the balance goes back up.">
+              <%- include('../../partials/csrf') %>
+              <input type="text" name="reason" required placeholder="Reason, e.g. cheque bounced" aria-label="Reason" class="mb-8">
+              <button class="btn btn-danger btn-sm" type="submit">Reverse payment</button>
+            </form>
+          </details>
+          <% } %>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+      <% if (open) { %>
+      <form method="post" action="/invoices/docs/<%= doc.id %>/payments" class="card-body" data-payment-form data-taxable="<%= doc.taxable %>" data-balance="<%= doc.balance %>"<%- payments.length ? ' style="border-top:1px solid var(--border)"' : '' %>>
+        <%- include('../../partials/csrf') %>
+        <div class="form-grid">
+          <div class="field"><label for="p-amount">Amount received (<%= cur %>)</label><input id="p-amount" name="amount" type="text" inputmode="decimal" value="<%= g.inputValue(doc.balance) %>" required data-pay-amount></div>
+          <div class="field"><label for="p-date">Date</label><input id="p-date" name="paid_on" type="date" value="<%= h.today() %>" max="<%= h.today() %>"></div>
+          <div class="field"><label for="p-mode">Mode</label><select id="p-mode" name="mode"><% C.PAYMENT_MODES.forEach(function (m) { %><option value="<%= m[0] %>" <%= cur !== 'INR' && m[0] === 'wire' ? 'selected' : '' %>><%= m[1] %></option><% }) %></select></div>
+          <div class="field"><label for="p-ref">Reference no.</label><input id="p-ref" name="reference" type="text" maxlength="190" placeholder="UTR / UPI ref / cheque no."></div>
+          <% if (cur === 'INR') { %>
+          <div class="field full">
+            <label for="p-tds-preset">TDS deducted by the client</label>
+            <div class="gst-tds">
+              <select id="p-tds-preset" name="tds_preset" data-tds-preset aria-label="TDS section">
+                <option value="">No TDS / custom amount</option>
+                <% C.TDS_PRESETS.forEach(function (t) { %><option value="<%= t[0] %>-<%= t[1] %>" data-rate="<%= t[1] %>"><%= t[2] %></option><% }) %>
+              </select>
+              <input name="tds" type="text" inputmode="decimal" placeholder="0.00" aria-label="TDS amount" data-tds-amount>
+            </div>
+            <div class="hint">TDS is worked out on the taxable value (<%= g.money(doc.taxable, cur) %>), not on GST. Picking a section fills the amount and reduces the cash received to match.</div>
+          </div>
+          <% } else { %>
+          <div class="field full"><label for="p-inr">INR credited to the bank (₹)</label><input id="p-inr" name="inr_amount" type="text" inputmode="decimal" placeholder="Leave blank to use ₹<%= Number(doc.exchange_rate).toFixed(4) %> per <%= cur %>"></div>
+          <% } %>
+          <div class="field full"><label for="p-notes">Notes <span class="muted">(internal)</span></label><input id="p-notes" name="notes" type="text" maxlength="1000"></div>
+        </div>
+        <button class="btn btn-block" type="submit">Record payment</button>
+      </form>
+      <% } else if (!payments.length) { %>
+      <div class="empty small"><%= doc.status === 'cancelled' ? 'Cancelled invoices take no payments.' : Number(doc.balance) <= 0 ? 'Nothing left to collect.' : 'No payments yet.' %></div>
+      <% } %>
+    </section>
+    <% } %>
+
+    <% if (final && doc.status !== 'cancelled' && (isInvoice || canEinvoice)) { %>
+    <section class="card">
+      <div class="card-head"><h3>Corrections &amp; e-invoicing</h3></div>
+      <div class="card-body stack">
+        <% if (isInvoice) { %>
+        <p class="small muted mt-0">A finalised invoice is locked. Correct it with a note linked to <%= doc.number %>.</p>
+        <div class="row">
+          <a class="btn btn-ghost btn-sm" href="/invoices/docs/new?kind=credit_note&original=<%= doc.id %>">Credit note<%= creditable > 0 ? '' : ' (nothing left)' %></a>
+          <a class="btn btn-ghost btn-sm" href="/invoices/docs/new?kind=debit_note&original=<%= doc.id %>">Debit note</a>
+        </div>
+        <% } %>
+        <% if (canEinvoice) { %>
+        <p class="small muted mb-0">E-invoicing isn’t switched on (it applies above ₹5 crore turnover). <a href="/invoices/docs/<%= doc.id %>/einvoice.json">Download the IRP request (JSON)</a></p>
+        <% } %>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (notes.length || source || converted) { %>
+    <section class="card">
+      <div class="card-head"><h3>Linked documents</h3></div>
+      <ul class="list">
+        <% if (source) { %><li><div class="grow"><a class="title mono" href="/invoices/docs/<%= source.id %>"><%= source.number %></a><span class="meta">Proforma this invoice came from</span></div></li><% } %>
+        <% if (converted) { %><li><div class="grow"><a class="title mono" href="/invoices/docs/<%= converted.id %>"><%= g.docLabel(converted) %></a><span class="meta">Tax invoice from this proforma</span></div><%- g.badge(g.displayStatus(converted)) %></li><% } %>
+        <% notes.forEach(function (n) { %><li><div class="grow"><a class="title mono" href="/invoices/docs/<%= n.id %>"><%= g.docLabel(n) %></a><span class="meta"><%= g.kindLabel(n.kind) %> · <%= h.date(n.issue_date) %> · <%= g.money(n.total, n.currency) %></span></div><%- g.badge(n.status) %></li><% }) %>
+      </ul>
+    </section>
+    <% } %>
+
+    <section class="card">
+      <div class="card-head"><h3>Audit trail</h3></div>
+      <div class="card-body">
+        <% if (!trail.length) { %><p class="muted small mb-0">Nothing yet.</p><% } else { %>
+        <ul class="timeline">
+          <% trail.forEach(function (a) { %>
+          <li class="k-<%= ['finalised', 'cancelled'].includes(a.action) ? 'status' : a.action === 'emailed' ? 'email' : a.entity_type === 'payment' ? 'call' : 'note' %>">
+            <div class="meta"><%= h.humanize(a.action) %> · <%= a.user_name || 'System' %> · <span title="<%= h.dateTime(a.created_at) %>"><%= h.dateTime(a.created_at) %></span></div>
+            <div class="body"><%= a.summary %></div>
+            <% if (a.changes) { const ch = JSON.parse(a.changes); %><div class="small muted"><% Object.keys(ch).forEach(function (f) { %><div><%= h.humanize(f) %>: <%= ch[f][0] || '—' %> → <%= ch[f][1] || '—' %></div><% }) %></div><% } %>
+          </li>
+          <% }) %>
+        </ul>
+        <% } %>
+      </div>
+    </section>
+
+    <% if (draft) { %>
+    <details>
+      <summary class="small muted" style="cursor:pointer">Discard this draft…</summary>
+      <form method="post" action="/invoices/docs/<%= doc.id %>/discard" class="mt-8" data-confirm="Discard this draft? It’s hidden from lists but kept in the database.">
+        <%- include('../../partials/csrf') %>
+        <button class="btn btn-danger btn-sm" type="submit">Discard draft</button>
+      </form>
+    </details>
+    <% } else if (final && doc.status !== 'cancelled' && doc.status !== 'converted') { %>
+    <details>
+      <summary class="small muted" style="cursor:pointer">Cancel <%= doc.number %>…</summary>
+      <form method="post" action="/invoices/docs/<%= doc.id %>/cancel" class="mt-8" data-confirm="Cancel <%= doc.number %>? It is marked CANCELLED, the number is never reused, and this can’t be undone.">
+        <%- include('../../partials/csrf') %>
+        <p class="small muted mt-0"><%= isInvoice ? 'Only cancel an invoice that hasn’t been reported in GSTR-1 yet. Once reported, issue a credit note instead.' : 'The record and its number are kept.' %></p>
+        <input type="text" name="reason" required maxlength="255" placeholder="Reason, e.g. raised in error, duplicate of HT/26-27/0007" class="mb-8" aria-label="Reason for cancelling">
+        <button class="btn btn-danger btn-sm" type="submit"><%- h.icon('ban', 14) %> Cancel <%= label.toLowerCase() %></button>
+      </form>
+    </details>
+    <% } %>
+  </div>
+</div>
+
+<% if (final && doc.status !== 'cancelled') { %>
+<dialog class="modal" id="email-dialog" aria-labelledby="email-title">
+  <form method="post" action="/invoices/docs/<%= doc.id %>/email">
+    <%- include('../../partials/csrf') %>
+    <div class="modal-head"><h2 id="email-title">Email <%= doc.number %></h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <% if (!mailEnabled) { %><div class="flash flash-info"><%- h.icon('info') %><span>Email isn’t configured on this server (SMTP settings), so the message will be logged but not delivered.</span></div><% } %>
+      <div class="field"><label for="em-to">To</label><input id="em-to" name="to" type="text" value="<%= doc.bill_email || (client && client.email) || '' %>" required placeholder="client@example.com"><div class="hint">Separate several addresses with commas.</div></div>
+      <div class="field"><label for="em-cc">Cc <span class="muted">(optional)</span></label><input id="em-cc" name="cc" type="text" value="<%= profile.email || '' %>"></div>
+      <div class="field"><label for="em-subject">Subject</label><input id="em-subject" name="subject" type="text" value="<%= g.docTitle(doc).replace(/\b\w+/g, function (w) { return w[0] + w.slice(1).toLowerCase(); }) %> <%= doc.number %> from <%= supplier.legal_name %>"></div>
+      <div class="field"><label for="em-message">Message</label><textarea id="em-message" name="message" rows="6"><%= emailMessage %></textarea></div>
+      <label class="check small"><input type="checkbox" name="duplicate" value="1"> Also attach the “Duplicate for supplier” copy</label>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit"><%- h.icon('send', 16) %> Send with PDF</button></div>
+  </form>
+</dialog>
+<% } %>

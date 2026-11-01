@@ -103,6 +103,7 @@ async function runAutomations() {
       reminders: s.auto_reminders === '1' ? await sendReminders(today) : 0,
       lmsCertificates: await syncCertificates(),
       holidays: await require('./holidays').syncIfStale(),
+      gstBackup: await require('./gst/backup').dailyBackup(),
     };
     await setSettings({ automation_last_run: nowSql() });
     return result;

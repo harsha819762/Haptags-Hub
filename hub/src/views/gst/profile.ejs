@@ -1,0 +1,162 @@
+<%
+  const C = g.C;
+  const f = function (key, label, opts) {
+    opts = opts || {};
+    const id = 'p-' + key;
+    const attrs = (opts.mono ? ' class="mono"' : '') + (opts.placeholder ? ' placeholder="' + h.esc(opts.placeholder) + '"' : '') + (errors[key] ? ' aria-invalid="true"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '');
+    const input = opts.textarea
+      ? '<textarea id="' + id + '" name="' + key + '" rows="' + (opts.rows || 3) + '"' + attrs + '>' + h.esc(form[key]) + '</textarea>'
+      : '<input id="' + id + '" name="' + key + '" type="' + (opts.type || 'text') + '" value="' + h.esc(form[key]) + '"' + attrs + '>';
+    return '<div class="field' + (opts.full ? ' full' : '') + '"><label for="' + id + '">' + label + '</label>' + input
+      + (errors[key] ? '<div class="error">' + h.esc(errors[key]) + '</div>' : '') + (opts.hint ? '<div class="hint">' + opts.hint + '</div>' : '') + '</div>';
+  };
+  const stateName = C.stateName(home) || '';
+%>
+<%- include('_nav', { active: 'profile' }) %>
+<div class="page-head">
+  <div><h1>Business profile</h1><div class="sub">Printed on every invoice. Finalised documents keep the details they were issued with.</div></div>
+</div>
+<% if (Object.keys(errors).length) { %><div class="flash flash-error" role="alert"><%- h.icon('alert') %><span>Please fix the highlighted fields. Nothing was saved.</span></div><% } %>
+
+<div class="split gst-split-wide">
+  <form method="post" action="/invoices/profile" class="stack" novalidate>
+    <%- include('../partials/csrf') %>
+    <section class="card card-pad">
+      <h3>GST registration</h3>
+      <p class="small muted mt-0">As on the registration certificate (Form GST REG-06).</p>
+      <div class="form-grid">
+        <%- f('legal_name', 'Legal name *', { max: 190 }) %>
+        <%- f('trade_name', 'Trade name', { max: 190 }) %>
+        <%- f('gstin', 'GSTIN', { mono: true, max: 15, hint: 'Sets your state: ' + h.esc(stateName) + ' (' + h.esc(home) + '). Same-state clients get CGST + SGST, others IGST.' }) %>
+        <%- f('pan', 'PAN', { mono: true, max: 10 }) %>
+        <%- f('constitution', 'Constitution of business', { max: 190 }) %>
+        <%- f('gst_registration_date', 'Registration effective from', { type: 'date', hint: 'Tax invoices can’t be dated before this.' }) %>
+        <%- f('llpin', 'LLPIN', { mono: true, max: 20 }) %>
+        <% if (!form.gstin) { %>
+        <div class="field"><label for="p-state_code">State</label><select id="p-state_code" name="state_code"><% C.GST_STATES.forEach(function (s) { %><option value="<%= s[0] %>" <%= h.selected(form.state_code, s[0]) %>><%= s[0] %> · <%= s[1] %></option><% }) %></select></div>
+        <% } else { %><input type="hidden" name="state_code" value="<%= form.state_code %>"><% } %>
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <h3>Address &amp; contact</h3>
+      <div class="form-grid">
+        <%- f('address', 'Registered address', { textarea: true, rows: 2, full: true, hint: 'Principal place of business, as registered.' }) %>
+        <%- f('city', 'City', { max: 100 }) %>
+        <%- f('pincode', 'PIN code', { max: 12 }) %>
+        <%- f('email', 'Email', { type: 'email', max: 190 }) %>
+        <%- f('phone', 'Phone', { max: 40 }) %>
+        <%- f('website', 'Website', { max: 190, full: true }) %>
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <h3>Bank &amp; UPI</h3>
+      <p class="small muted mt-0">Printed on invoices. The UPI ID adds a QR code for the amount due.</p>
+      <div class="form-grid">
+        <%- f('bank_account_name', 'Account name', { max: 190 }) %>
+        <%- f('bank_account_number', 'Account number', { mono: true, max: 30 }) %>
+        <%- f('bank_ifsc', 'IFSC', { mono: true, max: 11, placeholder: 'HDFC0001234' }) %>
+        <%- f('bank_name', 'Bank', { max: 190 }) %>
+        <%- f('bank_branch', 'Branch', { max: 190 }) %>
+        <%- f('bank_swift', 'SWIFT / BIC (for export invoices)', { mono: true, max: 11 }) %>
+        <%- f('upi_id', 'UPI ID', { mono: true, max: 100, placeholder: 'haptags@hdfcbank' }) %>
+        <%- f('upi_name', 'Name shown in UPI apps', { max: 100 }) %>
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <h3>Exports (LUT)</h3>
+      <p class="small muted mt-0">Export invoices are issued without IGST under your Letter of Undertaking (Form GST RFD-11). File a fresh LUT each financial year.</p>
+      <div class="form-grid">
+        <%- f('lut_number', 'LUT ARN', { mono: true, max: 40, full: true, placeholder: 'e.g. AD290326012345X' }) %>
+        <%- f('lut_valid_from', 'Valid from', { type: 'date' }) %>
+        <%- f('lut_valid_until', 'Valid until', { type: 'date', hint: 'Usually 31 March.' }) %>
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <h3>Authorised signatory</h3>
+      <div class="form-grid">
+        <%- f('signatory_name', 'Name', { max: 190, hint: 'Printed under the signature. Leave blank to print only the stamp.' }) %>
+        <%- f('signatory_designation', 'Designation', { max: 190 }) %>
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <h3>Document defaults</h3>
+      <div class="form-grid">
+        <%- f('invoice_prefix', 'Tax invoice prefix', { mono: true, max: 5, hint: 'e.g. HT → HT/26-27/0001' }) %>
+        <%- f('proforma_prefix', 'Proforma prefix', { mono: true, max: 5 }) %>
+        <%- f('credit_prefix', 'Credit note prefix', { mono: true, max: 5 }) %>
+        <%- f('debit_prefix', 'Debit note prefix', { mono: true, max: 5 }) %>
+        <div class="field"><label for="p-rate">Default GST rate</label><select id="p-rate" name="default_gst_rate"><% C.GST_RATES.forEach(function (r) { %><option value="<%= r %>" <%= Number(form.default_gst_rate) === r ? 'selected' : '' %>><%= r %>%</option><% }) %></select></div>
+        <div class="field"><label for="p-terms-default">Default payment terms</label><select id="p-terms-default" name="default_payment_terms"><% C.PAYMENT_TERMS.forEach(function (t) { %><option value="<%= t[0] %>" <%= h.selected(form.default_payment_terms, t[0]) %>><%= t[0] %></option><% }) %></select></div>
+        <%- f('proforma_valid_days', 'Proforma valid for (days)', { type: 'number' }) %>
+        <%- f('default_terms', 'Default terms & conditions', { textarea: true, rows: 4, full: true }) %>
+      </div>
+    </section>
+
+    <div class="form-actions gst-sticky-actions"><button class="btn" type="submit"><%- h.icon('check', 16) %> Save business profile</button></div>
+  </form>
+
+  <div class="stack">
+    <section class="card" id="images">
+      <div class="card-head"><h3>Logo &amp; signature</h3></div>
+      <div class="card-body stack">
+        <% [['logo', 'Logo', 'Shown top-left on every PDF. Defaults to the Haptags mark.'], ['signature', 'Authorised signature', 'The signed stamp printed in the signatory block of finalised documents.']].forEach(function (img) { const has = img[0] === 'logo' || form.signature_file_id; %>
+        <div>
+          <b class="small"><%= img[1] %></b>
+          <div class="gst-image-preview<%= img[0] === 'signature' ? ' wide' : '' %>">
+            <% if (has) { %><img src="/invoices/profile/image/<%= img[0] %>?v=<%= form[img[0] + '_file_id'] || 'default' %>" alt="<%= img[1] %>"><% } else { %><span class="muted small">None</span><% } %>
+          </div>
+          <form class="row" data-image-upload="/invoices/profile/image/<%= img[0] %>">
+            <input type="file" accept="image/png,image/jpeg" data-file aria-label="Choose <%= img[1].toLowerCase() %> image">
+            <button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('upload', 14) %> Upload</button>
+          </form>
+          <div class="error small" data-upload-error></div>
+          <p class="hint small mb-8"><%= img[2] %> PNG (transparent background is best) or JPEG, up to 2 MB.</p>
+          <% if (form[img[0] + '_file_id']) { %>
+          <form method="post" action="/invoices/profile/image/<%= img[0] %>/remove" data-confirm="<%= img[0] === 'logo' ? 'Go back to the Haptags mark?' : 'Remove the signature image from new documents?' %>"><%- include('../partials/csrf') %><button class="btn-link small" type="submit"><%= img[0] === 'logo' ? 'Reset to Haptags mark' : 'Remove signature' %></button></form>
+          <% } %>
+        </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <section class="card" id="numbering">
+      <div class="card-head"><h3>Numbering · FY <%= fy %></h3></div>
+      <form method="post" action="/invoices/profile/numbering" class="card-body" data-confirm="Move these series forward? Numbers skipped are never used.">
+        <%- include('../partials/csrf') %>
+        <p class="small muted mt-0">Consecutive per financial year, restarting on 1 April. A number is taken on finalising and never reused, even if the document is cancelled.</p>
+        <% series.forEach(function (s) { %>
+        <div class="row-between small mb-8"><span><%= s.label %></span><span class="mono strong"><%= s.next %></span></div>
+        <% }) %>
+        <details class="mt-8">
+          <summary class="small muted" style="cursor:pointer">Continue a series from a later number…</summary>
+          <p class="small muted">For example, if invoices were issued elsewhere this year. Series only move forward.</p>
+          <% series.forEach(function (s) { %>
+          <div class="field"><label for="n-<%= s.kind %>" class="small"><%= s.label %>: next number</label><input id="n-<%= s.kind %>" name="next_<%= s.kind %>" type="number" min="1" max="99999" placeholder="<%= Number(s.next.split('/').pop()) %>"></div>
+          <% }) %>
+          <button class="btn btn-ghost btn-sm" type="submit">Move forward</button>
+        </details>
+      </form>
+    </section>
+
+    <section class="card" id="backups">
+      <div class="card-head"><h3>Backups</h3></div>
+      <div class="card-body">
+        <p class="small muted mt-0">Saved on the server once a day (last 30 kept)<%= form.backup_last_run ? ', last at ' + h.dateTime(form.backup_last_run) : '' %>. Download one regularly and keep it off the server too.</p>
+        <div class="row mb-16">
+          <a class="btn btn-ghost btn-sm" href="/invoices/profile/backup"><%- h.icon('download', 14) %> Download now</a>
+          <form method="post" action="/invoices/profile/backup" class="inline"><%- include('../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit">Save on server now</button></form>
+        </div>
+        <% if (backups.length) { %>
+        <ul class="list gst-backups">
+          <% backups.slice(0, 10).forEach(function (b) { %><li><span class="grow mono small"><%= b.name %></span><span class="small muted"><%= Math.max(1, Math.round(b.size / 1024)) %> KB</span><a class="small" href="/invoices/profile/backups/<%= b.name %>">Download</a></li><% }) %>
+        </ul>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</div>

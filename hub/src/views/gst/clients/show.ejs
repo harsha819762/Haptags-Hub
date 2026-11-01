@@ -1,0 +1,65 @@
+<%- include('../_nav', { active: 'clients' }) %>
+<div class="crumbs"><a href="/invoices/clients">Clients</a> / <%= client.name %></div>
+<div class="page-head">
+  <div>
+    <h1><%= client.name %> <span class="badge tone-<%= client.client_type === 'b2b' ? 'blue' : client.client_type === 'export' ? 'violet' : 'grey' %>"><%= client.client_type.toUpperCase() %></span><% if (!client.is_active) { %> <span class="badge tone-grey">Inactive</span><% } %></h1>
+    <div class="sub"><%= g.C.clientTypeLabel(client.client_type) %><%= client.gstin ? ' · GSTIN ' + client.gstin : '' %></div>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="/invoices/clients/<%= client.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+    <% if (client.is_active) { %>
+    <a class="btn btn-ghost" href="/invoices/docs/new?kind=proforma&client_id=<%= client.id %>">Proforma</a>
+    <a class="btn" href="/invoices/docs/new?kind=invoice&client_id=<%= client.id %>"><%- h.icon('plus', 16) %> Tax invoice</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="label">Invoiced (all time)</div><div class="value"><%= h.inrShort(stats.invoiced) %></div><div class="delta"><%= stats.count %> tax invoice<%= stats.count === 1 ? '' : 's' %>, incl. GST</div></div>
+  <div class="stat"><div class="label">Outstanding</div><div class="value <%= stats.outstanding ? 'down' : '' %>"><%= h.inrShort(stats.outstanding) %></div><div class="delta"><a href="/invoices/reports/outstanding?client=<%= client.id %>">Ageing report →</a></div></div>
+</div>
+
+<div class="split">
+  <section class="card">
+    <div class="card-head"><h3>Documents</h3></div>
+    <% if (!documents.length) { %><div class="empty">No documents for this client yet.</div><% } else { %>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Document</th><th>Date</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th></tr></thead>
+      <tbody><% documents.forEach(function (d) { const st = g.displayStatus(d); %>
+        <tr class="<%= st === 'cancelled' ? 'is-cancelled' : '' %>"><td><a class="strong mono" href="/invoices/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="sub"><%= g.kindLabel(d.kind) %></span></td><td class="nowrap"><%= h.date(d.issue_date) %></td><td class="num"><%= g.money(d.total, d.currency) %></td><td class="num"><%= d.kind === 'invoice' && d.number && st !== 'cancelled' ? g.money(Math.max(0, d.balance), d.currency) : '—' %></td><td><%- g.badge(st) %></td></tr>
+      <% }) %></tbody>
+    </table></div>
+    <% } %>
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Details</h3></div>
+      <div class="card-body">
+        <dl class="dl">
+          <% if (client.client_type === 'export') { %><dt>Country</dt><dd><%= client.country %></dd><% } else { %><dt>State</dt><dd><%= client.state_name || '—' %> (<%= client.state_code || '—' %>)</dd><% } %>
+          <dt>GSTIN</dt><dd class="mono"><%= client.gstin || '—' %></dd>
+          <dt>PAN</dt><dd class="mono"><%= client.pan || '—' %></dd>
+          <dt>Address</dt><dd><%- h.nl2br([client.address, [client.city, client.pincode].filter(Boolean).join(' – ')].filter(Boolean).join('\n')) || '—' %></dd>
+          <dt>Contact</dt><dd><%= client.contact_person || '—' %></dd>
+          <dt>Email</dt><dd><%= client.email || '—' %></dd>
+          <dt>Phone</dt><dd><%= client.phone || '—' %></dd>
+          <% if (client.notes) { %><dt>Notes</dt><dd><%- h.nl2br(client.notes) %></dd><% } %>
+        </dl>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>History</h3></div>
+      <div class="card-body">
+        <ul class="timeline"><% trail.forEach(function (a) { %>
+          <li class="k-note"><div class="meta"><%= h.humanize(a.action) %> · <%= a.user_name || 'System' %> · <%= h.dateTime(a.created_at) %></div><div class="body"><%= a.summary %></div>
+          <% if (a.changes) { const ch = JSON.parse(a.changes); %><div class="small muted"><% Object.keys(ch).forEach(function (f) { %><div><%= h.humanize(f) %>: <%= ch[f][0] || '—' %> → <%= ch[f][1] || '—' %></div><% }) %></div><% } %></li>
+        <% }) %></ul>
+      </div>
+    </section>
+    <form method="post" action="/invoices/clients/<%= client.id %>/active" data-confirm="<%= client.is_active ? 'Hide this client from new documents? Existing documents stay.' : 'Make this client active again?' %>">
+      <%- include('../../partials/csrf') %><input type="hidden" name="active" value="<%= client.is_active ? '0' : '1' %>">
+      <button class="btn btn-ghost btn-sm" type="submit"><%= client.is_active ? 'Deactivate client' : 'Reactivate client' %></button>
+    </form>
+  </div>
+</div>

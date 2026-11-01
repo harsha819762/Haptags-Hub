@@ -28,6 +28,30 @@ haptags.com, which stays as it is.
 Notifications arrive live in any open Hub tab (toasts and badges), and as desktop notifications
 when the tab is in the background.
 
+## GST Invoices (`/invoices`, owners and admins only)
+
+A separate module for tax invoices under CGST Rule 46, with its own clients, services, payments
+and business profile. It has its own sidebar item under **GST**, which only owners and admins see;
+staff get "not allowed" if they open the link.
+
+| Area | What it does |
+|---|---|
+| Business profile | Legal and trade name, GSTIN, PAN, registration date, address, bank, SWIFT and UPI, LUT ARN and validity, signatory, logo and signature, prefixes, default GST rate, payment terms and terms & conditions. It starts from the GST certificate (REG-06, 28/10/2026) and the signed stamp. |
+| Clients | B2B (GSTIN checked, including its check digit, and the state taken from its first two digits), B2C, and export. **Copy from Hub** brings over the Hub's business clients. Clients are deactivated, never deleted. |
+| Services | Saved lines with SAC, unit, rate and GST rate. Pre-loaded with 998314, 998313, 998365 and 999293, all editable. |
+| Tax invoices | `HT/26-27/0001` style numbers, at most 16 characters, consecutive per financial year (April to March). A number is taken on **Finalise** and never reused; a cancelled invoice keeps its number. Same state as the GSTIN: CGST + SGST. Other states: IGST. Overseas: 0% IGST under LUT, in USD, EUR or GBP with the INR equivalent. Tax is worked out per line, totals are rounded to the rupee, and the amount is shown in words (lakh/crore). Finalised documents are locked. |
+| Proformas, notes | Proformas (`PF/…`) convert to a draft tax invoice in one click. Credit notes (`CN/…`) and debit notes (`DN/…`) link to the invoice they adjust and update its balance. |
+| PDF | A4, "TAX INVOICE" / "EXPORT INVOICE" / "PROFORMA INVOICE" / "CREDIT NOTE" / "DEBIT NOTE", marked original for recipient, with an optional duplicate for supplier. Includes the tax summary by SAC, bank details, a UPI QR for the amount due, and the signature. Download, print, or email it to the client as an attachment. |
+| Payments | Full or partial, by UPI, NEFT, RTGS, IMPS, cheque, cash or international wire, with TDS (194J at 10% or 2%, 194C) worked out on the taxable value. A wrong payment is reversed, not deleted. Status is Draft, Unpaid, Partially paid, Paid, Overdue or Cancelled. |
+| Dashboard | Invoiced this month and in the period, collected, outstanding, overdue, and GST split into CGST, SGST and IGST. Also invoiced vs collected per month, top clients and overdue invoices. Filters by date range, financial year, client and status. |
+| Reports | Sales register (Excel/CSV), a GSTR-1 workbook (b2b, b2cl, b2cs, exp, cdnr, cdnur, hsn(b2b), hsn(b2c), docs) and outstanding receivables with ageing. |
+| Safety | An audit log records who did what, when, and from which IP. Documents, lines and payments are never deleted, and database triggers refuse it. A daily gzipped JSON backup goes to `~/haptags-hub-backups` in production (outside the app folder that each deploy replaces), `data/backups/` locally, or `GST_BACKUP_DIR`. The last 30 are kept. A backup can also be downloaded from the profile page. |
+| E-invoicing | Not switched on (needed above ₹5 crore turnover). `src/lib/gst/einvoice.js` builds the IRP request (schema 1.1) from any B2B or export document. The PDF prints the IRN, acknowledgement and signed QR once they are saved. |
+
+The GST module and the older **Invoices** screen share one counter per prefix, and each checks the
+other's numbers, so a number is never issued twice under the GSTIN. To give GST invoices a fresh
+series, change the tax invoice prefix on the Business Profile page.
+
 ### How the real-time parts work
 
 - Browsers long-poll `/api/rt/poll`. This works through Hostinger's proxy, where WebSockets
@@ -133,6 +157,10 @@ src/lib/leads.js          enquiry validation, de-duplication, notifications
 src/routes/public.js      /start, lead API, shareable invoice/quote pages, Razorpay
 src/routes/admin/*        team back office
 src/routes/portal.js      client portal
-src/views/                EJS templates (partials/document.ejs = invoice/quote layout)
+src/lib/gst/              GST Invoices: tax.js (arithmetic), documents.js (draft → finalise → cancel),
+                          numbering.js, payments.js, pdf.js, gstr1.js, reports.js, einvoice.js, backup.js
+src/routes/gst/           /invoices routes (owners and admins)
+src/views/                EJS templates (partials/document.ejs = invoice/quote layout; gst/ = GST Invoices)
 test/flows.test.js        end-to-end tests
+test/gst.test.js          GST Invoices tests
 ```

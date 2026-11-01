@@ -6,7 +6,7 @@ const helmet = require('helmet');
 const cookieSession = require('cookie-session');
 const config = require('./config');
 const { getSettings } = require('./lib/settings');
-const { loadUser, requireStaff, requireClient } = require('./lib/auth');
+const { loadUser, requireStaff, requireAdmin, requireClient } = require('./lib/auth');
 const { csrf, flash, notFound } = require('./lib/middleware');
 const viewHelpers = require('./lib/view-helpers');
 
@@ -102,6 +102,7 @@ app.use(require('./routes/lms'));
 app.use(require('./routes/public'));
 app.use(require('./routes/auth'));
 app.use('/admin', requireStaff, require('./routes/admin'));
+app.use('/invoices', requireAdmin, require('./routes/gst'));
 app.use('/portal', requireClient, require('./routes/portal'));
 
 app.use(notFound);

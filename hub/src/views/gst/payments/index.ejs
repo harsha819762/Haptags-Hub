@@ -1,0 +1,33 @@
+<%- include('../_nav', { active: 'payments' }) %>
+<div class="page-head">
+  <div><h1>Payments</h1><div class="sub">Money received against tax invoices. Record a payment from the invoice’s page.</div></div>
+</div>
+<form method="get" class="gst-list-filters mb-16">
+  <input type="search" name="q" value="<%= q || '' %>" placeholder="Invoice, client, reference…" aria-label="Search payments">
+  <select name="mode" aria-label="Mode" data-autosubmit><option value="">All modes</option><% g.C.PAYMENT_MODES.forEach(function (m) { %><option value="<%= m[0] %>" <%= h.selected(mode, m[0]) %>><%= m[1] %></option><% }) %></select>
+  <input type="date" name="from" value="<%= from || '' %>" aria-label="From date">
+  <input type="date" name="to" value="<%= to || '' %>" aria-label="To date">
+  <button class="btn btn-ghost btn-sm" type="submit">Filter</button>
+</form>
+<p class="small muted"><b><%= h.inr(totals.inr) %></b> received in <%= totals.n %> payment<%= totals.n === 1 ? '' : 's' %><%= from || to ? ' (filtered)' : '' %>, excluding reversed ones.</p>
+<div class="card">
+  <% if (!rows.length) { %><div class="empty"><b>No payments</b>Open an unpaid tax invoice to record one.</div><% } else { %>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Date</th><th>Invoice</th><th>Client</th><th>Mode</th><th class="num">Amount</th><th class="num">TDS</th><th class="hide-sm">Recorded by</th></tr></thead>
+    <tbody>
+      <% rows.forEach(function (p) { %>
+      <tr class="<%= p.status === 'reversed' ? 'is-cancelled' : '' %>">
+        <td class="nowrap"><%= h.date(p.paid_on) %></td>
+        <td><a class="strong mono" href="/invoices/docs/<%= p.document_id %>#payments"><%= p.number %></a><% if (p.status === 'reversed') { %><span class="sub">Reversed: <%= p.reverse_reason %></span><% } %></td>
+        <td><%= p.bill_name %></td>
+        <td><%= g.C.modeLabel(p.mode) %><span class="sub"><%= p.reference || '' %></span></td>
+        <td class="num"><%= g.money(p.amount, p.currency) %><% if (p.currency !== 'INR') { %><span class="sub"><%= h.inr(p.inr_amount) %></span><% } %></td>
+        <td class="num"><%= Number(p.tds) ? g.money(p.tds, p.currency) : '—' %><% if (p.tds_section) { %><span class="sub"><%= p.tds_section %></span><% } %></td>
+        <td class="hide-sm small"><%= p.created_by_name || '' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div>
+  <%- include('../../partials/pager', { pagerBase: '/invoices/payments', pagerQuery: { q: q, mode: mode, from: from, to: to } }) %>
+  <% } %>
+</div>

@@ -1,0 +1,41 @@
+<%- include('../_nav', { active: 'clients' }) %>
+<div class="page-head">
+  <div><h1>Clients</h1><div class="sub">Who you invoice. Their type, state and GSTIN decide how GST is charged.</div></div>
+  <div class="actions">
+    <% if (hubCount) { %>
+    <form method="post" action="/invoices/clients/import-hub" class="inline" data-confirm="Copy <%= hubCount %> active client<%= hubCount === 1 ? '' : 's' %> from the Hub? You can edit each afterwards.">
+      <%- include('../../partials/csrf') %><button class="btn btn-ghost" type="submit"><%- h.icon('download', 16) %> Copy <%= hubCount %> from Hub</button>
+    </form>
+    <% } %>
+    <a class="btn" href="/invoices/clients/new"><%- h.icon('plus', 16) %> New client</a>
+  </div>
+</div>
+<div class="row-between">
+  <nav class="tabs">
+    <% [['', 'All']].concat(g.C.CLIENT_TYPES).forEach(function (t) { %><a href="<%= h.qs('/invoices/clients', { type: t[0], q: q, inactive: showInactive ? '1' : '' }) %>" class="<%= type === t[0] ? 'active' : '' %>"><%= t[0] ? t[0].toUpperCase() : t[1] %></a><% }) %>
+  </nav>
+  <form method="get" class="gst-list-filters mb-16">
+    <input type="hidden" name="type" value="<%= type %>">
+    <input type="search" name="q" value="<%= q || '' %>" placeholder="Name, GSTIN, email, phone…" aria-label="Search clients">
+    <label class="check small"><input type="checkbox" name="inactive" value="1" <%= showInactive ? 'checked' : '' %> data-autosubmit> Show inactive</label>
+  </form>
+</div>
+<div class="card">
+  <% if (!rows.length) { %><div class="empty"><b>No clients<%= q ? ' match “' + q + '”' : ' yet' %></b><a href="/invoices/clients/new">Add a client</a></div><% } else { %>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Client</th><th>Type</th><th>GSTIN</th><th>State / country</th><th class="hide-sm">Contact</th></tr></thead>
+    <tbody>
+      <% rows.forEach(function (c) { %>
+      <tr class="<%= c.is_active ? '' : 'is-cancelled' %>">
+        <td><a class="strong" href="/invoices/clients/<%= c.id %>"><%= c.name %></a><% if (!c.is_active) { %><span class="sub">Inactive</span><% } %></td>
+        <td><span class="badge tone-<%= c.client_type === 'b2b' ? 'blue' : c.client_type === 'export' ? 'violet' : 'grey' %>"><%= c.client_type.toUpperCase() %></span></td>
+        <td class="mono small"><%= c.gstin || '—' %></td>
+        <td><%= c.client_type === 'export' ? c.country : (c.state_name || '—') %><% if (c.state_code && c.client_type !== 'export') { %><span class="sub"><%= c.state_code %></span><% } %></td>
+        <td class="hide-sm small"><%= c.contact_person || '' %><span class="sub"><%= [c.email, c.phone].filter(Boolean).join(' · ') %></span></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div>
+  <%- include('../../partials/pager', { pagerBase: '/invoices/clients', pagerQuery: { type: type, q: q, inactive: showInactive ? '1' : '' } }) %>
+  <% } %>
+</div>

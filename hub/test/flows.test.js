@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-test-'));
 Object.assign(process.env, {
   SQLITE_FILE: path.join(tmp, 'test.sqlite'),
+  GST_BACKUP_DIR: path.join(tmp, 'backups'),
   RAZORPAY_KEY_ID: 'rzp_test_dummy',
   RAZORPAY_KEY_SECRET: 'test_key_secret',
   RAZORPAY_WEBHOOK_SECRET: 'test_webhook_secret',

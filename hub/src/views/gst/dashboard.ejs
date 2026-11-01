@@ -1,0 +1,140 @@
+<%- include('_nav', { active: 'dashboard' }) %>
+<%
+  const k = cards;
+  const diff = k.monthInvoiced - k.lastMonthToDate;
+  const pct = k.lastMonthToDate ? Math.round((diff / k.lastMonthToDate) * 100) : null;
+  const setup = [
+    [!profile.bank_account_number, 'Add bank details so they print on invoices'],
+    [!profile.upi_id, 'Add a UPI ID to print a pay-by-UPI QR code'],
+    [!profile.signature_file_id, 'Upload the authorised signature'],
+    [!profile.lut_number, 'Add your LUT ARN before raising export invoices'],
+  ].filter(function (s) { return s[0]; });
+  const keep = { client: filters.client, status: filters.status };
+%>
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <div class="sub"><%= period.label %><%= filters.client ? ' · ' + ((clients.find(function (c) { return String(c.id) === String(filters.client); }) || {}).name || '') : '' %><%= filters.status ? ' · ' + g.statusLabel(filters.status) : '' %></div>
+  </div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="/invoices/docs/new?kind=proforma"><%- h.icon('quotes', 16) %> Proforma</a>
+    <a class="btn" href="/invoices/docs/new?kind=invoice"><%- h.icon('plus', 16) %> New tax invoice</a>
+  </div>
+</div>
+
+<% if (setup.length) { %>
+<div class="flash flash-info"><%- h.icon('info') %><span><b>Finish the business profile:</b> <%= setup.map(function (s) { return s[1]; }).join(' · ') %>. <a href="/invoices/profile">Open business profile →</a></span></div>
+<% } %>
+<% if (drafts) { %>
+<div class="flash flash-info"><%- h.icon('edit') %><span><%= drafts %> draft<%= drafts === 1 ? '' : 's' %> waiting to be finalised. <a href="/invoices/docs?type=invoice&status=draft">Review drafts →</a></span></div>
+<% } %>
+
+<form method="get" action="/invoices" class="card card-pad gst-filters">
+  <div class="field"><label for="f-fy">Financial year</label>
+    <select id="f-fy" name="fy" data-period-fy><option value="">—</option><% fys.forEach(function (y) { %><option value="<%= y %>" <%= h.selected(filters.fy, y) %>>FY 20<%= y.slice(0, 2) %>–<%= y.slice(3) %></option><% }) %></select></div>
+  <div class="field"><label for="f-from">From</label><input id="f-from" type="date" name="from" value="<%= period.from %>" data-period-date></div>
+  <div class="field"><label for="f-to">To</label><input id="f-to" type="date" name="to" value="<%= period.to %>" data-period-date></div>
+  <div class="field"><label for="f-client">Client</label>
+    <select id="f-client" name="client"><option value="">All clients</option><% clients.forEach(function (c) { %><option value="<%= c.id %>" <%= h.selected(filters.client, c.id) %>><%= c.name %></option><% }) %></select></div>
+  <div class="field"><label for="f-status">Status</label>
+    <select id="f-status" name="status"><option value="">All (not cancelled)</option><% ['unpaid', 'partially_paid', 'overdue', 'paid', 'cancelled'].forEach(function (s) { %><option value="<%= s %>" <%= h.selected(filters.status, s) %>><%= g.statusLabel(s) %></option><% }) %></select></div>
+  <div class="field gst-filter-actions"><button class="btn btn-ghost" type="submit">Apply</button><a class="btn-link small" href="/invoices">Reset</a></div>
+  <nav class="tabs mb-0 full">
+    <% presets.forEach(function (p) { %><a href="<%= h.qs('/invoices', Object.assign({}, keep, { period: p[0] })) %>" class="<%= period.key === p[0] ? 'active' : '' %>"><%= p[1] %></a><% }) %>
+  </nav>
+</form>
+
+<div class="stats gst-stats">
+  <div class="stat hero-stat">
+    <div class="label">Invoiced this month</div>
+    <div class="value"><%= h.inrShort(k.monthInvoiced) %></div>
+    <div class="delta"><% if (pct !== null) { %><b class="<%= diff >= 0 ? 'up' : 'down' %>"><%= diff >= 0 ? '▲' : '▼' %> <%= Math.abs(pct) %>%</b> vs same point last month<% } else { %><%= k.monthCount %> invoice<%= k.monthCount === 1 ? '' : 's' %>, incl. GST<% } %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Invoiced in period</div>
+    <a class="value" href="<%= h.qs('/invoices/docs', { type: 'invoice', from: period.from, to: period.to, client: filters.client }) %>"><%= h.inrShort(k.invoiced) %></a>
+    <div class="delta"><%= k.count %> invoice<%= k.count === 1 ? '' : 's' %> · revenue excl. GST <%= h.inrCompact(k.revenue) %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Collected</div>
+    <a class="value" href="<%= h.qs('/invoices/payments', { from: period.from, to: period.to }) %>"><%= h.inrShort(k.collected) %></a>
+    <div class="delta"><%= k.tds ? 'Plus TDS deducted ' + h.inrShort(k.tds) : 'Received in the period' %></div>
+  </div>
+  <div class="stat">
+    <div class="label">Outstanding</div>
+    <a class="value" href="/invoices/reports/outstanding"><%= h.inrShort(k.outstanding) %></a>
+    <div class="delta"><%= k.openCount %> open invoice<%= k.openCount === 1 ? '' : 's' %> · as of today</div>
+  </div>
+  <div class="stat">
+    <div class="label">Overdue</div>
+    <a class="value <%= k.overdue ? 'down' : '' %>" href="<%= h.qs('/invoices/docs', { type: 'invoice', status: 'overdue' }) %>"><%= h.inrShort(k.overdue) %></a>
+    <div class="delta"><%= k.overdueCount ? k.overdueCount + ' past their due date' : 'Nothing overdue' %></div>
+  </div>
+  <div class="stat">
+    <div class="label">GST collected</div>
+    <div class="value"><%= h.inrShort(k.gst.total) %></div>
+    <div class="gst-split">
+      <span>CGST <b><%= h.inrShort(k.gst.cgst) %></b></span><span>SGST <b><%= h.inrShort(k.gst.sgst) %></b></span><span>IGST <b><%= h.inrShort(k.gst.igst) %></b></span>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Invoiced and collected per month</h2><span class="muted">Incl. GST</span></div>
+      <div class="card-body">
+        <div class="chart-scroll"><%- chart %></div>
+        <details class="table-view">
+          <summary>Show as table</summary>
+          <div class="table-wrap mt-8"><table class="table"><thead><tr><th>Month</th><th class="num">Revenue (excl. GST)</th><th class="num">Invoiced</th><th class="num">Collected</th></tr></thead><tbody>
+            <% series.forEach(function (p) { %><tr><td><%= p.tip %></td><td class="num"><%= h.inr(p.revenue) %></td><td class="num"><%= h.inr(p.a) %></td><td class="num"><%= h.inr(p.b) %></td></tr><% }) %>
+          </tbody></table></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h3>Overdue invoices</h3><a class="small" href="<%= h.qs('/invoices/docs', { type: 'invoice', status: 'overdue' }) %>">All overdue →</a></div>
+      <% if (!overdueAll.length) { %><div class="empty"><b>Nothing overdue</b>Every invoice is within its due date.</div><% } else { %>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Invoice</th><th>Client</th><th>Due</th><th class="num">Days late</th><th class="num">Balance</th></tr></thead>
+        <tbody><% overdueAll.forEach(function (d) { %>
+          <tr><td><a class="strong mono" href="/invoices/docs/<%= d.id %>"><%= d.number %></a></td><td><%= d.bill_name %></td><td class="nowrap"><%= h.date(d.due_date) %></td><td class="num down"><%= d.days %></td><td class="num strong"><%= g.money(d.balance, d.currency) %></td></tr>
+        <% }) %></tbody>
+      </table></div>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Top clients</h3><span class="muted small">Revenue in period</span></div>
+      <% if (!topClients.length) { %><div class="empty">No invoices in this period.</div><% } else { const max = Math.max(1, topClients[0].revenue); %>
+      <div class="card-body meter-list">
+        <% topClients.forEach(function (c) { %>
+        <div class="meter-row">
+          <div class="row-between"><a href="/invoices/clients/<%= c.id %>"><%= c.name %></a><b><%= h.inrShort(c.revenue) %></b></div>
+          <div class="meter"><span style="width:<%= Math.max(2, Math.round(c.revenue / max * 100)) %>%"></span></div>
+          <% if (c.outstanding) { %><div class="small muted mt-8"><%= h.inrShort(c.outstanding) %> outstanding</div><% } %>
+        </div>
+        <% }) %>
+      </div>
+      <% } %>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h3>Recent documents</h3></div>
+      <% if (!recent.length) { %><div class="empty"><b>No documents yet</b><a href="/invoices/docs/new?kind=invoice">Create the first tax invoice</a></div><% } else { %>
+      <ul class="list">
+        <% recent.forEach(function (d) { %>
+        <li>
+          <div class="grow"><a class="title mono" href="/invoices/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="meta"><%= g.kindLabel(d.kind) %> · <%= d.bill_name %> · <%= h.date(d.issue_date) %></span></div>
+          <div class="right"><div class="small strong"><%= g.money(d.total, d.currency) %></div><%- g.badge(g.displayStatus(d, today)) %></div>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </section>
+  </div>
+</div>

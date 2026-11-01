@@ -1,0 +1,58 @@
+<%
+  const C = g.C;
+  const err = function (k) { return errors[k] ? '<div class="error">' + h.esc(errors[k]) + '</div>' : ''; };
+  const inv = function (k) { return errors[k] ? 'aria-invalid="true"' : ''; };
+  const val = function (k) { return client[k] || ''; };
+%>
+<%- include('../_nav', { active: 'clients' }) %>
+<div class="crumbs"><a href="/invoices/clients">Clients</a> / <%= client.id ? client.name : 'New' %></div>
+<div class="page-head"><div><h1><%= client.id ? 'Edit client' : 'New client' %></h1><div class="sub">For a registered business, the GSTIN fills in the state and PAN.</div></div></div>
+
+<form method="post" action="<%= client.id ? '/invoices/clients/' + client.id : '/invoices/clients' %>" class="card card-pad gst-narrow" data-client-form novalidate>
+  <%- include('../../partials/csrf') %>
+  <fieldset class="gst-choice">
+    <legend>Client type</legend>
+    <% C.CLIENT_TYPES.forEach(function (t) { %>
+      <label class="gst-choice-item"><input type="radio" name="client_type" value="<%= t[0] %>" <%= (client.client_type || 'b2b') === t[0] ? 'checked' : '' %> data-client-type><span><b><%= t[0].toUpperCase() %></b> <%= t[1].replace(/\s*\(.*\)/, '') %></span></label>
+    <% }) %>
+  </fieldset>
+
+  <div class="form-grid mt-16">
+    <div class="field full"><label for="c-name">Legal name *</label><input id="c-name" name="name" type="text" maxlength="190" value="<%= val('name') %>" <%- inv('name') %> required><%- err('name') %></div>
+
+    <div class="field" data-type-show="b2b">
+      <label for="c-gstin">GSTIN *</label>
+      <input id="c-gstin" name="gstin" type="text" maxlength="15" class="mono" value="<%= val('gstin') %>" placeholder="29AASFH7857G1ZK" <%- inv('gstin') %> data-gstin autocomplete="off">
+      <div class="hint" data-gstin-status></div><%- err('gstin') %>
+    </div>
+    <div class="field" data-type-show="b2b b2c">
+      <label for="c-state">State *</label>
+      <select id="c-state" name="state_code" <%- inv('state_code') %> data-state>
+        <option value="">— Choose state —</option>
+        <% C.GST_STATES.forEach(function (s) { %><option value="<%= s[0] %>" <%= h.selected(client.state_code, s[0]) %>><%= s[0] %> · <%= s[1] %></option><% }) %>
+      </select>
+      <div class="hint" data-state-hint>Same state as you (<%= profile.gstin ? profile.gstin.slice(0, 2) : profile.state_code %>): CGST + SGST. Another state: IGST.</div><%- err('state_code') %>
+    </div>
+    <div class="field" data-type-show="export">
+      <label for="c-country">Country *</label>
+      <input id="c-country" name="country" type="text" list="countries" maxlength="80" value="<%= client.client_type === 'export' ? val('country') : '' %>" placeholder="e.g. United States" <%- inv('country') %>>
+      <datalist id="countries"><% C.COUNTRIES.forEach(function (c) { if (c[0] !== 'India') { %><option value="<%= c[0] %>"><% } }) %></datalist>
+      <div class="hint">Exports are zero-rated under your LUT: no IGST is charged.</div><%- err('country') %>
+    </div>
+    <div class="field"><label for="c-pan">PAN</label><input id="c-pan" name="pan" type="text" maxlength="10" class="mono" value="<%= val('pan') %>" placeholder="AASFH7857G" <%- inv('pan') %> data-pan><%- err('pan') %></div>
+
+    <div class="field full"><label for="c-address">Billing address</label><textarea id="c-address" name="address" rows="2" maxlength="1000"><%= val('address') %></textarea><div class="hint">Required on invoices to unregistered clients from ₹50,000.</div></div>
+    <div class="field"><label for="c-city">City</label><input id="c-city" name="city" type="text" maxlength="100" value="<%= val('city') %>"></div>
+    <div class="field"><label for="c-pin">PIN / postal code</label><input id="c-pin" name="pincode" type="text" maxlength="12" value="<%= val('pincode') %>"></div>
+
+    <div class="field"><label for="c-contact">Contact person</label><input id="c-contact" name="contact_person" type="text" maxlength="190" value="<%= val('contact_person') %>"></div>
+    <div class="field"><label for="c-email">Email</label><input id="c-email" name="email" type="email" maxlength="190" value="<%= val('email') %>" <%- inv('email') %>><%- err('email') %></div>
+    <div class="field"><label for="c-phone">Phone</label><input id="c-phone" name="phone" type="tel" maxlength="40" value="<%= val('phone') %>"></div>
+    <div class="field full"><label for="c-notes">Notes <span class="muted">(internal)</span></label><textarea id="c-notes" name="notes" rows="2"><%= val('notes') %></textarea></div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit"><%- h.icon('check', 16) %> Save client</button>
+    <% if (!client.id) { %><button class="btn btn-ghost" type="submit" name="then" value="invoice">Save &amp; create invoice</button><% } %>
+    <a class="btn-link" href="<%= client.id ? '/invoices/clients/' + client.id : '/invoices/clients' %>">Cancel</a>
+  </div>
+</form>

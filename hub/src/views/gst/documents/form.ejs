@@ -1,0 +1,175 @@
+<%
+  const C = g.C;
+  const isNote = kind === 'credit_note' || kind === 'debit_note';
+  const label = C.KINDS[kind].label;
+  const type = isNote ? 'notes' : kind;
+  const lines = doc.lines && doc.lines.length ? doc.lines : [{ description: '', quantity: 1, rate: 0, discount: 0, gst_rate: Number(profile.default_gst_rate) || 18 }];
+  const action = doc.id ? '/invoices/docs/' + doc.id : '/invoices/docs';
+  const err = function (k) { return errors[k] ? '<div class="error">' + h.esc(errors[k]) + '</div>' : ''; };
+  const inv = function (k) { return errors[k] ? 'aria-invalid="true"' : ''; };
+  const lineRow = function (l) {
+    l = l || {};
+    let opts = '<option value="">Custom line</option>';
+    items.forEach(function (it) { opts += '<option value="' + it.id + '"' + (String(l.item_id || '') === String(it.id) ? ' selected' : '') + '>' + h.esc(it.name) + '</option>'; });
+    let rates = '';
+    C.GST_RATES.forEach(function (r) { rates += '<option value="' + r + '"' + (Number(l.gst_rate) === r ? ' selected' : '') + '>' + r + '%</option>'; });
+    return '<tr data-line>'
+      + '<td class="c-item"><select name="line_item_id" aria-label="Catalog item" data-line-item>' + opts + '</select></td>'
+      + '<td class="c-desc"><textarea name="line_description" rows="1" placeholder="Description of the service" aria-label="Description" data-autosize>' + h.esc(l.description || '') + '</textarea></td>'
+      + '<td class="c-sac"><input type="text" name="line_sac" value="' + h.esc(l.sac || '') + '" class="mono" inputmode="numeric" maxlength="8" placeholder="998314" aria-label="SAC"></td>'
+      + '<td class="c-qty"><input type="text" name="line_qty" value="' + h.esc(l.quantity !== undefined ? g.qty(l.quantity) : '1') + '" inputmode="decimal" aria-label="Quantity"></td>'
+      + '<td class="c-unit"><input type="text" name="line_unit" value="' + h.esc(l.unit || '') + '" placeholder="Nos" maxlength="20" aria-label="Unit"></td>'
+      + '<td class="c-rate"><input type="text" name="line_rate" value="' + h.esc(g.inputValue(l.rate)) + '" inputmode="decimal" placeholder="0.00" aria-label="Rate"></td>'
+      + '<td class="c-disc"><input type="text" name="line_discount" value="' + h.esc(g.inputValue(l.discount)) + '" placeholder="0 or 10%" aria-label="Discount"></td>'
+      + '<td class="c-gst"><select name="line_gst_rate" aria-label="GST rate">' + rates + '</select></td>'
+      + '<td class="c-amt num" data-line-taxable>—</td>'
+      + '<td class="c-amt num" data-line-tax>—</td>'
+      + '<td class="c-rm"><button class="icon-btn" type="button" data-remove-line aria-label="Remove line">' + h.icon('trash', 15) + '</button></td>'
+      + '</tr>';
+  };
+%>
+<%- include('../_nav', { active: type }) %>
+<div class="crumbs"><a href="/invoices/docs?type=<%= type %>"><%= isNote ? 'Credit & debit notes' : C.KINDS[kind].plural %></a> / <%= doc.id ? 'Edit draft' : 'New' %></div>
+<div class="page-head">
+  <div>
+    <h1><%= doc.id ? 'Edit draft ' + label.toLowerCase() : 'New ' + label.toLowerCase() %></h1>
+    <div class="sub">Gets number <b class="mono"><%= nextNumber %></b> when finalised. Drafts have no number and can be changed freely.</div>
+  </div>
+</div>
+
+<% if (errors.form) { %><div class="flash flash-error" role="alert"><%- h.icon('alert') %><span><%= errors.form %></span></div><% } %>
+<% if (Object.keys(errors).length && !errors.form) { %><div class="flash flash-error" role="alert"><%- h.icon('alert') %><span>Please fix the highlighted fields.</span></div><% } %>
+
+<form method="post" action="<%= action %>" data-gst-editor data-kind="<%= kind %>" novalidate>
+  <%- include('../../partials/csrf') %>
+  <input type="hidden" name="kind" value="<%= kind %>">
+  <script type="application/json" id="gst-editor-data"><%- h.json(editorData) %></script>
+
+  <section class="card card-pad">
+    <div class="form-grid gst-form-3">
+      <% if (isNote) { %>
+        <div class="field full">
+          <label for="original_id">Against tax invoice *</label>
+          <select id="original_id" name="original_id" <%- inv('original_id') %> data-note-original="<%= kind %>" <%= doc.id ? 'disabled' : '' %>>
+            <option value="">— Choose the invoice this note adjusts —</option>
+            <% invoices.forEach(function (i) { %><option value="<%= i.id %>" <%= h.selected(doc.original_id, i.id) %>><%= i.number %> · <%= h.date(i.issue_date) %> · <%= i.bill_name %> · <%= g.money(i.total, i.currency) %></option><% }) %>
+          </select>
+          <% if (doc.id) { %><input type="hidden" name="original_id" value="<%= doc.original_id %>"><% } %>
+          <%- err('original_id') %>
+          <% if (original) { %><div class="hint">Client, place of supply and currency follow <%= original.number %>: <b><%= original.bill_name %></b>, <%= original.pos_name %> (<%= original.pos_code %>), <%= g.supplyLabel(original.supply_type) %><%= original.currency !== 'INR' ? ', ' + original.currency : '' %>.</div><% } else { %><div class="hint">Choosing an invoice copies its lines here; edit them to the amounts being <%= kind === 'credit_note' ? 'credited' : 'charged extra' %>.</div><% } %>
+        </div>
+        <div class="field full">
+          <label for="note_reason">Reason *</label>
+          <input id="note_reason" name="note_reason" type="text" maxlength="255" value="<%= doc.note_reason || '' %>" placeholder="<%= kind === 'credit_note' ? 'e.g. Post-sale discount, deficiency in service, excess billed' : 'e.g. Additional hours, under-billed value' %>" <%- inv('note_reason') %>>
+          <%- err('note_reason') %>
+        </div>
+        <input type="hidden" name="client_id" value="<%= doc.client_id || '' %>">
+      <% } else { %>
+        <div class="field full">
+          <label for="client_id">Client *</label>
+          <select id="client_id" name="client_id" <%- inv('client_id') %> data-client-select>
+            <option value="">— Choose client —</option>
+            <% clients.forEach(function (c) { %><option value="<%= c.id %>" <%= h.selected(doc.client_id, c.id) %>><%= c.name %> · <%= c.client_type === 'export' ? c.country : (c.gstin || 'Unregistered') %></option><% }) %>
+          </select>
+          <%- err('client_id') %>
+          <div class="hint">Not listed? <a href="/invoices/clients/new">Add a client</a> (opens the client form; come back after saving).</div>
+        </div>
+      <% } %>
+
+      <div class="field">
+        <label for="issue_date"><%= kind === 'invoice' ? 'Invoice date' : 'Date' %></label>
+        <input id="issue_date" name="issue_date" type="date" value="<%= doc.issue_date || h.today() %>" max="<%= h.today() %>" data-issue-date>
+      </div>
+      <% if (kind === 'invoice') { %>
+        <div class="field">
+          <label for="payment_terms">Payment terms</label>
+          <select id="payment_terms" name="payment_terms" data-terms-select>
+            <% C.PAYMENT_TERMS.forEach(function (t) { %><option value="<%= t[0] %>" <%= h.selected(doc.payment_terms, t[0]) %>><%= t[0] %></option><% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="due_date">Due date</label>
+          <input id="due_date" name="due_date" type="date" value="<%= doc.due_date || '' %>" <%- inv('due_date') %> data-due-date>
+          <%- err('due_date') %>
+        </div>
+      <% } else if (kind === 'proforma') { %>
+        <div class="field">
+          <label for="due_date">Valid until</label>
+          <input id="due_date" name="due_date" type="date" value="<%= doc.due_date || '' %>" <%- inv('due_date') %>>
+          <%- err('due_date') %>
+        </div>
+      <% } %>
+
+      <% if (!isNote) { %>
+      <div class="field">
+        <label for="pos_code">Place of supply</label>
+        <select id="pos_code" name="pos_code" data-pos-select>
+          <option value="">Client’s state</option>
+          <% C.POS_OPTIONS.forEach(function (s) { %><option value="<%= s[0] %>" <%= h.selected(doc.pos_code, s[0]) %>><%= s[0] %> · <%= s[1] %></option><% }) %>
+        </select>
+        <div class="hint">Defaults to the client’s state. Exports are always 96 · Other Countries.</div>
+      </div>
+      <div class="field" data-export-only>
+        <label for="currency">Currency</label>
+        <select id="currency" name="currency" data-currency>
+          <% Object.keys(C.CURRENCIES).forEach(function (cur) { %><option value="<%= cur %>" <%= h.selected(doc.currency || 'INR', cur) %>><%= cur %></option><% }) %>
+        </select>
+      </div>
+      <div class="field" data-fx-only>
+        <label for="exchange_rate">Exchange rate (₹ per unit)</label>
+        <input id="exchange_rate" name="exchange_rate" type="text" inputmode="decimal" value="<%= doc.exchange_rate && doc.currency !== 'INR' ? doc.exchange_rate : '' %>" placeholder="e.g. 88.2500" <%- inv('exchange_rate') %> data-fx>
+        <%- err('exchange_rate') %>
+        <div class="hint">Use the RBI reference rate or the CBIC notified rate for the invoice date.</div>
+      </div>
+      <% } %>
+      <div class="field full">
+        <label for="subject">Subject <span class="muted">(optional, printed)</span></label>
+        <input id="subject" name="subject" type="text" maxlength="255" value="<%= doc.subject || '' %>" placeholder="e.g. Website redesign — Phase 1">
+      </div>
+    </div>
+    <div class="gst-supply" data-supply aria-live="polite"></div>
+  </section>
+
+  <section class="card mt-16">
+    <div class="card-head"><h3>Lines</h3><span class="muted small">Amounts in <span data-cur-label><%= isNote && original ? original.currency : (doc.currency || 'INR') %></span>, before tax. Tax is worked out per line.</span></div>
+    <div class="card-body">
+      <% if (errors.lines) { %><div class="flash flash-error"><%- h.icon('alert') %><span><%= errors.lines %></span></div><% } %>
+      <div class="gst-lines-wrap">
+      <table class="gst-lines" id="gst-lines">
+        <thead><tr><th class="c-item">Item</th><th class="c-desc">Description</th><th class="c-sac">SAC</th><th class="c-qty">Qty</th><th class="c-unit">Unit</th><th class="c-rate">Rate</th><th class="c-disc">Discount</th><th class="c-gst">GST</th><th class="c-amt num">Taxable</th><th class="c-amt num">Tax</th><th class="c-rm"></th></tr></thead>
+        <tbody>
+          <% lines.forEach(function (l) { %><%- lineRow(l) %><% }) %>
+        </tbody>
+      </table>
+      </div>
+      <template id="gst-line-template"><%- lineRow({ quantity: 1, gst_rate: Number(profile.default_gst_rate) || 18 }) %></template>
+      <button class="btn btn-ghost btn-sm mt-8" type="button" data-add-line><%- h.icon('plus', 14) %> Add line</button>
+
+      <div class="gst-totals-row mt-24">
+        <p class="small muted">Discount: type an amount, or a percentage like <b>10%</b>. GST on each line is rounded to the paisa, then added up; the grand total is rounded to the rupee<span data-fx-note hidden> (foreign-currency invoices aren’t rounded)</span>.</p>
+        <div class="totals" data-totals>
+          <div class="row-between"><span>Taxable value</span><span data-t="taxable">—</span></div>
+          <div class="row-between" data-t-row="cgst"><span>CGST</span><span data-t="cgst">—</span></div>
+          <div class="row-between" data-t-row="sgst"><span>SGST</span><span data-t="sgst">—</span></div>
+          <div class="row-between" data-t-row="igst"><span>IGST</span><span data-t="igst">—</span></div>
+          <div class="row-between" data-t-row="round"><span>Round off</span><span data-t="round">—</span></div>
+          <div class="row-between grand"><span>Total</span><span data-t="total">—</span></div>
+          <div class="row-between small muted" data-t-row="inr" hidden><span>INR equivalent</span><span data-t="inr">—</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card card-pad mt-16">
+    <div class="form-grid">
+      <div class="field"><label for="notes">Notes <span class="muted">(printed)</span></label><textarea id="notes" name="notes" rows="3"><%= doc.notes || '' %></textarea></div>
+      <div class="field"><label for="terms">Terms &amp; conditions <span class="muted">(printed)</span></label><textarea id="terms" name="terms" rows="3"><%= doc.terms || '' %></textarea></div>
+    </div>
+  </section>
+
+  <div class="form-actions mt-16 gst-sticky-actions">
+    <button class="btn btn-ghost" type="submit" name="action" value="draft"><%- h.icon('edit', 16) %> Save draft</button>
+    <button class="btn" type="submit" name="action" value="finalise" data-confirm-click="Finalise this <%= label.toLowerCase() %>? It gets its number and is locked: after this it can only be cancelled or corrected with a note."><%- h.icon('lock', 16) %> Finalise <%= label.toLowerCase() %></button>
+    <a class="btn-link" href="<%= doc.id ? '/invoices/docs/' + doc.id : '/invoices/docs?type=' + type %>">Cancel</a>
+  </div>
+</form>

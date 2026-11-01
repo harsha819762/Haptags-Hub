@@ -30,6 +30,7 @@
         ['/admin/retainers', 'retainers', 'Retainers'],
       ].concat(isAdmin ? [['/admin/finance', 'finance', 'Finance & costs']] : [])
         .concat(isAdmin || locals.isPartner ? [['/admin/partners', 'partners', 'Partners']] : []);
+      const gstItems = isAdmin ? [['/invoices', 'gst', 'GST Invoices']] : [];
       const adminItems = isAdmin ? [
         ['/admin/settings', 'settings', 'Settings'],
         ['/admin/team', 'team', 'Team'],
@@ -52,6 +53,7 @@
       <%- sales.map(link).join('') %>
       <div class="nav-label">Money</div>
       <%- money.map(link).join('') %>
+      <% if (gstItems.length) { %><div class="nav-label">GST</div><%- gstItems.map(link).join('') %><% } %>
       <% if (adminItems.length) { %><div class="nav-label">Admin</div><%- adminItems.map(link).join('') %><% } %>
     </nav>
     <div class="sidebar-foot">
