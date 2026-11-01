@@ -10,6 +10,7 @@ const { emailDocument, defaultMessage, fileName } = require('../../lib/gst/mail'
 const { eligible, buildPayload } = require('../../lib/gst/einvoice');
 const { previewNumber, prefixFor, GstError } = require('../../lib/gst/numbering');
 const { getProfile, homeStateCode } = require('../../lib/gst/profile');
+const { hubClients, gstView, mirror, pickedClient } = require('../../lib/gst/clients');
 const { whereStatus } = require('../../lib/gst/reports');
 const { actor, documentTrail } = require('../../lib/gst/audit');
 const { displayStatus, docTitle } = require('../../lib/gst/format');
@@ -45,7 +46,7 @@ router.get('/', async (req, res) => {
   if (from) query.where('d.issue_date', '>=', from);
   if (to) query.where('d.issue_date', '<=', to);
   if (q) query.where((w) => w.where('d.number', 'like', `%${q}%`).orWhere('d.bill_name', 'like', `%${q}%`).orWhere('d.subject', 'like', `%${q}%`).orWhere('d.bill_gstin', 'like', `%${q}%`));
-  const page = await paginate(query.select('d.*'), req);
+  const page = await paginate(query.leftJoin('gst_clients as gc', 'gc.id', 'd.client_id').select('d.*', 'gc.hub_client_id'), req);
   const tabs = {
     invoice: [['', 'All'], ['open', 'Unpaid'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['draft', 'Drafts'], ['cancelled', 'Cancelled']],
     proforma: [['', 'All'], ['issued', 'Issued'], ['converted', 'Converted'], ['draft', 'Drafts'], ['cancelled', 'Cancelled']],
@@ -59,7 +60,9 @@ router.get('/', async (req, res) => {
 
 async function formData(kind, doc, errors = {}) {
   const profile = await getProfile();
-  const clients = await db('gst_clients').where({ is_active: true }).orWhere({ id: doc.client_id || 0 }).orderBy('name');
+  // The picker lists the Hub's active business clients (and the one already on this draft).
+  if (!doc.hub_client_id && doc.client_id) doc.hub_client_id = (await db('gst_clients').where({ id: doc.client_id }).first() || {}).hub_client_id;
+  const clients = (await hubClients().where((w) => w.where('status', 'active').orWhere('id', doc.hub_client_id || 0)).orderBy('name')).map(gstView);
   const items = await db('gst_items').where({ is_active: true }).orderBy('sort').orderBy('name');
   const invoices = C.NOTE_KINDS.includes(kind)
     ? await db('gst_documents').where({ kind: 'invoice' }).whereNotNull('number').whereNot('status', 'cancelled').orderBy('issue_date', 'desc').orderBy('id', 'desc').limit(500)
@@ -68,12 +71,16 @@ async function formData(kind, doc, errors = {}) {
   const original = doc.original_id ? await db('gst_documents').where({ id: doc.original_id }).first() : null;
   return {
     title: `${doc.id ? 'Edit' : 'New'} ${C.KINDS[kind].label.toLowerCase()} · GST Invoices`,
-    kind, doc, errors, clients, items, invoices, original,
+    kind, doc, errors, items, invoices, original,
+    picked: clients.find((c) => c.id === Number(doc.hub_client_id)) || null,
     home: homeStateCode(profile),
     nextNumber: await previewNumber(prefixFor(kind, profile), doc.issue_date || todayIST()),
     editorData: {
       home: homeStateCode(profile),
-      clients: Object.fromEntries(clients.map((c) => [c.id, { type: c.client_type, state: c.state_code, country: c.country, name: c.name }])),
+      clients: Object.fromEntries(clients.map((c) => [c.id, {
+        name: c.name, type: c.client_type, state: c.state_code, stateName: c.state_name, country: c.country, gstin: c.gstin,
+        city: c.city, contact: c.contact_person, email: c.email, issues: c.issues,
+      }])),
       items: Object.fromEntries(items.map((i) => [i.id, { name: i.name, description: i.description, sac: i.sac, unit: i.unit, rate: Number(i.rate), gst: Number(i.gst_rate) }])),
       terms: Object.fromEntries(C.PAYMENT_TERMS),
       original: original ? { pos: original.pos_code, supply: original.supply_type, currency: original.currency, fx: Number(original.exchange_rate) } : null,
@@ -97,10 +104,10 @@ router.get('/new', async (req, res, next) => {
   }
   if (kind === 'proforma') doc.due_date = addDays(today, Number(profile.proforma_valid_days) || 15);
   if (kind !== 'credit_note' && kind !== 'debit_note') doc.terms = profile.default_terms;
-  const client = await db('gst_clients').where({ id: int(req.query.client_id, 0) }).first();
-  if (client) {
-    doc.client_id = client.id;
-    doc.pos_code = client.client_type === 'export' ? '96' : client.state_code;
+  const hub = await hubClients().where({ id: int(req.query.client_id, 0) }).first();
+  if (hub) {
+    doc.hub_client_id = hub.id;
+    doc.pos_code = gstView(hub).state_code;
   }
   if (C.NOTE_KINDS.includes(kind) && req.query.original) {
     const original = await db('gst_documents').where({ id: int(req.query.original, 0), kind: 'invoice' }).first();
@@ -115,12 +122,20 @@ router.get('/new', async (req, res, next) => {
 });
 
 /** The editor's values after a failed save, so nothing typed is lost. */
-const formState = (kind, id, input, lines) => ({ ...input, id, kind, lines: lines.length ? lines : [] });
+const formState = (kind, id, input, lines, body) => ({
+  ...input, id, kind, lines: lines.length ? lines : [], hub_client_id: body.hub_client_id, client_search: body.client_search,
+});
 
 async function save(req, res, { kind, id = null }) {
   const who = actor(req);
-  const { input, lines, errors } = docs.parseForm(req.body, kind);
-  const rerender = async (errs) => res.status(422).render('gst/documents/form', await formData(kind, formState(kind, id, input, lines), errs));
+  // The picker sends a Hub client; documents point at its GST mirror row.
+  let clientId = req.body.client_id;
+  if (!C.NOTE_KINDS.includes(kind)) {
+    const hub = await pickedClient(req.body);
+    clientId = hub ? await mirror(hub.id) : '';
+  }
+  const { input, lines, errors } = docs.parseForm({ ...req.body, client_id: clientId }, kind);
+  const rerender = async (errs) => res.status(422).render('gst/documents/form', await formData(kind, formState(kind, id, input, lines, req.body), errs));
   if (Object.keys(errors).length) return rerender(errors);
   let docId;
   try {

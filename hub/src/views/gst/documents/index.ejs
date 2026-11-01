@@ -43,7 +43,7 @@
       <tr class="<%= st === 'cancelled' ? 'is-cancelled' : '' %>">
         <td><a class="strong mono" href="/invoices/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="sub"><%= type === 'notes' ? g.kindLabel(d.kind) : (d.subject || '') %></span></td>
         <td class="nowrap"><%= h.date(d.issue_date) %><% if (d.kind === 'invoice' && d.due_date && d.number) { %><span class="sub <%= st === 'overdue' ? 'down' : '' %>">Due <%= h.date(d.due_date) %></span><% } %></td>
-        <td><a href="/invoices/clients/<%= d.client_id %>"><%= d.bill_name %></a><span class="sub mono"><%= d.bill_gstin || (d.client_type === 'export' ? d.bill_country : 'Unregistered') %></span></td>
+        <td><% if (d.hub_client_id) { %><a href="/invoices/clients/<%= d.hub_client_id %>"><%= d.bill_name %></a><% } else { %><%= d.bill_name %><% } %><span class="sub mono"><%= d.bill_gstin || (d.client_type === 'export' ? d.bill_country : 'Unregistered') %></span></td>
         <td class="hide-sm small"><%= d.supply_type === 'intra' ? 'CGST+SGST' : d.supply_type === 'inter' ? 'IGST' : 'Export' %><span class="sub"><%= d.pos_name %> (<%= d.pos_code %>)</span></td>
         <td class="num"><%= g.money(d.total, d.currency) %><% if (d.currency !== 'INR') { %><span class="sub"><%= h.inr(d.inr_total) %></span><% } %></td>
         <% if (type === 'invoice') { %><td class="num <%= d.number && Number(d.balance) > 0 && st !== 'cancelled' ? 'strong' : 'muted' %>"><%= d.number && st !== 'cancelled' ? g.money(Math.max(0, d.balance), d.currency) : '—' %></td><% } %>

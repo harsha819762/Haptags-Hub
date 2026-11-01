@@ -16,6 +16,7 @@ const { GstError, prefixFor, takeNumber } = require('./numbering');
 const { parseGstin } = require('./gstin');
 const { audit, diff } = require('./audit');
 const { money, toMinor } = require('./format');
+const { freshClient } = require('./clients');
 
 const isFinal = (doc) => Boolean(doc.number) && doc.status !== 'draft';
 const isTaxDocument = (kind) => kind !== 'proforma';
@@ -177,7 +178,7 @@ async function saveDraft({ kind, id = null, input, lines, who, extra = {} }) {
   if (!C.KINDS[kind]) throw new GstError('Unknown document type.');
   const profile = await getProfile();
   const original = C.NOTE_KINDS.includes(kind) ? await noteOriginal(input.original_id) : null;
-  const client = await db('gst_clients').where({ id: original ? original.client_id : input.client_id }).first();
+  const client = await freshClient(original ? original.client_id : input.client_id);
   if (!client) throw new GstError('Choose a client.');
   const current = id ? await db('gst_documents').where({ id }).first() : null;
   if (id && (!current || current.kind !== kind || current.status !== 'draft' || current.discarded_at)) throw new GstError('Only drafts can be edited. Finalised documents are corrected with a credit or debit note.');

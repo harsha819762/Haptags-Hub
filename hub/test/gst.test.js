@@ -96,6 +96,7 @@ test.before(async () => {
   await ensureOwner();
   // Tests date documents "today"; keep the registration date out of the way.
   await setProfile({ gst_registration_date: '2017-07-01' });
+  await db('clients').insert({ name: 'Student Only', segment: 'student', status: 'active', country: 'India', created_at: nowSql(), updated_at: nowSql() });
   await db('users').insert({ name: 'Sam Staff', email: 'staff@test.local', role: 'staff', password_hash: await hashPassword('staff-password-1'), is_active: true, token_version: 1, created_at: nowSql(), updated_at: nowSql() });
   const app = require('../src/app');
   await new Promise((resolve) => { server = app.listen(0, resolve); });
@@ -187,18 +188,19 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   assert.equal(r.status, 422);
   r = await b.post('/invoices/clients', { client_type: 'b2b', name: 'Menon Exports Pvt Ltd', gstin: '29AASFH7857G1ZK', state_code: '07', address: '12, Indiranagar', city: 'Bengaluru', pincode: '560038', email: 'asha@menon.test' });
   const kaId = idFrom(r.location);
-  const ka = await db('gst_clients').where({ id: kaId }).first();
-  assert.deepEqual([ka.state_code, ka.state_name, ka.pan], ['29', 'Karnataka', 'AASFH7857G']);
+  // Clients are the Hub's own: the GSTIN set the state and PAN on the Hub client.
+  const ka = await db('clients').where({ id: kaId }).first();
+  assert.deepEqual([ka.segment, ka.state, ka.pan, ka.gstin], ['business', 'Karnataka', 'AASFH7857G', '29AASFH7857G1ZK']);
   r = await b.post('/invoices/clients', { client_type: 'b2b', name: 'Sharma Traders', gstin: '27AAPFU0939F1ZV', address: 'Pune' });
   const mhId = idFrom(r.location);
   r = await b.post('/invoices/clients', { client_type: 'export', name: 'Acme Inc.', country: 'United States', address: '500 Market St', city: 'San Francisco' });
   const usId = idFrom(r.location);
-  assert.equal((await db('gst_clients').where({ id: usId }).first()).state_code, '96');
+  assert.deepEqual(Object.values(await db('clients').where({ id: usId }).first('country', 'state')), ['United States', null]);
 
   // An intra-state invoice: CGST + SGST, saved as a draft (no number yet).
   await b.get('/invoices/docs/new?kind=invoice');
   r = await b.post('/invoices/docs', {
-    kind: 'invoice', action: 'draft', client_id: kaId, issue_date: today, payment_terms: 'Net 15', subject: 'Website',
+    kind: 'invoice', action: 'draft', hub_client_id: kaId, issue_date: today, payment_terms: 'Net 15', subject: 'Website',
     ...lines([{ rate: '1,00,000', disc: '10%' }, { d: 'Consulting', sac: '998313', q: 4, rate: '2500' }]),
   });
   const inv1 = idFrom(r.location);
@@ -218,7 +220,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   assert.equal(JSON.parse(d.supplier_json).gstin, '29AASFH7857G1ZK');
   r = await b.get(`/invoices/docs/${inv1}/edit`);
   assert.equal(r.location, `/invoices/docs/${inv1}`);
-  await b.post(`/invoices/docs/${inv1}`, { kind: 'invoice', action: 'draft', client_id: kaId, ...lines([{ rate: '1' }]) });
+  await b.post(`/invoices/docs/${inv1}`, { kind: 'invoice', action: 'draft', hub_client_id: kaId, ...lines([{ rate: '1' }]) });
   assert.equal((await docRow(inv1)).total, 11800000);
 
   // The document page and PDF (original + duplicate).
@@ -230,13 +232,13 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   assert.equal(pdf.body.subarray(0, 5).toString(), '%PDF-');
 
   // Inter-state: IGST at the full rate.
-  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', client_id: mhId, issue_date: today, payment_terms: 'Net 30', ...lines([{ rate: '50000' }]) });
+  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: mhId, issue_date: today, payment_terms: 'Net 30', ...lines([{ rate: '50000' }]) });
   const inv2 = idFrom(r.location);
   d = await docRow(inv2);
   assert.deepEqual([d.number, d.supply_type, d.igst, d.cgst, d.pos_code], [`HT/${fy}/0002`, 'inter', 900000, 0, '27']);
 
   // Export: refused without an LUT, then 0% IGST in USD with the INR equivalent.
-  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', client_id: usId, issue_date: today, payment_terms: 'Net 30', currency: 'USD', exchange_rate: '88.25', ...lines([{ rate: '4,250' }]) });
+  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: usId, issue_date: today, payment_terms: 'Net 30', currency: 'USD', exchange_rate: '88.25', ...lines([{ rate: '4,250' }]) });
   const inv3 = idFrom(r.location);
   assert.equal((await docRow(inv3)).status, 'draft');
   await setProfile({ lut_number: 'AD2903260012345', lut_valid_from: '2017-07-01', lut_valid_until: addDays(today, 200) });
@@ -250,7 +252,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   r = await b.post(`/invoices/docs/${inv2}/cancel`, { reason: 'Raised in error' });
   d = await docRow(inv2);
   assert.deepEqual([d.status, d.number, d.cancel_reason], ['cancelled', `HT/${fy}/0002`, 'Raised in error']);
-  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', client_id: mhId, issue_date: today, ...lines([{ rate: '1000' }]) });
+  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: mhId, issue_date: today, ...lines([{ rate: '1000' }]) });
   assert.equal((await docRow(idFrom(r.location))).number, `HT/${fy}/0004`);
   // The Hub's older invoice screen shares the series and skips these numbers too.
   assert.equal(await legacyPreview('HT', today), `HT/${fy}/0005`);
@@ -269,7 +271,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   await b.get(`/invoices/docs/new?kind=credit_note&original=${inv1}`);
   r = await b.post('/invoices/docs', { kind: 'credit_note', action: 'finalise', original_id: inv1, note_reason: 'Discount agreed', issue_date: today, ...lines([{ rate: '10000' }]) });
   const cn = await docRow(idFrom(r.location));
-  assert.deepEqual([cn.number, cn.status, cn.original_id, cn.client_id, cn.total], [`CN/${fy}/0001`, 'issued', inv1, kaId, 1180000]);
+  assert.deepEqual([cn.number, cn.status, cn.original_id, cn.client_id, cn.total], [`CN/${fy}/0001`, 'issued', inv1, (await docRow(inv1)).client_id, 1180000]);
   d = await docRow(inv1);
   assert.deepEqual([d.credited, d.balance], [1180000, 4620000]);
   // A credit note can't exceed what is left on the invoice.
@@ -284,7 +286,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   assert.equal((await docRow(inv1)).status, 'paid');
 
   // Proforma: its own series; one click drafts the tax invoice; finalising marks it converted.
-  r = await b.post('/invoices/docs', { kind: 'proforma', action: 'finalise', client_id: kaId, issue_date: today, due_date: addDays(today, 15), ...lines([{ rate: '20000' }]) });
+  r = await b.post('/invoices/docs', { kind: 'proforma', action: 'finalise', hub_client_id: kaId, issue_date: today, due_date: addDays(today, 15), ...lines([{ rate: '20000' }]) });
   const pf = idFrom(r.location);
   assert.equal((await docRow(pf)).number, `PF/${fy}/0001`);
   r = await b.post(`/invoices/docs/${pf}/convert`);
@@ -298,7 +300,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   // Numbers run in date order within a series.
   const yesterday = addDays(today, -1);
   if (financialYear(yesterday) === fy) {
-    r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', client_id: kaId, issue_date: yesterday, ...lines([{ rate: '100' }]) });
+    r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: kaId, issue_date: yesterday, ...lines([{ rate: '100' }]) });
     assert.equal((await docRow(idFrom(r.location))).status, 'draft');
   }
 
@@ -336,6 +338,48 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   assert.deepEqual(actions.sort(), ['cancelled', 'created', 'finalised']);
   assert.ok((await db('gst_audit').where({ action: 'finalised' }).first()).user_name);
   assert.equal((await b.get('/invoices/audit')).status, 200);
+});
+
+test('invoices bill the Hub’s existing clients directly, picked by search', async () => {
+  const b = new Browser();
+  await b.login('owner@test.local', 'owner-password-1');
+  await b.get('/admin/clients/new');
+  // A client added in the Hub's own Clients screen…
+  let r = await b.post('/admin/clients', { name: 'Kumar Textiles', gstin: '27AAPFK1234M1Z0', state: 'Maharashtra', city: 'Pune', country: 'India', email: 'ops@kumar.test' });
+  const hubId = idFrom(r.location);
+  // …is in the invoice editor's client search, with no dropdown and nothing to copy first.
+  const form = await b.get('/invoices/docs/new?kind=invoice');
+  assert.match(form.text, /data-client-search/);
+  assert.doesNotMatch(form.text, /<select[^>]+name="client_id"/);
+  const data = JSON.parse(form.text.match(/<script type="application\/json" id="gst-editor-data">([\s\S]*?)<\/script>/)[1]);
+  assert.deepEqual([data.clients[hubId].name, data.clients[hubId].type, data.clients[hubId].state], ['Kumar Textiles', 'b2b', '27']);
+  assert.ok(!Object.values(data.clients).some((c) => c.name === 'Student Only'));
+  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: hubId, issue_date: today, ...lines([{ rate: '1000' }]) });
+  let d = await docRow(idFrom(r.location));
+  assert.deepEqual([d.status, d.bill_name, d.supply_type, d.pos_code, d.bill_gstin], ['unpaid', 'Kumar Textiles', 'inter', '27', '27AAPFK1234M1Z0']);
+  assert.equal((await db('gst_clients').where({ id: d.client_id }).first()).hub_client_id, hubId);
+  // Without JavaScript, the typed name is enough.
+  r = await b.post('/invoices/docs', { kind: 'invoice', action: 'draft', client_search: 'kumar textiles', issue_date: today, ...lines([{ rate: '500' }]) });
+  d = await docRow(idFrom(r.location));
+  assert.equal(d.bill_name, 'Kumar Textiles');
+  // Editing the Hub client updates the next draft save; the finalised invoice keeps what it printed.
+  await b.get(`/admin/clients/${hubId}/edit`);
+  await b.post(`/admin/clients/${hubId}`, { name: 'Kumar Textiles Pvt Ltd', gstin: '27AAPFK1234M1Z0', state: 'Maharashtra', country: 'India' });
+  await b.post(`/invoices/docs/${d.id}`, { kind: 'invoice', action: 'draft', hub_client_id: hubId, issue_date: today, ...lines([{ rate: '500' }]) });
+  assert.equal((await docRow(d.id)).bill_name, 'Kumar Textiles Pvt Ltd');
+  // The GST client pages are the same Hub clients.
+  assert.match((await b.get('/invoices/clients')).text, /Kumar Textiles Pvt Ltd/);
+  assert.equal((await b.get(`/invoices/clients/${hubId}`)).status, 200);
+
+  // Clients that had been added only inside GST Invoices join the Hub list (by GSTIN match first).
+  await db('gst_clients').insert([
+    { name: 'Kumar dup', client_type: 'b2b', gstin: '27AAPFK1234M1Z0', country: 'India', state_code: '27', is_active: true, created_at: nowSql(), updated_at: nowSql() },
+    { name: 'Only In GST', client_type: 'b2c', country: 'India', state_code: '33', state_name: 'Tamil Nadu', is_active: true, created_at: nowSql(), updated_at: nowSql() },
+  ]);
+  await require('../src/migrations/009_gst_hub_clients').up(db);
+  assert.equal((await db('gst_clients').where({ name: 'Kumar dup' }).first()).hub_client_id, hubId);
+  const moved = await db('clients').where({ name: 'Only In GST' }).first();
+  assert.deepEqual([moved.segment, moved.state], ['business', 'Tamil Nadu']);
 });
 
 test('documents and payments are never deleted, and numbers never change', async () => {

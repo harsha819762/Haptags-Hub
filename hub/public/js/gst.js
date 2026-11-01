@@ -71,7 +71,8 @@
     var tbody = $('#gst-lines tbody', editor);
     var tpl = $('#gst-line-template');
     var kind = editor.getAttribute('data-kind');
-    var clientSel = $('[data-client-select]', editor);
+    var clientId = $('[data-client-id]', editor);
+    var clientSearch = $('[data-client-search]', editor);
     var posSel = $('[data-pos-select]', editor);
     var curSel = $('[data-currency]', editor);
     var fxIn = $('[data-fx]', editor);
@@ -87,7 +88,7 @@
 
     var state = function () {
       if (data.original) return { supply: data.original.supply, currency: data.original.currency, fx: data.original.fx, pos: data.original.pos };
-      var c = clientSel && data.clients[clientSel.value];
+      var c = clientId && data.clients[clientId.value];
       var pos = posSel && posSel.value ? posSel.value : c ? (c.type === 'export' ? '96' : c.state) : '';
       if (c && c.type === 'export') pos = '96';
       var supply = !c && !pos ? null : (c && c.type === 'export') || pos === '96' ? 'export' : pos === data.home ? 'intra' : 'inter';
@@ -159,14 +160,106 @@
     editor.addEventListener('input', function (e) { if (e.target.matches('[data-autosize]')) autosize(e.target); recalc(); });
     editor.addEventListener('change', function (e) {
       if (e.target.matches('[data-line-item]')) fillFromItem(e.target.closest('tr'));
-      if (e.target === clientSel && posSel) {
-        var c = data.clients[clientSel.value];
-        posSel.value = c ? (c.type === 'export' ? '96' : c.state || '') : '';
-        if (c && c.type === 'export' && curSel && curSel.value === 'INR') curSel.value = 'USD';
-        if (c && c.type !== 'export' && curSel) curSel.value = 'INR';
-      }
       recalc();
     });
+
+    // Client picker: type to search the Hub's clients; the pick sets place of supply and currency.
+    var picker = $('[data-client-picker]', editor);
+    if (picker && clientSearch) {
+      var results = $('#client-results', picker);
+      var card = $('[data-client-card]', picker);
+      var ids = Object.keys(data.clients).sort(function (a, b) { return data.clients[a].name.localeCompare(data.clients[b].name); });
+      var matches = [];
+      var active = -1;
+      clientSearch.removeAttribute('list'); // the datalist is only for browsers without JavaScript
+      var el = function (tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
+      var describe = function (c) {
+        if (c.type === 'export') return 'Export · ' + c.country;
+        return (c.type === 'b2b' ? 'B2B · GSTIN ' + c.gstin : 'B2C · unregistered') + (c.stateName ? ' · ' + c.stateName + ' (' + c.state + ')' : '');
+      };
+      var renderCard = function () {
+        var c = data.clients[clientId.value];
+        card.textContent = '';
+        card.hidden = !c;
+        if (!c) return;
+        card.appendChild(el('b', '', c.name));
+        card.appendChild(el('span', '', describe(c)));
+        var contact = [c.contact, c.email].filter(Boolean).join(' · ');
+        if (contact) card.appendChild(el('span', 'muted', contact));
+        if (c.issues && c.issues.length) {
+          var warn = el('span', 'gst-picker-warn', 'Needs fixing before a tax invoice: ' + c.issues.join(', ') + '. ');
+          var fix = el('a', '', 'Edit client');
+          fix.href = '/invoices/clients/' + clientId.value + '/edit';
+          fix.target = '_blank';
+          warn.appendChild(fix);
+          card.appendChild(warn);
+        }
+      };
+      var close = function () { results.hidden = true; clientSearch.setAttribute('aria-expanded', 'false'); active = -1; };
+      var highlight = function () {
+        $$('li', results).forEach(function (li, i) { li.classList.toggle('active', i === active); if (i === active) li.scrollIntoView({ block: 'nearest' }); });
+        if (active >= 0) clientSearch.setAttribute('aria-activedescendant', 'client-opt-' + active); else clientSearch.removeAttribute('aria-activedescendant');
+      };
+      var choose = function (id) {
+        var c = data.clients[id];
+        clientId.value = id;
+        clientSearch.value = c.name;
+        close();
+        if (posSel) posSel.value = c.type === 'export' ? '96' : c.state || '';
+        if (curSel && c.type === 'export' && curSel.value === 'INR') curSel.value = 'USD';
+        if (curSel && c.type !== 'export') curSel.value = 'INR';
+        renderCard();
+        recalc();
+      };
+      var search = function () {
+        var q = clientSearch.value.trim().toLowerCase();
+        matches = ids.filter(function (id) {
+          var c = data.clients[id];
+          return !q || [c.name, c.gstin, c.city, c.contact, c.email].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+        }).slice(0, 8);
+        results.textContent = '';
+        matches.forEach(function (id, i) {
+          var c = data.clients[id];
+          var li = el('li');
+          li.id = 'client-opt-' + i;
+          li.setAttribute('role', 'option');
+          li.appendChild(el('b', '', c.name));
+          li.appendChild(el('span', '', describe(c) + (c.city ? ' · ' + c.city : '')));
+          li.addEventListener('mousedown', function (ev) { ev.preventDefault(); choose(id); });
+          results.appendChild(li);
+        });
+        if (!matches.length) {
+          var none = el('li', 'empty', q ? 'No Hub client matches “' + clientSearch.value.trim() + '”. ' : 'No clients yet. ');
+          var add = el('a', '', 'Add a client');
+          add.href = '/invoices/clients/new';
+          none.appendChild(add);
+          results.appendChild(none);
+        }
+        results.hidden = false;
+        clientSearch.setAttribute('aria-expanded', 'true');
+      };
+      clientSearch.addEventListener('input', function () {
+        var c = data.clients[clientId.value];
+        if (c && clientSearch.value !== c.name) { clientId.value = ''; renderCard(); recalc(); }
+        search();
+      });
+      clientSearch.addEventListener('focus', function () { if (!clientId.value) search(); });
+      clientSearch.addEventListener('blur', function () { setTimeout(close, 150); });
+      clientSearch.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' && results.hidden) { e.preventDefault(); search(); return; }
+        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && matches.length) {
+          e.preventDefault();
+          active = (active + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+          highlight();
+        } else if (e.key === 'Enter' && !results.hidden) {
+          e.preventDefault();
+          if (matches.length) choose(matches[Math.max(0, active)]);
+        } else if (e.key === 'Escape') {
+          close();
+        }
+      });
+      renderCard();
+    }
     editor.addEventListener('click', function (e) {
       if (e.target.closest('[data-add-line]')) {
         e.preventDefault();

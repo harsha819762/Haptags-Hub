@@ -114,7 +114,7 @@
       <div class="card-body meter-list">
         <% topClients.forEach(function (c) { %>
         <div class="meter-row">
-          <div class="row-between"><a href="/invoices/clients/<%= c.id %>"><%= c.name %></a><b><%= h.inrShort(c.revenue) %></b></div>
+          <div class="row-between"><a href="/invoices/clients/<%= c.hub %>"><%= c.name %></a><b><%= h.inrShort(c.revenue) %></b></div>
           <div class="meter"><span style="width:<%= Math.max(2, Math.round(c.revenue / max * 100)) %>%"></span></div>
           <% if (c.outstanding) { %><div class="small muted mt-8"><%= h.inrShort(c.outstanding) %> outstanding</div><% } %>
         </div>

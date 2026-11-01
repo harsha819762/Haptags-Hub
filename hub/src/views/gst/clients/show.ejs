@@ -6,6 +6,7 @@
     <div class="sub"><%= g.C.clientTypeLabel(client.client_type) %><%= client.gstin ? ' · GSTIN ' + client.gstin : '' %></div>
   </div>
   <div class="actions">
+    <a class="btn btn-ghost" href="/admin/clients/<%= client.id %>"><%- h.icon('external', 16) %> Open in Hub</a>
     <a class="btn btn-ghost" href="/invoices/clients/<%= client.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
     <% if (client.is_active) { %>
     <a class="btn btn-ghost" href="/invoices/docs/new?kind=proforma&client_id=<%= client.id %>">Proforma</a>
@@ -14,6 +15,9 @@
   </div>
 </div>
 
+<% if (client.issues.length) { %>
+<div class="flash flash-error"><%- h.icon('alert') %><span>Before a tax invoice can be finalised for this client: <%= client.issues.join(', ') %>. <a href="/invoices/clients/<%= client.id %>/edit">Fix the client’s details</a></span></div>
+<% } %>
 <div class="stats">
   <div class="stat"><div class="label">Invoiced (all time)</div><div class="value"><%= h.inrShort(stats.invoiced) %></div><div class="delta"><%= stats.count %> tax invoice<%= stats.count === 1 ? '' : 's' %>, incl. GST</div></div>
   <div class="stat"><div class="label">Outstanding</div><div class="value <%= stats.outstanding ? 'down' : '' %>"><%= h.inrShort(stats.outstanding) %></div><div class="delta"><a href="/invoices/reports/outstanding?client=<%= client.id %>">Ageing report →</a></div></div>
@@ -57,9 +61,6 @@
         <% }) %></ul>
       </div>
     </section>
-    <form method="post" action="/invoices/clients/<%= client.id %>/active" data-confirm="<%= client.is_active ? 'Hide this client from new documents? Existing documents stay.' : 'Make this client active again?' %>">
-      <%- include('../../partials/csrf') %><input type="hidden" name="active" value="<%= client.is_active ? '0' : '1' %>">
-      <button class="btn btn-ghost btn-sm" type="submit"><%= client.is_active ? 'Deactivate client' : 'Reactivate client' %></button>
-    </form>
+    <p class="small muted">Projects, quotes, the client portal and active/inactive status are managed in the <a href="/admin/clients/<%= client.id %>">Hub’s client page</a>.</p>
   </div>
 </div>

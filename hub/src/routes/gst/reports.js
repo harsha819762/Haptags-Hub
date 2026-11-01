@@ -59,13 +59,13 @@ router.get('/gstr1.xlsx', async (req, res) => {
 });
 
 router.get('/outstanding', async (req, res) => {
-  const report = await outstanding({ clientId: int(req.query.client, 0) || null });
+  const report = await outstanding({ hubClientId: int(req.query.client, 0) || null });
   res.render('gst/reports/outstanding', { title: 'Outstanding receivables · GST Invoices', report });
 });
 
 router.get('/outstanding.:ext', async (req, res, next) => {
   if (!['csv', 'xlsx'].includes(req.params.ext)) return next();
-  const report = await outstanding({ clientId: int(req.query.client, 0) || null });
+  const report = await outstanding({ hubClientId: int(req.query.client, 0) || null });
   const sheet = outstandingSheet(report);
   await audit(actor(req), { entity: 'report', action: 'exported', summary: `Outstanding receivables exported (${req.params.ext}, ${report.items.length} invoices)` });
   const name = `outstanding-${report.today}.${req.params.ext}`;

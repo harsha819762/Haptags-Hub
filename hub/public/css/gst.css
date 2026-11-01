@@ -33,6 +33,21 @@
 .table tr.is-cancelled td, .list li.is-reversed { color: var(--text-3); }
 .table tr.is-cancelled a.strong { color: var(--text-3); text-decoration: line-through; }
 
+/* Client picker (search the Hub's clients) */
+.gst-picker { position: relative; }
+.gst-picker-box { position: relative; }
+.gst-picker-box .ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+.gst-picker-box input { padding-left: 36px; }
+.gst-picker-results { position: absolute; z-index: 30; left: 0; right: 0; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); max-height: 320px; overflow-y: auto; }
+.gst-picker-results li { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.gst-picker-results li span { font-size: 12.5px; color: var(--text-3); }
+.gst-picker-results li:hover, .gst-picker-results li.active { background: var(--blue-50); }
+.gst-picker-results li.empty { cursor: default; color: var(--text-3); font-size: 13.5px; display: block; }
+.gst-picker-results li.empty:hover { background: none; }
+.gst-picker-card { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); font-size: 13.5px; }
+.gst-picker-card b { font-size: 14.5px; }
+.gst-picker-warn { color: var(--red); font-weight: 600; margin-top: 4px; }
+
 /* Editor */
 .gst-form-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .gst-supply { margin-top: 2px; padding: 10px 14px; border-radius: 10px; background: var(--grey-bg); color: var(--text-2); font-weight: 600; font-size: 13.5px; }

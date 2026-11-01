@@ -15,7 +15,7 @@
 <div class="page-head">
   <div>
     <h1 class="gst-title"><span class="mono"><%= doc.number || 'Draft ' + label.toLowerCase() %></span> <%- g.badge(status) %><% if (final && doc.status !== 'cancelled') { %><span class="gst-lock" title="Finalised and locked"><%- h.icon('lock', 15) %> Locked</span><% } %></h1>
-    <div class="sub"><%= g.docTitle(doc) %> · <a href="/invoices/clients/<%= doc.client_id %>"><%= doc.bill_name %></a> · <%= h.date(doc.issue_date) %> · <%= g.supplyLabel(doc.supply_type) %></div>
+    <div class="sub"><%= g.docTitle(doc) %> · <a href="/invoices/clients/<%= client.hub_client_id %>"><%= doc.bill_name %></a> · <%= h.date(doc.issue_date) %> · <%= g.supplyLabel(doc.supply_type) %></div>
   </div>
   <div class="actions">
     <% if (doc.discarded_at) { %>

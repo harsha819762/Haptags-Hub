@@ -65,14 +65,20 @@
         </div>
         <input type="hidden" name="client_id" value="<%= doc.client_id || '' %>">
       <% } else { %>
-        <div class="field full">
-          <label for="client_id">Client *</label>
-          <select id="client_id" name="client_id" <%- inv('client_id') %> data-client-select>
-            <option value="">— Choose client —</option>
-            <% clients.forEach(function (c) { %><option value="<%= c.id %>" <%= h.selected(doc.client_id, c.id) %>><%= c.name %> · <%= c.client_type === 'export' ? c.country : (c.gstin || 'Unregistered') %></option><% }) %>
-          </select>
+        <div class="field full gst-picker" data-client-picker>
+          <label for="client_search">Client *</label>
+          <input type="hidden" name="hub_client_id" value="<%= picked ? picked.id : (doc.hub_client_id || '') %>" data-client-id>
+          <div class="gst-picker-box">
+            <%- h.icon('search', 16) %>
+            <input id="client_search" name="client_search" type="text" autocomplete="off" spellcheck="false" list="client-names"
+              value="<%= picked ? picked.name : (doc.client_search || '') %>" placeholder="Type a client’s name, GSTIN or city"
+              role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="client-results" <%- inv('client_id') %> data-client-search>
+          </div>
+          <datalist id="client-names"><% Object.keys(editorData.clients).forEach(function (id) { %><option value="<%= editorData.clients[id].name %>"><% }) %></datalist>
+          <ul class="gst-picker-results" id="client-results" role="listbox" hidden></ul>
+          <div class="gst-picker-card" data-client-card hidden></div>
           <%- err('client_id') %>
-          <div class="hint">Not listed? <a href="/invoices/clients/new">Add a client</a> (opens the client form; come back after saving).</div>
+          <div class="hint">Your Hub clients (<%= Object.keys(editorData.clients).length %>). Not there? <a href="/invoices/clients/new">Add a client</a>.</div>
         </div>
       <% } %>
 
@@ -107,7 +113,7 @@
           <option value="">Client’s state</option>
           <% C.POS_OPTIONS.forEach(function (s) { %><option value="<%= s[0] %>" <%= h.selected(doc.pos_code, s[0]) %>><%= s[0] %> · <%= s[1] %></option><% }) %>
         </select>
-        <div class="hint">Defaults to the client’s state. Exports are always 96 · Other Countries.</div>
+        <div class="hint">Follows the client’s state. Exports are always 96 · Other Countries.</div>
       </div>
       <div class="field" data-export-only>
         <label for="currency">Currency</label>

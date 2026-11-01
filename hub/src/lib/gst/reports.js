@@ -8,6 +8,7 @@ const { todayIST, daysBetween, addMonths, financialYear } = require('../util');
 const { monthsBetween, monthLabel } = require('../period');
 const { displayStatus } = require('./format');
 const C = require('./constants');
+const { hubIds } = require('./clients');
 
 const OPEN = ['unpaid', 'partially_paid'];
 const toInr = (doc, minor) => (doc.currency === 'INR' ? Number(minor) : Math.round(Number(minor) * Number(doc.exchange_rate)));
@@ -85,6 +86,8 @@ async function dashboard({ from, to, clientId = null, status = '' }) {
     clients.set(d.client_id, c);
   }
   const topClients = [...clients.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 6);
+  const hubs = await hubIds(topClients.map((c) => c.id));
+  for (const c of topClients) c.hub = hubs[c.id];
 
   const overdueAll = (await whereStatus(invoices({ clientId }), 'overdue', today).orderBy('due_date').limit(10))
     .map((d) => ({ ...d, days: daysBetween(d.due_date, today), inrBalance: toInr(d, d.balance) }));
@@ -171,10 +174,11 @@ function bucket(days) {
   return '90+';
 }
 
-/** Open invoices with ageing, and a per-client summary. */
-async function outstanding({ clientId = null } = {}) {
+/** Open invoices with ageing, and a per-client summary. hubClientId narrows it to one Hub client. */
+async function outstanding({ hubClientId = null } = {}) {
   const today = todayIST();
-  const q = invoices({ clientId }).whereIn('status', OPEN).where('balance', '>', 0).orderBy('due_date').orderBy('seq');
+  const q = invoices().whereIn('status', OPEN).where('balance', '>', 0).orderBy('due_date').orderBy('seq');
+  if (hubClientId) q.whereIn('client_id', db('gst_clients').where({ hub_client_id: hubClientId }).select('id'));
   const docs = await q;
   const items = docs.map((d) => {
     const days = d.due_date ? daysBetween(d.due_date, today) : 0;
@@ -189,6 +193,8 @@ async function outstanding({ clientId = null } = {}) {
     byClient.set(it.client_id, c);
   }
   const clients = [...byClient.values()].sort((a, b) => b.total - a.total);
+  const hubs = await hubIds(clients.map((c) => c.id));
+  for (const c of clients) c.hub = hubs[c.id];
   const totals = { total: 0, ...Object.fromEntries(BUCKETS.map((b) => [b[0], 0])) };
   for (const c of clients) { totals.total += c.total; for (const [k] of BUCKETS) totals[k] += c[k]; }
   return { today, items, clients, totals, buckets: BUCKETS };
