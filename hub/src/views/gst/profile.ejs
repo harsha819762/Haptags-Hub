@@ -110,7 +110,7 @@
           <div class="gst-image-preview<%= img[0] === 'signature' ? ' wide' : '' %>">
             <% if (has) { %><img src="/invoices/profile/image/<%= img[0] %>?v=<%= form[img[0] + '_file_id'] || 'default' %>" alt="<%= img[1] %>"><% } else { %><span class="muted small">None</span><% } %>
           </div>
-          <form class="row" data-image-upload="/invoices/profile/image/<%= img[0] %>">
+          <form class="gst-upload" data-image-upload="/invoices/profile/image/<%= img[0] %>">
             <input type="file" accept="image/png,image/jpeg" data-file aria-label="Choose <%= img[1].toLowerCase() %> image">
             <button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('upload', 14) %> Upload</button>
           </form>
