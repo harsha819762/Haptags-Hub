@@ -39,7 +39,7 @@ staff get "not allowed" if they open the link.
 | Business profile | Legal and trade name, GSTIN, PAN, registration date, address, bank, SWIFT and UPI, LUT ARN and validity, signatory, logo and signature, prefixes, default GST rate, payment terms and terms & conditions. It starts from the GST certificate (REG-06, 28/10/2026) and the signed stamp. |
 | Clients | The Hub's own business clients: one list, no copying. On an invoice you find the client by typing a name, GSTIN or city. Each client is B2B (GSTIN checked, including its check digit, with the state taken from its first two digits), B2C, or export (outside India). Clients with a missing state or an invalid GSTIN are flagged. Adding or editing a client here updates the Hub's Clients. |
 | Services | Saved lines with SAC, unit, rate and GST rate. Pre-loaded with 998314, 998313, 998365 and 999293, all editable. |
-| Tax invoices | `HT/26-27/0001` style numbers, at most 16 characters, consecutive per financial year (April to March). A number is taken on **Finalise** and never reused; a cancelled invoice keeps its number. Same state as the GSTIN: CGST + SGST. Other states: IGST. Overseas: 0% IGST under LUT, in USD, EUR or GBP with the INR equivalent. Tax is worked out per line, totals are rounded to the rupee, and the amount is shown in words (lakh/crore). Finalised documents are locked. |
+| Tax invoices | `HTG/26-27/0001` style numbers, at most 16 characters, consecutive per financial year (April to March). A number is taken on **Finalise** and never reused; a cancelled invoice keeps its number. Same state as the GSTIN: CGST + SGST. Other states: IGST. Overseas: 0% IGST under LUT, in USD, EUR or GBP with the INR equivalent. Tax is worked out per line, totals are rounded to the rupee, and the amount is shown in words (lakh/crore). Finalised documents are locked. |
 | Proformas, notes | Proformas (`PF/…`) convert to a draft tax invoice in one click. Credit notes (`CN/…`) and debit notes (`DN/…`) link to the invoice they adjust and update its balance. |
 | PDF | A4, "TAX INVOICE" / "EXPORT INVOICE" / "PROFORMA INVOICE" / "CREDIT NOTE" / "DEBIT NOTE", marked original for recipient, with an optional duplicate for supplier. Includes the tax summary by SAC, bank details, a UPI QR for the amount due, and the signature. Download, print, or email it to the client as an attachment. |
 | Payments | Full or partial, by UPI, NEFT, RTGS, IMPS, cheque, cash or international wire, with TDS (194J at 10% or 2%, 194C) worked out on the taxable value. A wrong payment is reversed, not deleted. Status is Draft, Unpaid, Partially paid, Paid, Overdue or Cancelled. |
@@ -48,9 +48,9 @@ staff get "not allowed" if they open the link.
 | Safety | An audit log records who did what, when, and from which IP. Documents, lines and payments are never deleted, and database triggers refuse it. A daily gzipped JSON backup goes to `~/haptags-hub-backups` in production (outside the app folder that each deploy replaces), `data/backups/` locally, or `GST_BACKUP_DIR`. The last 30 are kept. A backup can also be downloaded from the profile page. |
 | E-invoicing | Not switched on (needed above ₹5 crore turnover). `src/lib/gst/einvoice.js` builds the IRP request (schema 1.1) from any B2B or export document. The PDF prints the IRN, acknowledgement and signed QR once they are saved. |
 
-The GST module and the older **Invoices** screen share one counter per prefix, and each checks the
-other's numbers, so a number is never issued twice under the GSTIN. To give GST invoices a fresh
-series, change the tax invoice prefix on the Business Profile page.
+GST tax invoices have a series of their own (`HTG/26-27/0001`), separate from the older
+**Invoices** screen's `HT` and `HTE`. The Business Profile won't accept a prefix those screens use,
+and both screens still check each other's numbers, so a number is never issued twice under the GSTIN.
 
 ### How the real-time parts work
 

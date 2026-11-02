@@ -9,6 +9,7 @@ const { previewNumber, advanceSeries, MAX_LENGTH } = require('../../lib/gst/numb
 const { gzipped, writeBackup, listBackups, backupPath } = require('../../lib/gst/backup');
 const { actor, audit, diff } = require('../../lib/gst/audit');
 const { str, isDate, isEmail, int, todayIST, financialYear } = require('../../lib/util');
+const { getSettings } = require('../../lib/settings');
 const { sendFile } = require('./_helpers');
 
 const router = express.Router();
@@ -22,7 +23,8 @@ const FIELDS = [
 const PREFIXES = ['invoice_prefix', 'proforma_prefix', 'credit_prefix', 'debit_prefix'];
 const DATES = ['gst_registration_date', 'lut_valid_from', 'lut_valid_until'];
 
-function parseProfile(body) {
+/** hubPrefixes: the series of the Hub's own invoice and quotation screens, which GST must not reuse. */
+function parseProfile(body, hubPrefixes = []) {
   const v = {};
   for (const f of FIELDS) v[f] = str(body[f], f === 'default_terms' || f === 'address' ? 3000 : 190) || '';
   const errors = {};
@@ -53,6 +55,11 @@ function parseProfile(body) {
     if (!/^[A-Z0-9]{1,5}$/.test(v[p])) errors[p] = 'Up to 5 letters or digits, so numbers stay within 16 characters.';
   }
   if (new Set(PREFIXES.map((p) => v[p])).size < PREFIXES.length) errors.debit_prefix = 'Each document type needs its own prefix.';
+  for (const p of PREFIXES) {
+    if (!errors[p] && hubPrefixes.map((x) => String(x || '').toUpperCase()).includes(v[p])) {
+      errors[p] = `${v[p]} is used by the Hub’s older Invoices or Quotations screen. Use another prefix so GST documents stay a separate series.`;
+    }
+  }
   if (!C.GST_RATES.includes(Number(v.default_gst_rate))) v.default_gst_rate = '18';
   if (!C.PAYMENT_TERMS.some((t) => t[0] === v.default_payment_terms)) v.default_payment_terms = DEFAULTS.default_payment_terms;
   v.proforma_valid_days = String(Math.min(365, Math.max(1, int(v.proforma_valid_days, 15))));
@@ -74,7 +81,8 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const before = await getProfile();
-  const { values, errors } = parseProfile(req.body);
+  const hub = await getSettings();
+  const { values, errors } = parseProfile(req.body, [hub.invoice_prefix, hub.edu_invoice_prefix, hub.quote_prefix]);
   if (Object.keys(errors).length) {
     return res.status(422).render('gst/profile', { title: 'Business profile · GST Invoices', form: { ...before, ...values }, errors, ...(await pageData(before)) });
   }

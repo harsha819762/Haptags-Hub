@@ -42,7 +42,7 @@ const DEFAULTS = {
   logo_file_id: '',
   signature_file_id: '',
 
-  invoice_prefix: 'HT',
+  invoice_prefix: 'HTG', // GST tax invoices have their own series; HT belongs to the Hub's older Invoices screen
   proforma_prefix: 'PF',
   credit_prefix: 'CN',
   debit_prefix: 'DN',

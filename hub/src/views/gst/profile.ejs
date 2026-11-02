@@ -86,7 +86,7 @@
     <section class="card card-pad">
       <h3>Document defaults</h3>
       <div class="form-grid">
-        <%- f('invoice_prefix', 'Tax invoice prefix', { mono: true, max: 5, hint: 'e.g. HT → HT/26-27/0001' }) %>
+        <%- f('invoice_prefix', 'Tax invoice prefix', { mono: true, max: 5, hint: 'e.g. HTG → HTG/26-27/0001. Must differ from the older Invoices screen’s prefix.' }) %>
         <%- f('proforma_prefix', 'Proforma prefix', { mono: true, max: 5 }) %>
         <%- f('credit_prefix', 'Credit note prefix', { mono: true, max: 5 }) %>
         <%- f('debit_prefix', 'Debit note prefix', { mono: true, max: 5 }) %>

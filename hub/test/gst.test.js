@@ -153,7 +153,7 @@ test('business profile starts from the GST certificate, with the signature', asy
   assert.equal(p.legal_name, 'HAPTAGS LLP');
   assert.equal(p.gstin, '29AASFH7857G1ZK');
   assert.equal(p.pan, 'AASFH7857G');
-  assert.equal(p.invoice_prefix, 'HT');
+  assert.equal(p.invoice_prefix, 'HTG');
   const sig = await db('files').where({ id: Number(p.signature_file_id) }).first();
   assert.equal(sig.mime, 'image/png');
   assert.ok(Number(sig.size) > 1000);
@@ -214,7 +214,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   // Finalise: number HT/FY/0001, locked, supplier details frozen.
   r = await b.post(`/invoices/docs/${inv1}/finalise`);
   d = await docRow(inv1);
-  assert.equal(d.number, `HT/${fy}/0001`);
+  assert.equal(d.number, `HTG/${fy}/0001`);
   assert.ok(d.number.length <= 16);
   assert.equal(d.status, 'unpaid');
   assert.equal(JSON.parse(d.supplier_json).gstin, '29AASFH7857G1ZK');
@@ -235,7 +235,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: mhId, issue_date: today, payment_terms: 'Net 30', ...lines([{ rate: '50000' }]) });
   const inv2 = idFrom(r.location);
   d = await docRow(inv2);
-  assert.deepEqual([d.number, d.supply_type, d.igst, d.cgst, d.pos_code], [`HT/${fy}/0002`, 'inter', 900000, 0, '27']);
+  assert.deepEqual([d.number, d.supply_type, d.igst, d.cgst, d.pos_code], [`HTG/${fy}/0002`, 'inter', 900000, 0, '27']);
 
   // Export: refused without an LUT, then 0% IGST in USD with the INR equivalent.
   r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: usId, issue_date: today, payment_terms: 'Net 30', currency: 'USD', exchange_rate: '88.25', ...lines([{ rate: '4,250' }]) });
@@ -244,18 +244,18 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   await setProfile({ lut_number: 'AD2903260012345', lut_valid_from: '2017-07-01', lut_valid_until: addDays(today, 200) });
   await b.post(`/invoices/docs/${inv3}/finalise`);
   d = await docRow(inv3);
-  assert.deepEqual([d.number, d.supply_type, d.currency, d.igst, d.total, d.inr_total, d.lut_number], [`HT/${fy}/0003`, 'export', 'USD', 0, 425000, 37506250, 'AD2903260012345']);
+  assert.deepEqual([d.number, d.supply_type, d.currency, d.igst, d.total, d.inr_total, d.lut_number], [`HTG/${fy}/0003`, 'export', 'USD', 0, 425000, 37506250, 'AD2903260012345']);
   const expPdf = await b.get(`/invoices/docs/${inv3}/pdf`, { binary: true });
   assert.equal(expPdf.body.subarray(0, 5).toString(), '%PDF-');
 
   // Cancelling keeps the number; the next invoice never reuses it.
   r = await b.post(`/invoices/docs/${inv2}/cancel`, { reason: 'Raised in error' });
   d = await docRow(inv2);
-  assert.deepEqual([d.status, d.number, d.cancel_reason], ['cancelled', `HT/${fy}/0002`, 'Raised in error']);
+  assert.deepEqual([d.status, d.number, d.cancel_reason], ['cancelled', `HTG/${fy}/0002`, 'Raised in error']);
   r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: mhId, issue_date: today, ...lines([{ rate: '1000' }]) });
-  assert.equal((await docRow(idFrom(r.location))).number, `HT/${fy}/0004`);
-  // The Hub's older invoice screen shares the series and skips these numbers too.
-  assert.equal(await legacyPreview('HT', today), `HT/${fy}/0005`);
+  assert.equal((await docRow(idFrom(r.location))).number, `HTG/${fy}/0004`);
+  // The Hub's older invoice screen has its own HT series, which GST invoices don't advance.
+  assert.equal(await legacyPreview('HT', today), `HT/${fy}/0001`);
 
   // Payments: partial with TDS u/s 194J @ 10% of the taxable value, then the rest.
   r = await b.post(`/invoices/docs/${inv1}/payments`, { amount: '50000', tds_preset: '194J-10', mode: 'neft', reference: 'UTR123', paid_on: today });
@@ -307,7 +307,7 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   // Overdue is derived from the due date.
   await db('gst_documents').where({ id: inv3 }).update({ due_date: addDays(today, -3) });
   const overdueList = await b.get('/invoices/docs?type=invoice&status=overdue');
-  assert.match(overdueList.text, new RegExp(`HT/${fy}/0003`));
+  assert.match(overdueList.text, new RegExp(`HTG/${fy}/0003`));
 
   // Email the PDF: logged even without SMTP.
   await b.get(`/invoices/docs/${inv3}`);
@@ -325,13 +325,13 @@ test('full flow: clients, invoices, numbering, locking, payments, notes, proform
   const names = gstr1.body.toString('latin1');
   for (const sheet of ['xl/worksheets/sheet10.xml', 'xl/workbook.xml']) assert.ok(names.includes(sheet), sheet);
   const outstanding = await b.get('/invoices/reports/outstanding');
-  assert.match(outstanding.text, new RegExp(`HT/${fy}/0003`));
+  assert.match(outstanding.text, new RegExp(`HTG/${fy}/0003`));
   assert.equal((await b.get('/invoices')).status, 200);
   assert.equal((await b.get(`/invoices?fy=${fy}&status=paid`)).status, 200);
 
   // E-invoice request for a B2B invoice.
   const irp = JSON.parse((await b.get(`/invoices/docs/${inv1}/einvoice.json`)).text);
-  assert.deepEqual([irp.Version, irp.DocDtls.No, irp.SellerDtls.Gstin, irp.BuyerDtls.Gstin, irp.ValDtls.TotInvVal], ['1.1', `HT/${fy}/0001`, '29AASFH7857G1ZK', '29AASFH7857G1ZK', 118000]);
+  assert.deepEqual([irp.Version, irp.DocDtls.No, irp.SellerDtls.Gstin, irp.BuyerDtls.Gstin, irp.ValDtls.TotInvVal], ['1.1', `HTG/${fy}/0001`, '29AASFH7857G1ZK', '29AASFH7857G1ZK', 118000]);
 
   // Audit log: who created, finalised, cancelled.
   const actions = await db('gst_audit').where({ entity_type: 'document', entity_id: inv2 }).pluck('action');
@@ -426,6 +426,48 @@ test('numbering restarts every financial year and backups are written', async ()
   assert.ok(snap.files.some((f) => f.mime === 'image/png'));
 });
 
+// GST invoices issued in the shared HT series before it was split off move into HTG.
+test('GST tax invoices move from the shared HT series into their own HTG series', async () => {
+  const { setProfile: set, reloadProfile } = require('../src/lib/gst/profile');
+  await set({ invoice_prefix: 'HT' }); // as on the live site before the split
+  const b = new Browser();
+  await b.login('owner@test.local', 'owner-password-1');
+  await b.get('/invoices/docs/new?kind=invoice');
+  const hub = await db('clients').where({ name: 'Kumar Textiles Pvt Ltd' }).first();
+  const ids = [];
+  for (const rate of ['1000', '2000']) {
+    const r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: hub.id, issue_date: today, ...lines([{ rate }]) });
+    ids.push(idFrom(r.location));
+  }
+  const old = await Promise.all(ids.map(docRow));
+  assert.ok(old.every((d) => d.series === 'HT'));
+  const htgBefore = Number((await db('gst_documents').where({ series: 'HTG' }).max({ m: 'seq' }).first()).m || 0);
+
+  await require('../src/migrations/011_gst_own_series').up(db);
+  await reloadProfile();
+
+  const moved = await Promise.all(ids.map(docRow));
+  assert.deepEqual(moved.map((d) => d.number), [1, 2].map((i) => `HTG/${fy}/${String(htgBefore + i).padStart(4, '0')}`));
+  assert.ok(moved.every((d) => d.series === 'HTG'));
+  assert.equal((await getProfile()).invoice_prefix, 'HTG');
+  // The older screen's HT counter is back at its own last number.
+  const legacyMax = Math.max(0, ...(await db('invoices').where('number', 'like', `HT/${fy}/%`).pluck('number')).map((n) => Number(n.split('/').pop())));
+  assert.equal(await legacyPreview('HT', today), `HT/${fy}/${String(legacyMax + 1).padStart(4, '0')}`);
+  const note = await db('gst_audit').where({ entity_type: 'document', entity_id: ids[0], action: 'renumbered' }).first();
+  assert.match(note.summary, new RegExp(`from ${old[0].number} to ${moved[0].number}`));
+  // The number lock is back, and running it again changes nothing.
+  await assert.rejects(() => db('gst_documents').where({ id: ids[0] }).update({ number: 'X/1' }), /cannot be changed/);
+  await require('../src/migrations/011_gst_own_series').up(db);
+  assert.equal((await docRow(ids[0])).number, moved[0].number);
+  // The profile won't take a prefix the older screens use.
+  await b.get('/invoices/profile');
+  const form = { ...(await getProfile()), invoice_prefix: 'HT' };
+  for (const k of ['logo_file_id', 'signature_file_id', 'backup_last_run']) delete form[k];
+  const r = await b.post('/invoices/profile', form);
+  assert.equal(r.status, 422);
+  assert.match(r.text, /used by the Hub’s older Invoices or Quotations screen/);
+});
+
 // Runs last: it removes every GST document.
 test('one-off fresh start removes the trial documents and restarts the numbering', async () => {
   const before = Number((await db('gst_documents').count({ n: '*' }).first()).n);
@@ -456,7 +498,7 @@ test('one-off fresh start removes the trial documents and restarts the numbering
   const { previewNumber } = require('../src/lib/gst/numbering');
   const legacySeq = Number(legacy.number.split('/').pop());
   assert.equal(await previewNumber('HT', today), `HT/${fy}/${String(legacySeq + 1).padStart(4, '0')}`);
-  for (const p of ['PF', 'CN', 'DN']) assert.equal(await previewNumber(p, today), `${p}/${fy}/0001`);
+  for (const p of ['HTG', 'PF', 'CN', 'DN']) assert.equal(await previewNumber(p, today), `${p}/${fy}/0001`);
   // Running it again does nothing.
   await require('../src/migrations/010_gst_fresh_start').up(db);
   assert.equal(Number((await db('gst_audit').where({ action: 'reset' }).count({ n: '*' }).first()).n), 1);
