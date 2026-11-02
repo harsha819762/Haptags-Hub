@@ -15,6 +15,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { createTriggers, dropTriggers } = require('../lib/gst/triggers');
+
 const SIGNATURE = path.join(__dirname, '..', 'lib', 'gst', 'assets', 'authorised-signature.png');
 
 const ITEMS = [
@@ -24,40 +26,7 @@ const ITEMS = [
   ['Online training / LMS courses', 'Online training and LMS courses', '999293'],
 ];
 
-const MYSQL_TRIGGERS = [
-  `CREATE TRIGGER gst_documents_no_delete BEFORE DELETE ON gst_documents FOR EACH ROW
-   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'GST documents are never deleted'`,
-  `CREATE TRIGGER gst_documents_number_lock BEFORE UPDATE ON gst_documents FOR EACH ROW
-   BEGIN
-     IF OLD.number IS NOT NULL AND NOT (NEW.number <=> OLD.number) THEN
-       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'A GST document number cannot be changed';
-     END IF;
-   END`,
-  `CREATE TRIGGER gst_lines_lock BEFORE DELETE ON gst_document_lines FOR EACH ROW
-   BEGIN
-     IF (SELECT status FROM gst_documents WHERE id = OLD.document_id) <> 'draft' THEN
-       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Lines of a finalised GST document cannot be removed';
-     END IF;
-   END`,
-  `CREATE TRIGGER gst_payments_no_delete BEFORE DELETE ON gst_payments FOR EACH ROW
-   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'GST payments are never deleted; reverse them instead'`,
-];
-
-const SQLITE_TRIGGERS = [
-  `CREATE TRIGGER gst_documents_no_delete BEFORE DELETE ON gst_documents
-   BEGIN SELECT RAISE(ABORT, 'GST documents are never deleted'); END`,
-  `CREATE TRIGGER gst_documents_number_lock BEFORE UPDATE OF number ON gst_documents
-   WHEN OLD.number IS NOT NULL AND NEW.number IS NOT OLD.number
-   BEGIN SELECT RAISE(ABORT, 'A GST document number cannot be changed'); END`,
-  `CREATE TRIGGER gst_lines_lock BEFORE DELETE ON gst_document_lines
-   WHEN (SELECT status FROM gst_documents WHERE id = OLD.document_id) <> 'draft'
-   BEGIN SELECT RAISE(ABORT, 'Lines of a finalised GST document cannot be removed'); END`,
-  `CREATE TRIGGER gst_payments_no_delete BEFORE DELETE ON gst_payments
-   BEGIN SELECT RAISE(ABORT, 'GST payments are never deleted; reverse them instead'); END`,
-];
-
 exports.up = async function up(knex) {
-  const mysql = knex.client.config.client === 'mysql2';
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const create = async (name, build) => {
     if (!(await knex.schema.hasTable(name))) await knex.schema.createTable(name, build);
@@ -249,17 +218,7 @@ exports.up = async function up(knex) {
     t.index(['created_at']);
   });
 
-  for (const sql of mysql ? MYSQL_TRIGGERS : SQLITE_TRIGGERS) {
-    const name = sql.match(/CREATE TRIGGER (\w+)/)[1];
-    try {
-      await knex.raw(`DROP TRIGGER IF EXISTS ${name}`);
-      await knex.raw(sql);
-    } catch (err) {
-      // Some MySQL hosts need SUPER to create triggers when binary logging is on. The app never
-      // deletes these rows either way; the triggers are a second lock.
-      console.warn(`[migrate] GST safety trigger ${name} not created (${err.message}). The app still never deletes GST records.`);
-    }
-  }
+  await createTriggers(knex);
 
   if (!(await knex('gst_items').first())) {
     await knex('gst_items').insert(ITEMS.map(([name, description, sac], i) => ({
@@ -284,9 +243,7 @@ exports.up = async function up(knex) {
 };
 
 exports.down = async function down(knex) {
-  for (const name of ['gst_documents_no_delete', 'gst_documents_number_lock', 'gst_lines_lock', 'gst_payments_no_delete']) {
-    await knex.raw(`DROP TRIGGER IF EXISTS ${name}`);
-  }
+  await dropTriggers(knex);
   for (const name of ['gst_audit', 'gst_payments', 'gst_document_lines', 'gst_documents', 'gst_items', 'gst_clients', 'gst_profile']) {
     await knex.schema.dropTableIfExists(name);
   }

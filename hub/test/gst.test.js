@@ -425,3 +425,39 @@ test('numbering restarts every financial year and backups are written', async ()
   assert.ok(snap.tables.gst_documents.length >= 5);
   assert.ok(snap.files.some((f) => f.mime === 'image/png'));
 });
+
+// Runs last: it removes every GST document.
+test('one-off fresh start removes the trial documents and restarts the numbering', async () => {
+  const before = Number((await db('gst_documents').count({ n: '*' }).first()).n);
+  assert.ok(before >= 5);
+  assert.ok(await db('gst_payments').first());
+  assert.ok(await db('gst_documents').where({ kind: 'credit_note' }).first());
+  // The older Invoices screen issued a number in the shared HT series (the signature test).
+  const legacy = await db('invoices').where('number', 'like', `HT/${fy}/%`).orderBy('number', 'desc').first();
+  assert.ok(legacy);
+
+  await require('../src/migrations/010_gst_fresh_start').up(db);
+
+  for (const t of ['gst_documents', 'gst_document_lines', 'gst_payments']) assert.equal(Number((await db(t).count({ n: '*' }).first()).n), 0, t);
+  assert.ok(await db('invoices').where({ id: legacy.id }).first(), 'the Hub’s own invoices are untouched');
+  assert.ok(await db('gst_clients').first(), 'clients are untouched');
+  const reset = await db('gst_audit').where({ action: 'reset' }).first();
+  assert.match(reset.summary, /Fresh start/);
+  assert.equal(await db('gst_audit').where({ entity_type: 'document' }).whereNotNull('entity_id').first(), undefined);
+  // The safety triggers are back.
+  const triggers = await db.raw("select name from sqlite_master where type = 'trigger' and name like 'gst_%'");
+  assert.equal(triggers.length, 4);
+  // A kept backup holds what was removed.
+  const kept = listBackups().find((b) => b.name.startsWith('gst-before-fresh-start-'));
+  const snap = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(process.env.GST_BACKUP_DIR, kept.name))).toString());
+  assert.equal(snap.tables.gst_documents.length, before);
+
+  // HT continues after the older screen's number; the GST-only series start again at 0001.
+  const { previewNumber } = require('../src/lib/gst/numbering');
+  const legacySeq = Number(legacy.number.split('/').pop());
+  assert.equal(await previewNumber('HT', today), `HT/${fy}/${String(legacySeq + 1).padStart(4, '0')}`);
+  for (const p of ['PF', 'CN', 'DN']) assert.equal(await previewNumber(p, today), `${p}/${fy}/0001`);
+  // Running it again does nothing.
+  await require('../src/migrations/010_gst_fresh_start').up(db);
+  assert.equal(Number((await db('gst_audit').where({ action: 'reset' }).count({ n: '*' }).first()).n), 1);
+});

@@ -18,6 +18,9 @@ const { getProfile, setProfile } = require('./profile');
 
 const TABLES = ['gst_profile', 'gst_clients', 'gst_items', 'gst_documents', 'gst_document_lines', 'gst_payments', 'gst_audit'];
 const KEEP = 30;
+// Daily backups are pruned; a 'before-…' one (written before a one-off cleanup) is always kept.
+const DAILY = /^gst-\d{4}-\d{2}-\d{2}\.json\.gz$/;
+const NAME = /^gst-(\d{4}-\d{2}-\d{2}|before-[a-z-]+-\d{8}T\d{6})\.json\.gz$/;
 const dir = () => process.env.GST_BACKUP_DIR
   || (config.isProd ? path.join(os.homedir(), 'haptags-hub-backups') : path.join(__dirname, '..', '..', '..', 'data', 'backups'));
 
@@ -48,7 +51,7 @@ async function gzipped() {
 
 function listBackups() {
   if (!fs.existsSync(dir())) return [];
-  return fs.readdirSync(dir()).filter((f) => /^gst-\d{4}-\d{2}-\d{2}\.json\.gz$/.test(f)).sort().reverse()
+  return fs.readdirSync(dir()).filter((f) => NAME.test(f)).sort().reverse()
     .map((name) => ({ name, size: fs.statSync(path.join(dir(), name)).size }));
 }
 
@@ -59,7 +62,7 @@ async function writeBackup({ force = false } = {}) {
   if (!force && fs.existsSync(file)) return null;
   fs.mkdirSync(dir(), { recursive: true });
   fs.writeFileSync(file, await gzipped());
-  for (const old of listBackups().slice(KEEP)) fs.rmSync(path.join(dir(), old.name), { force: true });
+  for (const old of listBackups().filter((b) => DAILY.test(b.name)).slice(KEEP)) fs.rmSync(path.join(dir(), old.name), { force: true });
   await setProfile({ backup_last_run: nowSql() });
   return name;
 }
@@ -76,10 +79,19 @@ async function dailyBackup() {
   }
 }
 
+/** Writes a backup that is never pruned, e.g. before a one-off cleanup. Returns the file name. */
+async function keepBackup(label) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
+  const name = `gst-before-${label}-${stamp}.json.gz`;
+  fs.mkdirSync(dir(), { recursive: true });
+  fs.writeFileSync(path.join(dir(), name), await gzipped());
+  return name;
+}
+
 function backupPath(name) {
-  if (!/^gst-\d{4}-\d{2}-\d{2}\.json\.gz$/.test(String(name))) return null;
+  if (!NAME.test(String(name))) return null;
   const file = path.join(dir(), name);
   return fs.existsSync(file) ? file : null;
 }
 
-module.exports = { snapshot, gzipped, writeBackup, dailyBackup, listBackups, backupPath, TABLES };
+module.exports = { snapshot, gzipped, writeBackup, keepBackup, dailyBackup, listBackups, backupPath, TABLES };
