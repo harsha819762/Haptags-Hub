@@ -91,6 +91,21 @@ test('the 43 LMS courses are programmes with both plan fees', async () => {
   assert.equal(offers.roleFor('Food Technology'), 'Food Technology Intern');
 });
 
+test('offer letters are signed by the CEO by default', async () => {
+  assert.equal((await getSettings()).offer_signatory_name, 'Reddivari Harshavardhan Reddy');
+  assert.equal((await getSettings()).offer_signatory_designation, 'Chief Executive Officer');
+  // Migration 014 fills a blank name and leaves a typed one alone.
+  const up = require('../src/migrations/014_offer_signatory').up;
+  await db('settings').where({ key: 'offer_signatory_name' }).del();
+  await db('settings').insert({ key: 'offer_signatory_name', value: '' });
+  await up(db);
+  assert.equal((await db('settings').where({ key: 'offer_signatory_name' }).first()).value, 'Reddivari Harshavardhan Reddy');
+  await db('settings').where({ key: 'offer_signatory_name' }).update({ value: 'Someone Else' });
+  await up(db);
+  assert.equal((await db('settings').where({ key: 'offer_signatory_name' }).first()).value, 'Someone Else');
+  await db('settings').where({ key: 'offer_signatory_name' }).del();
+});
+
 test('upsert: no duplicates, first match by name, archive what the LMS dropped', async () => {
   const trx = await db.transaction();
   try {

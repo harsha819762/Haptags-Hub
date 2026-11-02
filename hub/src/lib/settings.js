@@ -47,7 +47,7 @@ const DEFAULTS = {
 
   // Internship offer letters (Education → Offer letters). Terms: one per paragraph, "Heading: text".
   offer_prefix: 'HTOL',
-  offer_signatory_name: '',
+  offer_signatory_name: 'Reddivari Harshavardhan Reddy',
   offer_signatory_designation: 'Chief Executive Officer',
   offer_reporting_to: '',
   offer_reporting_designation: '',
