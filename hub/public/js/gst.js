@@ -6,12 +6,6 @@
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var csrf = function () { var m = $('meta[name=csrf-token]'); return m ? m.content : ''; };
 
-  // Buttons that need their own confirmation (a form-level data-confirm would ask for every button).
-  document.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-confirm-click]');
-    if (b && !window.confirm(b.getAttribute('data-confirm-click'))) e.preventDefault();
-  });
-
   // Dashboard: a financial year and a custom date range are alternatives; picking one clears the other.
   var fySel = $('[data-period-fy]');
   if (fySel) {

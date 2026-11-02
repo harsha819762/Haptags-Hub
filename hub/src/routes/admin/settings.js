@@ -21,6 +21,8 @@ const GROUPS = {
     'edu_invoice_prefix', 'edu_sac', 'edu_gst_rate', 'edu_due_days', 'edu_terms'],
   payments: ['upi_id', 'upi_name', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_ifsc', 'bank_branch'],
   automation: ['auto_reminders', 'lead_auto_reply'],
+  offers: ['offer_prefix', 'offer_signatory_name', 'offer_signatory_designation', 'offer_reporting_to', 'offer_reporting_designation',
+    'offer_mode', 'offer_location', 'offer_schedule', 'offer_respond_days', 'offer_terms'],
 };
 const CHECKBOXES = ['auto_reminders', 'lead_auto_reply'];
 
@@ -57,6 +59,10 @@ router.post('/settings', requireAdmin, async (req, res) => {
   if (values.edu_invoice_prefix) values.edu_invoice_prefix = values.edu_invoice_prefix.replace(/[^A-Za-z0-9-]/g, '').slice(0, 6) || DEFAULTS.edu_invoice_prefix;
   if (values.edu_invoice_prefix && values.edu_invoice_prefix === (values.invoice_prefix || '')) values.edu_invoice_prefix = `${values.edu_invoice_prefix}E`.slice(0, 6);
   if (values.quote_prefix) values.quote_prefix = values.quote_prefix.replace(/[^A-Za-z0-9-]/g, '').slice(0, 6) || DEFAULTS.quote_prefix;
+  if ('offer_prefix' in values) values.offer_prefix = values.offer_prefix.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 6) || DEFAULTS.offer_prefix;
+  if ('offer_mode' in values && !['onsite', 'remote', 'hybrid'].includes(values.offer_mode)) values.offer_mode = DEFAULTS.offer_mode;
+  if ('offer_respond_days' in values) values.offer_respond_days = String(Math.min(60, Math.max(1, int(values.offer_respond_days, 7))));
+  if ('offer_terms' in values && !values.offer_terms.trim()) values.offer_terms = DEFAULTS.offer_terms;
   if (values.whatsapp) values.whatsapp = values.whatsapp.replace(/\D/g, '');
   await setSettings(values);
   req.flash('success', 'Settings saved.');

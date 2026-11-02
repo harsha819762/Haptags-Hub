@@ -1,0 +1,52 @@
+<%# Offer letter on screen. c: offers.letterContent(); logo, signature: data URIs. The PDF has the same wording. %>
+<% const co = c.company; const sign = c.status !== 'draft' ? signature : null; %>
+<article class="letter<%= c.status === 'draft' ? ' is-draft' : c.status === 'withdrawn' ? ' is-withdrawn' : '' %>" aria-label="<%= c.title %>">
+  <header class="letter-head">
+    <div class="letter-brand">
+      <% if (logo) { %><img src="<%= logo %>" alt=""><% } %>
+      <div><b><%= co.legal_name %></b><% if (co.tagline) { %><small><%= co.tagline %></small><% } %></div>
+    </div>
+    <div class="letter-contact"><%= co.address %><br><%= [co.email, co.phone].filter(Boolean).join(' · ') %><% if (co.website) { %><br><%= co.website %><% } %></div>
+  </header>
+
+  <h1 class="letter-title"><%= c.title %></h1>
+  <div class="letter-meta"><span>Ref: <b><%= c.reference %></b></span><span>Date: <b><%= c.date %></b></span></div>
+
+  <div class="letter-to">To,<br><% c.to.forEach(function (line, i) { %><%- i ? '' : '<b>' %><%= line %><%- i ? '' : '</b>' %><br><% }) %></div>
+  <p class="letter-subject">Subject: <%= c.subject %></p>
+  <p><%= c.salutation %></p>
+  <% c.intro.forEach(function (p) { %><p><%= p %></p><% }) %>
+
+  <table class="letter-details">
+    <tbody><% c.details.forEach(function (d) { %><tr><th scope="row"><%= d[0] %></th><td><%= d[1] %></td></tr><% }) %></tbody>
+  </table>
+
+  <% if (c.joining) { %><h2 class="letter-label">Joining</h2><p><%= c.joining %></p><% } %>
+
+  <h2 class="letter-label">Terms and conditions</h2>
+  <ol class="letter-terms">
+    <% c.terms.forEach(function (t) { %><li><% if (t.heading) { %><b><%= t.heading %>:</b> <% } %><%= t.text %></li><% }) %>
+  </ol>
+
+  <% c.closing.forEach(function (p) { %><p><%= p %></p><% }) %>
+
+  <div class="letter-sign">
+    <p class="mb-0"><%= c.signoff.lead %></p>
+    <b><%= c.signoff.company %></b>
+    <% if (sign) { %><img src="<%= sign %>" alt="Signed stamp of the authorised signatory"><% } else { %><span class="letter-sign-space"><%= c.status === 'draft' ? 'The signature is added when the letter is issued.' : '' %></span><% } %>
+    <% if (c.signoff.name) { %><b><%= c.signoff.name %></b><% } %>
+    <span class="muted"><%= c.signoff.designation %></span>
+  </div>
+
+  <section class="letter-accept">
+    <h2 class="letter-label"><%= c.acceptance.heading %></h2>
+    <p><%= c.acceptance.text %></p>
+    <% if (c.acceptance.accepted) { %>
+      <div class="letter-accepted"><%= c.acceptance.accepted %></div>
+    <% } else { %>
+      <div class="letter-lines"><span>Signature</span><span>Name</span><span>Date</span></div>
+    <% } %>
+  </section>
+
+  <footer class="letter-foot"><%= [co.legal_name, co.llpin && 'LLPIN ' + co.llpin, co.gstin && 'GSTIN ' + co.gstin].filter(Boolean).join(' · ') %><br>Registered office: <%= co.address %></footer>
+</article>

@@ -13,7 +13,10 @@ const { createOrder, verifyPaymentSignature } = require('../lib/razorpay');
 const { logActivity } = require('../lib/activity');
 const { sendMail } = require('../lib/mailer');
 const { formatINR, toPaise } = require('../lib/money');
-const { nowSql, todayIST, str, safeEqual } = require('../lib/util');
+const { nowSql, todayIST, str, safeEqual, formatDate } = require('../lib/util');
+const offers = require('../lib/offers');
+const { renderOfferPdf } = require('../lib/offer-pdf');
+const { imageDataUri } = require('../lib/gst/profile');
 const { STAFF_ROLES } = require('../lib/auth');
 
 const router = express.Router();
@@ -245,6 +248,69 @@ router.post('/q/:token/respond', async (req, res, next) => {
   });
   req.flash('success', accept ? 'Thank you! Your acceptance has been recorded — we’ll be in touch with next steps.' : 'Thanks for letting us know. We’ve recorded your response.');
   res.redirect(`/q/${q.public_token}`);
+});
+
+// ---- Internship offer letters: the student reads, downloads and accepts or declines ----------
+const offerLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
+
+async function findOffer(req) {
+  const o = await db('offer_letters').where({ public_token: req.params.token }).first();
+  if (!o) return null;
+  const isStaff = req.user && STAFF_ROLES.includes(req.user.role);
+  if (o.status === 'draft' && !isStaff) return null;
+  return o;
+}
+
+router.get('/o/:token', async (req, res, next) => {
+  const o = await findOffer(req);
+  if (!o) return next();
+  const [c, logo, signature] = await Promise.all([offers.letterContent(o), imageDataUri('logo'), imageDataUri('signature')]);
+  res.render('public/offer', {
+    layout: 'doc', title: `Offer letter ${o.number || '(draft)'}`, styles: ['offer'], letter: o, c, logo, signature,
+    status: offers.displayStatus(o), isStaff: Boolean(req.user && STAFF_ROLES.includes(req.user.role)),
+  });
+});
+
+router.get('/o/:token/pdf', async (req, res, next) => {
+  const o = await findOffer(req);
+  if (!o) return next();
+  res.set({
+    'Content-Type': 'application/pdf', 'Cache-Control': 'private, no-store',
+    'Content-Disposition': `attachment; filename="Offer-letter-${String(o.number || 'draft').replace(/\//g, '-')}.pdf"`,
+  });
+  res.send(await renderOfferPdf(await offers.letterContent(o)));
+});
+
+router.post('/o/:token/respond', offerLimiter, async (req, res, next) => {
+  const o = await findOffer(req);
+  if (!o) return next();
+  const accept = req.body.decision === 'accept';
+  if (accept && req.body.agree !== '1') {
+    req.flash('error', 'Please tick the box to confirm you have read and accept the terms.');
+    return res.redirect(`/o/${o.public_token}#respond`);
+  }
+  try {
+    const updated = await offers.respond(o, { accept, name: str(req.body.name, 190), note: str(req.body.note, 1000), ip: req.ip });
+    // A copy of the accepted letter for the student's records.
+    if (accept && updated.candidate_email) {
+      const pdf = await renderOfferPdf(await offers.letterContent(updated));
+      await sendMail({
+        to: updated.candidate_email,
+        subject: `Your accepted offer letter ${updated.number}`,
+        related: ['offer', updated.id],
+        heading: 'Welcome aboard!',
+        lines: [`Dear ${updated.candidate_name.split(/\s+/)[0]},`, `Thank you for accepting your internship as ${updated.role_title}. A copy of your accepted offer letter is attached for your records.`, 'We look forward to seeing you on your first day.'],
+        rows: [['Reference', updated.number], ['Starts', formatDate(updated.start_date)]],
+        button: { label: 'View your offer letter', url: offers.offerUrl(updated) },
+        attachments: [{ filename: `Offer-letter-${updated.number.replace(/\//g, '-')}.pdf`, content: pdf, contentType: 'application/pdf' }],
+      });
+    }
+    req.flash('success', accept ? 'Thank you! Your acceptance is recorded. A copy of the letter has been emailed to you.' : 'Thank you for letting us know. Your reply is recorded.');
+  } catch (err) {
+    if (!err.offer) throw err;
+    req.flash('error', err.message);
+  }
+  res.redirect(`/o/${o.public_token}`);
 });
 
 module.exports = router;

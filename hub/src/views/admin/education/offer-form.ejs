@@ -1,0 +1,66 @@
+<%
+  const err = function (k) { return errors[k] ? '<div class="error">' + h.esc(errors[k]) + '</div>' : ''; };
+  const inv = function (k) { return errors[k] ? 'aria-invalid="true"' : ''; };
+  const v = function (k) { return letter[k] === null || letter[k] === undefined ? '' : letter[k]; };
+  const rupees = function (p) { return Number(p) ? (Number(p) / 100).toFixed(2).replace(/\.00$/, '') : ''; };
+%>
+<%- include('_nav') %>
+<div class="crumbs"><a href="/admin/education/offers">Offer letters</a> / <a href="/admin/education/students/<%= student.id %>"><%= student.name %></a> / <%= letter.id ? 'Edit draft' : 'New' %></div>
+<h2><%= letter.id ? 'Edit draft offer letter' : 'New offer letter' %></h2>
+<p class="muted">Filled in from <%= student.name %>’s record and programme. When you issue it, it gets the number <b class="mono"><%= nextNumber %></b> and the standard terms from <a href="/admin/settings?tab=offers">Settings → Offer letters</a>, and its wording is fixed.</p>
+<% if (Object.keys(errors).length) { %><div class="flash flash-error" role="alert"><%- h.icon('alert') %><span>Please fix the highlighted fields.</span></div><% } %>
+
+<form method="post" action="<%= letter.id ? '/admin/education/offers/' + letter.id : '/admin/education/offers' %>" novalidate>
+  <%- include('../../partials/csrf') %>
+  <input type="hidden" name="client_id" value="<%= student.id %>">
+
+  <section class="card card-pad">
+    <h3>Student</h3>
+    <div class="form-grid">
+      <div class="field"><label for="o-name">Full name *</label><input id="o-name" name="candidate_name" type="text" maxlength="190" value="<%= v('candidate_name') %>" <%- inv('candidate_name') %>><%- err('candidate_name') %></div>
+      <div class="field"><label for="o-email">Email</label><input id="o-email" name="candidate_email" type="email" maxlength="190" value="<%= v('candidate_email') %>" <%- inv('candidate_email') %>><%- err('candidate_email') %><div class="hint">The letter and the link to accept it are sent here.</div></div>
+      <div class="field"><label for="o-phone">Phone</label><input id="o-phone" name="candidate_phone" type="tel" maxlength="40" value="<%= v('candidate_phone') %>"></div>
+      <div class="field"><label for="o-college">College</label><input id="o-college" name="college" type="text" maxlength="190" value="<%= v('college') %>"></div>
+      <div class="field"><label for="o-course">Course and year</label><input id="o-course" name="course" type="text" maxlength="190" value="<%= v('course') %>" placeholder="e.g. B.E. Computer Science, 3rd year"></div>
+      <div class="field"><label for="o-address">Address <span class="muted">(optional)</span></label><input id="o-address" name="candidate_address" type="text" maxlength="500" value="<%= v('candidate_address') %>"></div>
+    </div>
+  </section>
+
+  <section class="card card-pad mt-16">
+    <h3>Internship</h3>
+    <div class="form-grid">
+      <div class="field"><label for="o-role">Position *</label><input id="o-role" name="role_title" type="text" maxlength="190" value="<%= v('role_title') %>" placeholder="e.g. Java Full Stack Development Intern" <%- inv('role_title') %>><%- err('role_title') %></div>
+      <div class="field"><label for="o-prog">Programme</label><input id="o-prog" name="programme" type="text" maxlength="190" value="<%= v('programme') %>"></div>
+      <div class="field"><label for="o-start">Start date *</label><input id="o-start" name="start_date" type="date" value="<%= v('start_date') %>" <%- inv('start_date') %>><%- err('start_date') %></div>
+      <div class="field"><label for="o-end">End date *</label><input id="o-end" name="end_date" type="date" value="<%= v('end_date') %>" <%- inv('end_date') %>><%- err('end_date') %></div>
+      <div class="field"><label for="o-duration">Duration</label><input id="o-duration" name="duration" type="text" maxlength="60" value="<%= v('duration') %>" placeholder="Worked out from the dates"><div class="hint">Leave blank to work it out from the dates, e.g. “3 months”.</div></div>
+      <div class="field"><label for="o-mode">Mode</label><select id="o-mode" name="mode"><% [['onsite', 'On-site'], ['hybrid', 'Hybrid'], ['remote', 'Remote']].forEach(function (m) { %><option value="<%= m[0] %>" <%= h.selected(letter.mode, m[0]) %>><%= m[1] %></option><% }) %></select></div>
+      <div class="field"><label for="o-location">Location</label><input id="o-location" name="location" type="text" maxlength="255" value="<%= v('location') %>" <%- inv('location') %>><%- err('location') %></div>
+      <div class="field"><label for="o-schedule">Working days and hours</label><input id="o-schedule" name="schedule" type="text" maxlength="255" value="<%= v('schedule') %>"></div>
+      <div class="field"><label for="o-rep">Reporting to</label><input id="o-rep" name="reporting_to" type="text" maxlength="190" value="<%= v('reporting_to') %>" placeholder="Mentor or manager’s name"></div>
+      <div class="field"><label for="o-repd">Their designation</label><input id="o-repd" name="reporting_designation" type="text" maxlength="190" value="<%= v('reporting_designation') %>" placeholder="e.g. Technical Lead"></div>
+    </div>
+  </section>
+
+  <section class="card card-pad mt-16">
+    <h3>Stipend, fee and reply</h3>
+    <div class="form-grid">
+      <div class="field"><label for="o-stipend">Stipend per month (₹)</label><input id="o-stipend" name="stipend" type="text" inputmode="decimal" value="<%= rupees(letter.stipend) %>" placeholder="0"><div class="hint">Leave blank for no stipend (shown as “Not applicable”).</div></div>
+      <div class="field"><label for="o-fee">Programme fee (₹)</label><input id="o-fee" name="fee" type="text" inputmode="decimal" value="<%= rupees(letter.fee) %>" <%- inv('fee') %>><%- err('fee') %>
+        <label class="check small mt-8"><input type="checkbox" name="show_fee" value="1" <%= letter.show_fee ? 'checked' : '' %>> Mention the programme fee in the letter</label></div>
+      <div class="field"><label for="o-respond">Accept by</label><input id="o-respond" name="respond_by" type="date" value="<%= v('respond_by') %>"><div class="hint">The offer lapses after this date.</div></div>
+    </div>
+  </section>
+
+  <section class="card card-pad mt-16">
+    <h3>Joining instructions and extra terms</h3>
+    <div class="field"><label for="o-join">Joining instructions</label><textarea id="o-join" name="joining_instructions" rows="3" maxlength="2000"><%= v('joining_instructions') %></textarea><div class="hint">Printed under “Joining”: where and when to report, what to bring.</div></div>
+    <div class="field mb-0"><label for="o-extra">Additional terms for this letter <span class="muted">(optional)</span></label><textarea id="o-extra" name="extra_terms" rows="3" maxlength="5000" placeholder="e.g. Project: You will work on the LMS mobile app."><%= v('extra_terms') %></textarea><div class="hint">Added after the standard terms, numbered. One per paragraph, written as “Heading: text”.</div></div>
+  </section>
+
+  <div class="form-actions mt-16">
+    <button class="btn btn-ghost" type="submit" name="action" value="draft"><%- h.icon('edit', 16) %> Save draft</button>
+    <button class="btn" type="submit" name="action" value="issue" data-confirm-click="Issue this offer letter as <%= nextNumber %>? Its wording is then fixed; you can still withdraw it."><%- h.icon('send', 16) %> Issue offer letter</button>
+    <a class="btn-link" href="<%= letter.id ? '/admin/education/offers/' + letter.id : '/admin/education/students/' + student.id %>">Cancel</a>
+  </div>
+</form>

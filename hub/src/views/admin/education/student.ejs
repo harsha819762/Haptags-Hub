@@ -62,6 +62,23 @@
       </ul><% } %>
     </section>
 
+    <section class="card" id="offers">
+      <div class="card-head"><h3>Offer letters</h3><a class="btn btn-sm" href="/admin/education/offers/new?student=<%= st.id %>"><%- h.icon('plus', 14) %> Create offer letter</a></div>
+      <% if (!offerLetters.length) { %><div class="empty small">No offer letter yet. Create one to send <%= first %> a formal internship offer to accept online.</div><% } else { %>
+      <ul class="list">
+        <% offerLetters.forEach(function (o) { %>
+        <li>
+          <div class="grow">
+            <a class="title" href="/admin/education/offers/<%= o.id %>"><span class="mono"><%= o.number || 'Draft' %></span> · <%= o.role_title %></a>
+            <span class="meta"><%= h.date(o.start_date) %> – <%= h.date(o.end_date) %><%= o.responded_at ? ' · ' + (o.status === 'accepted' ? 'accepted ' : 'answered ') + h.dateTime(o.responded_at) : o.respond_by && o.status === 'issued' ? ' · accept by ' + h.date(o.respond_by) : '' %></span>
+          </div>
+          <%- h.badge({ issued: 'sent', accepted: 'accepted', declined: 'declined', withdrawn: 'void', expired: 'expired', draft: 'draft' }[o.display], h.humanize(o.display)) %>
+        </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </section>
+
     <section class="card" id="certificates">
       <div class="card-head"><h3>Certificates</h3><span class="muted"><%= certificates.length %></span></div>
       <% if (certificates.length) { %>

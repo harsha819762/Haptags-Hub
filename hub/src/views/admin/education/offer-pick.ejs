@@ -1,0 +1,21 @@
+<%- include('_nav') %>
+<div class="crumbs"><a href="/admin/education/offers">Offer letters</a> / New</div>
+<h2>Who is the offer for?</h2>
+<form method="get" class="row mb-16">
+  <input type="search" name="q" value="<%= q || '' %>" placeholder="Search students by name, email, phone or college" aria-label="Search students" style="max-width:420px" autofocus>
+  <button class="btn btn-ghost" type="submit">Search</button>
+  <a class="btn-link small" href="/admin/education/students/new">Enrol a new student</a>
+</form>
+<div class="card">
+  <% if (!students.length) { %><div class="empty"><b>No students found</b><%= q ? 'Try another name, or enrol the student first.' : 'Enrol a student first.' %></div><% } else { %>
+  <ul class="list">
+    <% students.forEach(function (s) { %>
+    <li>
+      <div class="grow"><span class="title"><%= s.name %></span><span class="meta"><%= [s.program_name, s.college, s.email].filter(Boolean).join(' · ') %></span></div>
+      <a class="btn btn-sm" href="/admin/education/offers/new?student=<%= s.id %>">Create offer letter</a>
+    </li>
+    <% }) %>
+  </ul>
+  <% } %>
+</div>
+<% if (!q && students.length === 30) { %><p class="small muted mt-8">Showing the 30 most recent students. Search to find others.</p><% } %>

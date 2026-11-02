@@ -1,0 +1,102 @@
+<%
+  const tone = { draft: 'draft', issued: 'sent', accepted: 'accepted', declined: 'declined', withdrawn: 'void', expired: 'expired' };
+  const label = { issued: 'Awaiting reply' }[status] || h.humanize(status);
+  const first = letter.candidate_name.split(/\s+/)[0];
+  const live = ['issued', 'expired', 'accepted', 'declined', 'withdrawn'].includes(status);
+  const wa = status === 'issued' ? h.waLink(letter.candidate_phone, 'Hi ' + first + ', congratulations! Here is your internship offer letter ' + letter.number + ' from ' + c.company.legal_name + ' for the role of ' + letter.role_title + '. Please read and accept it by ' + h.date(letter.respond_by) + ': ' + link) : null;
+  const pdf = '/admin/education/offers/' + letter.id + '/pdf';
+%>
+<%- include('_nav') %>
+<div class="crumbs"><a href="/admin/education/offers">Offer letters</a> / <a href="/admin/education/students/<%= letter.client_id %>"><%= letter.candidate_name %></a> / <%= letter.number || 'Draft' %></div>
+<div class="page-head">
+  <div>
+    <h2 class="mb-0"><span class="mono"><%= letter.number || 'Draft offer letter' %></span> <%- h.badge(tone[status], label) %></h2>
+    <div class="sub"><%= letter.role_title %> · <%= h.date(letter.start_date) %> – <%= h.date(letter.end_date) %></div>
+  </div>
+  <div class="actions">
+    <% if (letter.status === 'draft') { %>
+      <a class="btn btn-ghost" href="/admin/education/offers/<%= letter.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+      <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener"><%- h.icon('external', 16) %> Preview PDF</a>
+      <form method="post" action="/admin/education/offers/<%= letter.id %>/issue" class="inline" data-confirm="Issue this offer letter? It gets its number and its wording is fixed; you can still withdraw it.">
+        <%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('send', 16) %> Issue letter</button>
+      </form>
+    <% } else { %>
+      <a class="btn btn-ghost" href="<%= pdf %>?download=1"><%- h.icon('download', 16) %> Download PDF</a>
+      <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener"><%- h.icon('printer', 16) %> Print</a>
+      <% if (status === 'issued') { %>
+        <button class="btn btn-ghost" type="button" data-dialog="#offer-email"><%- h.icon('mail', 16) %> Email</button>
+        <% if (wa) { %><a class="btn btn-wa" href="<%= wa %>" target="_blank" rel="noopener"><%- h.icon('whatsapp', 16) %> WhatsApp</a><% } %>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<div class="split">
+  <div><%- include('../../partials/offer-letter', { c: c, logo: logo, signature: signature }) %></div>
+
+  <div class="stack">
+    <% if (live) { %>
+    <section class="card">
+      <div class="card-head"><h3>Student’s link</h3></div>
+      <div class="card-body">
+        <p class="small muted mt-0"><%= first %> reads the letter and accepts or declines it here. No login needed.</p>
+        <div class="copy-field"><input id="olink" type="text" readonly value="<%= link %>" aria-label="Offer letter link"><button class="btn btn-ghost btn-sm" type="button" data-copy="#olink"><%- h.icon('copy', 14) %></button></div>
+        <% if (letter.emailed_at) { %><p class="small muted mt-8 mb-0">Emailed <%= h.dateTime(letter.emailed_at) %>.</p><% } %>
+      </div>
+    </section>
+    <% } %>
+
+    <section class="card">
+      <div class="card-head"><h3>Status</h3><%- h.badge(tone[status], label) %></div>
+      <div class="card-body">
+        <dl class="dl">
+          <dt>Student</dt><dd><a href="/admin/education/students/<%= letter.client_id %>"><%= letter.candidate_name %></a></dd>
+          <dt>Issued</dt><dd><%= letter.issued_on ? h.date(letter.issued_on) : 'Not yet' %></dd>
+          <% if (letter.respond_by) { %><dt>Accept by</dt><dd><%= h.date(letter.respond_by) %><%= status === 'expired' ? ' (lapsed)' : '' %></dd><% } %>
+          <% if (letter.responded_at) { %>
+            <dt><%= letter.status === 'accepted' ? 'Accepted' : 'Answered' %></dt><dd><%= h.dateTime(letter.responded_at) %> by <%= letter.responded_name %><% if (letter.responded_ip) { %><span class="sub mono"><%= letter.responded_ip %></span><% } %></dd>
+            <% if (letter.response_note) { %><dt>Note</dt><dd><%= letter.response_note %></dd><% } %>
+          <% } %>
+          <% if (letter.withdrawn_at) { %><dt>Withdrawn</dt><dd><%= h.dateTime(letter.withdrawn_at) %>: <%= letter.withdraw_reason %></dd><% } %>
+        </dl>
+        <% if (letter.status === 'draft' && !c.signoff.name) { %><p class="small down mb-0 mt-8">The signatory’s name is blank. Add it in <a href="/admin/settings?tab=offers">Settings → Offer letters</a> before issuing.</p><% } %>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h3>History</h3></div>
+      <div class="card-body"><%- include('../../partials/timeline', { activities: activities }) %></div>
+    </section>
+
+    <% if (letter.status === 'draft') { %>
+      <form method="post" action="/admin/education/offers/<%= letter.id %>/delete" data-confirm="Delete this draft offer letter?"><%- include('../../partials/csrf') %><button class="btn btn-danger btn-sm" type="submit"><%- h.icon('trash', 14) %> Delete draft</button></form>
+    <% } else { %>
+      <form method="post" action="/admin/education/offers/<%= letter.id %>/revise" data-confirm="Create a revised copy as a new draft?"><%- include('../../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('copy', 14) %> Make a revised copy</button></form>
+      <% if (['issued', 'accepted'].includes(letter.status)) { %>
+      <details>
+        <summary class="small muted" style="cursor:pointer">Withdraw this offer…</summary>
+        <form method="post" action="/admin/education/offers/<%= letter.id %>/withdraw" class="mt-8" data-confirm="Withdraw <%= letter.number %>? The student’s link will show the offer is no longer open.">
+          <%- include('../../partials/csrf') %>
+          <input type="text" name="reason" required maxlength="255" placeholder="Reason, e.g. issued with wrong dates" class="mb-8" aria-label="Reason for withdrawing">
+          <button class="btn btn-danger btn-sm" type="submit"><%- h.icon('ban', 14) %> Withdraw offer</button>
+        </form>
+      </details>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<% if (status === 'issued') { %>
+<dialog class="modal" id="offer-email" aria-labelledby="offer-email-title">
+  <form method="post" action="/admin/education/offers/<%= letter.id %>/email">
+    <%- include('../../partials/csrf') %>
+    <div class="modal-head"><h2 id="offer-email-title">Email the offer letter</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <% if (!mailEnabled) { %><div class="flash flash-info"><%- h.icon('info') %><span>Email isn’t set up on this server, so the message is logged but not delivered. Share the link or WhatsApp instead.</span></div><% } %>
+      <div class="field"><label for="oe-to">To</label><input id="oe-to" name="to" type="email" value="<%= letter.candidate_email || '' %>" required></div>
+      <div class="field mb-0"><label for="oe-msg">Message <span class="muted">(optional)</span></label><textarea id="oe-msg" name="message" rows="5" placeholder="Leave blank for the standard congratulations message."></textarea><div class="hint">The PDF is attached, with a button to view and accept the offer online.</div></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit"><%- h.icon('send', 16) %> Send</button></div>
+  </form>
+</dialog>
+<% } %>

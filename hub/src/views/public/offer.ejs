@@ -1,0 +1,45 @@
+<% const first = letter.candidate_name.split(/\s+/)[0]; %>
+<div class="doc-actions no-print">
+  <div class="row">
+    <% if (isStaff) { %><a class="btn btn-ghost btn-sm" href="/admin/education/offers/<%= letter.id %>">← Back to Hub</a><% } %>
+    <% if (letter.status === 'draft') { %><span class="badge tone-amber">Draft preview: not visible to the student yet</span><% } %>
+  </div>
+  <div class="row">
+    <% if (status === 'issued') { %><a class="btn btn-sm" href="#respond">Accept offer</a><% } %>
+    <a class="btn btn-ghost btn-sm" href="/o/<%= letter.public_token %>/pdf"><%- h.icon('download', 16) %> Download PDF</a>
+  </div>
+</div>
+
+<% if (status === 'accepted') { %>
+  <div class="flash flash-success offer-banner"><%- h.icon('check') %><span>You accepted this offer on <%= h.dateTime(letter.responded_at) %>. Welcome to <%= c.company.brand %>, <%= first %>!</span></div>
+<% } else if (status === 'declined') { %>
+  <div class="flash flash-info offer-banner"><%- h.icon('info') %><span>You declined this offer on <%= h.dateTime(letter.responded_at) %>. Changed your mind? <a href="mailto:<%= c.company.email %>">Write to us</a>.</span></div>
+<% } else if (status === 'expired') { %>
+  <div class="flash flash-info offer-banner"><%- h.icon('clock') %><span>This offer lapsed on <%= h.date(letter.respond_by) %>. If you are still interested, <a href="mailto:<%= c.company.email %>">write to us</a>.</span></div>
+<% } else if (status === 'withdrawn') { %>
+  <div class="flash flash-error offer-banner"><%- h.icon('ban') %><span>This offer has been withdrawn and is no longer open.</span></div>
+<% } %>
+
+<%- include('../partials/offer-letter', { c: c, logo: logo, signature: signature }) %>
+
+<% if (status === 'issued') { %>
+<section class="offer-respond no-print" id="respond">
+  <div class="card card-pad">
+    <h2>Accept your internship offer</h2>
+    <p class="muted">Please accept by <b><%= h.date(letter.respond_by) %></b>. Your typed name serves as your signature, and the time of your acceptance is recorded on the letter.</p>
+    <form method="post" action="/o/<%= letter.public_token %>/respond">
+      <%- include('../partials/csrf') %>
+      <div class="form-grid">
+        <div class="field"><label for="name">Your full name</label><input id="name" name="name" type="text" autocomplete="name" value="<%= letter.candidate_name %>" required></div>
+        <div class="field"><label for="note">Message <span class="muted">(optional)</span></label><input id="note" name="note" type="text" maxlength="1000" placeholder="Anything we should know before you join?"></div>
+      </div>
+      <label class="check mb-16"><input type="checkbox" name="agree" value="1"> I have read and understood the terms of this offer letter, and I accept the internship on these terms.</label>
+      <div class="row">
+        <button class="btn btn-success btn-lg" type="submit" name="decision" value="accept"><%- h.icon('check') %> Accept offer</button>
+        <button class="btn btn-ghost" type="submit" name="decision" value="decline" data-confirm-click="Decline this internship offer?">Decline</button>
+        <% if (settings.whatsapp) { %><a class="btn btn-wa" href="https://wa.me/<%= settings.whatsapp %>?text=<%= encodeURIComponent('Hi, I have a question about my internship offer letter ' + letter.number) %>" target="_blank" rel="noopener"><%- h.icon('whatsapp') %> Ask a question</a><% } %>
+      </div>
+    </form>
+  </div>
+</section>
+<% } %>

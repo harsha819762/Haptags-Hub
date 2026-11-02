@@ -12,6 +12,7 @@ const {
 } = require('../../lib/billing');
 const { requireAdmin } = require('../../lib/auth');
 const certs = require('../../lib/certificates');
+const { displayStatus: displayOfferStatus } = require('../../lib/offers');
 const { importStudents, TEMPLATE } = require('../../lib/student-import');
 const config = require('../../config');
 const { getActivities, logActivity } = require('../../lib/activity');
@@ -211,18 +212,20 @@ async function loadStudent(req, res, next) {
 
 router.get('/students/:id', loadStudent, async (req, res) => {
   const st = req.student;
-  const [invoices, payments, activities, certificates] = await Promise.all([
+  const [invoices, payments, activities, certificates, offerLetters] = await Promise.all([
     db('invoices').where({ client_id: st.id }).orderBy('due_date').orderBy('id'),
     db('payments as p').join('invoices as i', 'i.id', 'p.invoice_id').where('p.client_id', st.id).orderBy('p.paid_on', 'desc')
       .select('p.*', 'i.number as invoice_number'),
     getActivities('client', st.id),
     db('certificates').where({ client_id: st.id }).orderBy('issued_on', 'desc'),
+    db('offer_letters').where({ client_id: st.id }).orderBy('id', 'desc'),
   ]);
   const live = invoices.filter((i) => !['draft', 'void'].includes(i.status));
   const totals = live.reduce((t, i) => ({ billed: t.billed + Number(i.total), paid: t.paid + Number(i.amount_paid) }), { billed: 0, paid: 0 });
   const next = live.find((i) => Number(i.total) > Number(i.amount_paid));
   res.render('admin/education/student', {
     title: st.name, tab: 'students', st, invoices: invoices.map((i) => ({ ...i, link: invoiceUrl(i) })), payments, activities, certificates,
+    offerLetters: offerLetters.map((o) => ({ ...o, display: displayOfferStatus(o) })),
     lmsEnabled: Boolean(config.lms.apiUrl),
     totals: { ...totals, due: totals.billed - totals.paid }, next: next ? { ...next, link: invoiceUrl(next) } : null,
     settings: await getSettings(), programs: await programs(),
@@ -439,5 +442,7 @@ router.post('/programs/:id', async (req, res, next) => {
   req.flash('success', 'Program saved.');
   res.redirect('/admin/education/programs');
 });
+
+router.use('/offers', require('./offers'));
 
 module.exports = router;

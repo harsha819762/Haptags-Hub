@@ -24,6 +24,12 @@
     else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
   });
 
+  // A button that needs its own confirmation (a form-level data-confirm would ask for every button).
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-confirm-click]');
+    if (b && !window.confirm(b.getAttribute('data-confirm-click'))) e.preventDefault();
+  });
+
   // Confirm destructive actions
   document.addEventListener('submit', function (e) {
     var f = e.target;

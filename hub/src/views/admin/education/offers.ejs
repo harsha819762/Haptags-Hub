@@ -1,0 +1,35 @@
+<%- include('_nav') %>
+<%
+  const tone = { draft: 'draft', issued: 'sent', accepted: 'accepted', declined: 'declined', withdrawn: 'void', expired: 'expired' };
+  const tabs = [['', 'All'], ['draft', 'Drafts'], ['issued', 'Awaiting reply'], ['accepted', 'Accepted'], ['declined', 'Declined'], ['expired', 'Expired'], ['withdrawn', 'Withdrawn']];
+%>
+<div class="row-between">
+  <nav class="tabs">
+    <% tabs.forEach(function (t) { %><a href="<%= h.qs('/admin/education/offers', { status: t[0], q: q }) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %><% if (t[0] && counts[t[0]]) { %><span class="n"><%= counts[t[0]] %></span><% } %></a><% }) %>
+  </nav>
+  <div class="row mb-16">
+    <form method="get"><input type="hidden" name="status" value="<%= status %>"><input type="search" name="q" value="<%= q || '' %>" placeholder="Name, number, position, college…" aria-label="Search offer letters" style="width:240px"></form>
+    <a class="btn" href="/admin/education/offers/new"><%- h.icon('plus', 16) %> New offer letter</a>
+  </div>
+</div>
+<div class="card">
+  <% if (!rows.length) { %>
+    <div class="empty"><b>No offer letters<%= q || status ? ' here' : ' yet' %></b>Open a student and choose <b>Create offer letter</b>, or use the button above.</div>
+  <% } else { %>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Letter</th><th>Student</th><th>Internship</th><th class="hide-sm">Reply</th><th>Status</th></tr></thead>
+    <tbody>
+      <% rows.forEach(function (o) { const st = displayStatus(o, today); %>
+      <tr>
+        <td><a class="strong mono" href="/admin/education/offers/<%= o.id %>"><%= o.number || 'Draft' %></a><span class="sub"><%= o.issued_on ? 'Issued ' + h.date(o.issued_on) : 'Not issued' %></span></td>
+        <td><a href="/admin/education/students/<%= o.client_id %>"><%= o.candidate_name %></a><span class="sub"><%= o.college || '' %></span></td>
+        <td><%= o.role_title %><span class="sub"><%= h.date(o.start_date) %> – <%= h.date(o.end_date) %></span></td>
+        <td class="hide-sm small"><%= o.responded_at ? h.dateTime(o.responded_at) : st === 'issued' && o.respond_by ? 'By ' + h.date(o.respond_by) : '—' %></td>
+        <td><%- h.badge(tone[st], h.humanize(st === 'issued' ? 'awaiting_reply' : st)) %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div>
+  <%- include('../../partials/pager', { pagerBase: '/admin/education/offers', pagerQuery: { status: status, q: q } }) %>
+  <% } %>
+</div>

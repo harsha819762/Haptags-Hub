@@ -105,21 +105,23 @@ async function image(kind, fileId) {
   return null;
 }
 
-let signatureCache = { id: null, uri: null };
+const uriCache = {};
 
 /**
- * The authorised signature as a data: URI, for the Hub's own invoice pages. Inline, so the client
- * link (/i/…) shows it without the signature having a public URL of its own. Cached per file.
+ * The logo or authorised signature as a data: URI, for the Hub's own pages (invoices, offer
+ * letters). Inline, so client links show them without the images having public URLs. Cached per file.
  */
-async function signatureDataUri() {
+async function imageDataUri(kind) {
   const p = await getProfile();
-  const id = p.signature_file_id || '';
-  if (signatureCache.id !== id) {
-    const img = id ? await image('signature', id) : null;
-    signatureCache = { id, uri: img ? `data:${img.mime};base64,${img.data.toString('base64')}` : null };
+  const id = p[`${kind}_file_id`] || '';
+  if (!uriCache[kind] || uriCache[kind].id !== id) {
+    const img = id || kind === 'logo' ? await image(kind, id) : null;
+    uriCache[kind] = { id, uri: img ? `data:${img.mime};base64,${img.data.toString('base64')}` : null };
   }
-  return signatureCache.uri;
+  return uriCache[kind].uri;
 }
+
+const signatureDataUri = () => imageDataUri('signature');
 
 /** Stores an uploaded logo/signature. The old file is kept, because finalised documents print it. */
 async function saveImage(kind, { mime, data, name }, userId) {
@@ -131,4 +133,4 @@ async function saveImage(kind, { mime, data, name }, userId) {
   return fileId;
 }
 
-module.exports = { DEFAULTS, getProfile, setProfile, homeStateCode, supplierSnapshot, image, saveImage, signatureDataUri, reloadProfile: load };
+module.exports = { DEFAULTS, getProfile, setProfile, homeStateCode, supplierSnapshot, image, saveImage, imageDataUri, signatureDataUri, reloadProfile: load };
