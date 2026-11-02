@@ -503,3 +503,46 @@ test('one-off fresh start removes the trial documents and restarts the numbering
   await require('../src/migrations/010_gst_fresh_start').up(db);
   assert.equal(Number((await db('gst_audit').where({ action: 'reset' }).count({ n: '*' }).first()).n), 1);
 });
+
+// After the fresh start: the live series on 2 Nov 2026 was 0001 LVS (cancelled, re-raised as 0002)
+// and 0003 CMR. The cancelled 0001 is removed and CMR becomes 0001.
+test('one-off: the cancelled LVS 0001 is removed and CMR becomes HTG/26-27/0001', { skip: fy !== '26-27' && 'only for FY 26-27' }, async () => {
+  const b = new Browser();
+  await b.login('owner@test.local', 'owner-password-1');
+  await b.get('/admin/clients/new');
+  const ids = {};
+  for (const name of ['LVS Constructions', 'LVS BUILDERS LLP', 'CMR CONSTRUTIONS']) {
+    const hubId = idFrom((await b.post('/admin/clients', { name, state: 'Karnataka', city: 'Bengaluru', country: 'India' })).location);
+    await b.get('/invoices/docs/new?kind=invoice');
+    const r = await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: hubId, issue_date: today, ...lines([{ rate: name.startsWith('CMR') ? '500' : '30000' }]) });
+    ids[name] = idFrom(r.location);
+  }
+  const before = await Promise.all(Object.values(ids).map(docRow));
+  assert.deepEqual(before.map((d) => d.number), ['HTG/26-27/0001', 'HTG/26-27/0002', 'HTG/26-27/0003']);
+  const migration = require('../src/migrations/015_gst_cmr_first');
+
+  // While 0001 is still live, nothing happens.
+  await migration.up(db);
+  assert.equal((await docRow(ids['CMR CONSTRUTIONS'])).number, 'HTG/26-27/0003');
+
+  await b.get(`/invoices/docs/${ids['LVS Constructions']}`);
+  await b.post(`/invoices/docs/${ids['LVS Constructions']}/cancel`, { reason: 'Wrong client name; re-raised to LVS BUILDERS LLP' });
+  await migration.up(db);
+
+  assert.equal(await docRow(ids['LVS Constructions']), undefined);
+  assert.equal(await db('gst_document_lines').where({ document_id: ids['LVS Constructions'] }).first(), undefined);
+  const cmr = await docRow(ids['CMR CONSTRUTIONS']);
+  assert.deepEqual([cmr.number, cmr.seq, cmr.status, Number(cmr.total)], ['HTG/26-27/0001', 1, 'unpaid', 59000]);
+  assert.equal((await docRow(ids['LVS BUILDERS LLP'])).number, 'HTG/26-27/0002');
+  const { previewNumber } = require('../src/lib/gst/numbering');
+  assert.equal(await previewNumber('HTG', today), 'HTG/26-27/0003');
+  assert.match((await db('gst_audit').where({ action: 'removed' }).first()).summary, /Removed the cancelled HTG\/26-27\/0001 to LVS Constructions \(₹35,400\.00/);
+  assert.match((await db('gst_audit').where({ entity_id: cmr.id, action: 'renumbered' }).first()).summary, /from HTG\/26-27\/0003 to HTG\/26-27\/0001/);
+  assert.ok(listBackups().some((k) => k.name.startsWith('gst-before-cmr-first-')));
+  // The safety triggers are back, and running it again changes nothing.
+  assert.equal((await db.raw("select name from sqlite_master where type = 'trigger' and name like 'gst_%'")).length, 4);
+  await assert.rejects(() => db('gst_documents').where({ id: cmr.id }).update({ number: 'X/1' }), /cannot be changed/);
+  await migration.up(db);
+  assert.equal((await docRow(cmr.id)).number, 'HTG/26-27/0001');
+  assert.match((await b.get(`/invoices/docs/${cmr.id}`)).text, /HTG\/26-27\/0001/);
+});
