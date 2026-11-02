@@ -13,6 +13,7 @@ const {
 const { requireAdmin } = require('../../lib/auth');
 const certs = require('../../lib/certificates');
 const { displayStatus: displayOfferStatus } = require('../../lib/offers');
+const { syncPrograms, lmsCourseUrl } = require('../../lib/lms-programs');
 const { importStudents, TEMPLATE } = require('../../lib/student-import');
 const config = require('../../config');
 const { getActivities, logActivity } = require('../../lib/activity');
@@ -23,6 +24,8 @@ const { paginate, idParam, back } = require('./_helpers');
 const router = express.Router();
 
 const programs = (all = false) => db('programs').modify((q) => { if (!all) q.where({ is_active: true }); }).orderBy('name');
+// Grouped by LMS category on the Programs page and the enrol form; programmes without one come last.
+const byCategory = (rows) => rows.sort((x, y) => (x.category || '~').localeCompare(y.category || '~') || x.name.localeCompare(y.name));
 
 // ---------------- Overview ----------------
 router.get('/', async (req, res) => {
@@ -140,7 +143,7 @@ function readStudent(body, s) {
 async function formLocals(extra) {
   const s = await getSettings();
   return {
-    programs: await programs(), methods: C.PAYMENT_METHODS, states: C.STATES, settings: s,
+    programs: byCategory(await programs()), methods: C.PAYMENT_METHODS, states: C.STATES, settings: s,
     nextNumber: await previewNumber(s.edu_invoice_prefix, todayIST()), ...extra,
   };
 }
@@ -180,8 +183,12 @@ router.post('/students', async (req, res) => {
   if (Object.keys(errors).length) {
     return res.status(422).render('admin/education/student-form', { title: 'New student', tab: 'students', ...(await formLocals({ form: req.body, errors })) });
   }
+  // LMS programmes have two plans; only those with a certificate fee offer the choice.
+  const program = await db('programs').where({ id: int(req.body.program_id, 0) }).first();
+  const planLabel = program && Number(program.certificate_fee) ? (req.body.plan === 'certificate' ? 'Certificate plan' : 'Internship plan') : null;
   const { clientId } = await E.enroll(student, {
-    programId: int(req.body.program_id, 0) || null,
+    programId: program ? program.id : null,
+    planLabel,
     description: str(req.body.description, 200),
     batch: student.batch,
     fee: fee - discount,
@@ -406,7 +413,22 @@ router.get('/programs', async (req, res) => {
     .select('c.program_id').countDistinct({ students: 'c.id' }).sum({ billed: 'i.total', paid: 'i.amount_paid' }).groupBy('c.program_id');
   const byId = Object.fromEntries(stats.map((r) => [r.program_id, { students: Number(r.students), billed: Number(r.billed || 0), paid: Number(r.paid || 0) }]));
   const edit = await db('programs').where({ id: int(req.query.edit, 0) }).first();
-  res.render('admin/education/programs', { title: 'Programs', tab: 'programs', rows, byId, kinds: E.PROGRAM_KINDS, edit, settings: await getSettings() });
+  byCategory(rows);
+  res.render('admin/education/programs', {
+    title: 'Programs', tab: 'programs', rows, byId, kinds: E.PROGRAM_KINDS, edit, settings: await getSettings(),
+    lmsEnabled: Boolean(config.lms.platformUrl), lmsCourseUrl,
+  });
+});
+
+// Adds new LMS courses, updates names and fees, and archives courses the LMS no longer publishes.
+router.post('/programs/sync', async (req, res) => {
+  try {
+    const r = await syncPrograms();
+    req.flash('success', `Synced with lms.haptags.com: ${r.added} added, ${r.updated} updated${r.archived ? `, ${r.archived} archived (no longer published)` : ''}.`);
+  } catch (err) {
+    req.flash('error', `Couldn’t sync with the LMS: ${err.message}`);
+  }
+  res.redirect('/admin/education/programs');
 });
 
 function readProgram(body) {
@@ -414,7 +436,9 @@ function readProgram(body) {
     name: str(body.name, 190),
     kind: E.PROGRAM_KINDS.some((k) => k[0] === body.kind) ? body.kind : 'internship',
     fee: toPaise(body.fee),
+    certificate_fee: toPaise(body.certificate_fee),
     fee_includes_gst: Boolean(body.fee_includes_gst),
+    category: str(body.category, 100),
     duration: str(body.duration, 60),
     description: str(body.description, 2000),
   };

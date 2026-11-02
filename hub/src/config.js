@@ -93,6 +93,8 @@ const config = {
 };
 
 config.razorpay.enabled = Boolean(config.razorpay.keyId && config.razorpay.keySecret);
+// The LMS's course catalogue (PocketBase) sits beside its API: /hcgi/api → /hcgi/platform.
+config.lms.platformUrl = (env.LMS_PLATFORM_URL || config.lms.apiUrl.replace(/\/api$/, '/platform')).replace(/\/+$/, '');
 
 if (isProd && !config.sessionSecret) {
   throw new Error('SESSION_SECRET must be set in production.');

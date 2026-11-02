@@ -73,11 +73,21 @@
         ? 'Student pays ' + inr.format(total) + (n > 1 ? ' in ' + n + ' instalments of about ' + inr.format(total / n) : '') + (paid ? '; ' + inr.format(paid) + ' received now, ' + inr.format(Math.max(0, total - paid)) + ' left.' : '.')
         : '';
     };
-    prog.addEventListener('change', function () {
-      var f = prog.selectedOptions[0] && prog.selectedOptions[0].getAttribute('data-fee');
+    // LMS programmes have an Internship and a Certificate-only plan, each with its own fee.
+    var plan = $('[name=plan]', enrol);
+    var planField = $('[data-plan-field]', enrol);
+    var syncPlan = function (setFee) {
+      var opt = prog.selectedOptions[0];
+      var cert = opt && opt.getAttribute('data-cert-fee');
+      if (planField) planField.hidden = !cert;
+      if (!setFee) return;
+      var f = cert && plan && plan.value === 'certificate' ? cert : opt && opt.getAttribute('data-fee');
       if (f) fee.value = f;
       summary();
-    });
+    };
+    prog.addEventListener('change', function () { syncPlan(true); });
+    if (plan) plan.addEventListener('change', function () { syncPlan(true); });
+    syncPlan(false);
     enrol.addEventListener('input', summary);
     summary();
   }

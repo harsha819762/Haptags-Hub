@@ -39,7 +39,8 @@ async function enroll(student, plan, userId) {
   const now = nowSql();
   const today = plan.issueDate || todayIST();
   const program = plan.programId ? await db('programs').where({ id: plan.programId }).first() : null;
-  const programName = program ? program.name : (plan.description || 'Program fee');
+  // plan.planLabel names an LMS plan on the invoice, e.g. "Java Internship Training (Certificate plan)".
+  const programName = (program ? program.name : (plan.description || 'Program fee')) + (program && plan.planLabel ? ` (${plan.planLabel})` : '');
   const result = await db.transaction(async (trx) => {
     // plan.clientId: bill a student who is already in the Hub (e.g. added from a certificate).
     let clientId = plan.clientId;

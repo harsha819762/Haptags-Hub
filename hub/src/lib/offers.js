@@ -66,6 +66,8 @@ function joiningText({ mode, location, reporting_to: reportingTo, start_date: st
 async function defaultsFor(student) {
   const s = await getSettings();
   const program = student.program_id ? await db('programs').where({ id: student.program_id }).first() : null;
+  // The fee they were actually billed (their plan, less any discount), else the programme's fee.
+  const billed = await db('invoices').where({ client_id: student.id }).whereNotIn('status', ['draft', 'void']).sum({ t: 'total' }).first();
   const today = todayIST();
   const start = isDate(student.start_date) && student.start_date >= today ? student.start_date : addDays(today, 7);
   // End: the student's own date, else the programme's length ('3 months', '6 weeks'), else a month.
@@ -94,7 +96,7 @@ async function defaultsFor(student) {
     reporting_to: s.offer_reporting_to,
     reporting_designation: s.offer_reporting_designation,
     stipend: 0,
-    fee: program ? Number(program.fee) : 0,
+    fee: Number(billed && billed.t) || (program ? Number(program.fee) : 0),
     show_fee: false,
     respond_by: addDays(today, int(s.offer_respond_days, 7)),
     extra_terms: '',

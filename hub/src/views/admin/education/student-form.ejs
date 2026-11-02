@@ -17,9 +17,19 @@
     <div class="field"><label for="program_id">Program</label>
       <select id="program_id" name="program_id">
         <option value="" data-fee="">— Other (describe below) —</option>
-        <% programs.forEach(function (p) { %><option value="<%= p.id %>" data-fee="<%= Number(p.fee) / 100 %>" <%= h.selected(form.program_id, p.id) %>><%= p.name %> · <%= h.inr(p.fee) %></option><% }) %>
+        <% let group = null; programs.forEach(function (p, i) { const cat = p.category || 'Other'; %>
+        <% if (cat !== group) { %><%- group === null ? '' : '</optgroup>' %><optgroup label="<%= cat %>"><% group = cat; } %>
+        <option value="<%= p.id %>" data-fee="<%= Number(p.fee) / 100 %>"<% if (Number(p.certificate_fee)) { %> data-cert-fee="<%= Number(p.certificate_fee) / 100 %>"<% } %> <%= h.selected(form.program_id, p.id) %>><%= p.name %> · <%= h.inr(p.fee) %></option>
+        <% if (i === programs.length - 1) { %></optgroup><% } }) %>
       </select>
       <% if (!programs.length) { %><div class="hint"><a href="/admin/education/programs">Add your programs</a> to fill fees in one click.</div><% } %>
+    </div>
+    <div class="field" data-plan-field hidden><label for="plan">Plan</label>
+      <select id="plan" name="plan">
+        <option value="internship" <%= h.selected(form.plan || 'internship', 'internship') %>>Internship</option>
+        <option value="certificate" <%= h.selected(form.plan, 'certificate') %>>Certificate only</option>
+      </select>
+      <div class="hint">As on lms.haptags.com. The plan is named on the invoice.</div>
     </div>
     <div class="field" data-show-when="#program_id="><label for="description">What is the fee for?</label><input id="description" name="description" type="text" value="<%= form.description || '' %>" placeholder="e.g. Summer internship – Web development"></div>
     <div class="field"><label for="batch">Batch</label><input id="batch" name="batch" type="text" value="<%= form.batch || '' %>" placeholder="e.g. Jan 2027"></div>

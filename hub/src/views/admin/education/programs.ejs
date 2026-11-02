@@ -1,18 +1,27 @@
 <%- include('_nav') %>
 <div class="split">
   <div class="card">
+    <div class="card-head">
+      <h3>Programs <span class="muted small"><%= rows.filter(function (p) { return p.is_active; }).length %> active</span></h3>
+      <% if (lmsEnabled) { %>
+      <form method="post" action="/admin/education/programs/sync" class="inline" data-confirm="Sync programmes with lms.haptags.com? New courses are added, names and fees updated, and courses no longer published are archived.">
+        <%- include('../../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('retainers', 15) %> Sync from LMS</button>
+      </form>
+      <% } %>
+    </div>
     <% if (!rows.length) { %><div class="empty"><%- h.icon('education', 30) %><b>No programs yet</b>Add your internships and courses with their fees, and enrolling a student becomes one click.</div><% } else { %>
     <div class="table-wrap"><table class="table">
-      <thead><tr><th>Program</th><th class="num">Fee</th><th class="num">Students</th><th class="num">Billed</th><th class="num">Collected</th><th></th></tr></thead>
+      <thead><tr><th>Program</th><th class="num">Fee</th><th class="num">Students</th><th class="num">Billed</th><th></th></tr></thead>
       <tbody>
-        <% rows.forEach(function (p) { const s = byId[p.id] || { students: 0, billed: 0, paid: 0 }; %>
+        <% let group = null; rows.forEach(function (p) { const s = byId[p.id] || { students: 0, billed: 0, paid: 0 }; %>
+        <% if ((p.category || 'Other') !== group) { group = p.category || 'Other'; %><tr class="program-group"><th colspan="5"><%= group %></th></tr><% } %>
         <tr class="<%= p.is_active ? '' : 'muted' %>">
-          <td><a class="strong" href="/admin/education/students?program=<%= p.id %>"><%= p.name %></a><span class="sub"><%= h.humanize(p.kind) %><%= p.duration ? ' · ' + p.duration : '' %><%= p.is_active ? '' : ' · archived' %></span></td>
-          <td class="num"><%= h.inr(p.fee) %><span class="sub"><%= p.fee_includes_gst ? 'incl. GST' : '+ GST' %></span></td>
+          <td><a class="strong" href="/admin/education/students?program=<%= p.id %>"><%= p.name %></a><span class="sub"><%= h.humanize(p.kind) %><%= p.duration ? ' · ' + p.duration : '' %> · <%= p.fee_includes_gst ? 'incl. GST' : '+ GST' %><%= p.is_active ? '' : ' · archived' %></span></td>
+          <td class="num"><%= h.inr(p.fee) %><% if (Number(p.certificate_fee)) { %><span class="sub">Certificate <%= h.inr(p.certificate_fee) %></span><% } %></td>
           <td class="num"><%= s.students %></td>
-          <td class="num"><%= h.inr(s.billed) %></td>
-          <td class="num"><%= h.inr(s.paid) %></td>
+          <td class="num"><%= h.inr(s.billed) %><span class="sub"><%= h.inr(s.paid) %> collected</span></td>
           <td class="nowrap">
+            <% if (p.lms_slug) { %><a class="btn btn-ghost btn-sm" href="<%= lmsCourseUrl(p.lms_slug) %>" target="_blank" rel="noopener" title="Open on lms.haptags.com"><%- h.icon('external', 15) %></a><% } %>
             <a class="btn btn-ghost btn-sm" href="/admin/education/students/new?program=<%= p.id %>" title="Enrol a student"><%- h.icon('plus', 15) %></a>
             <a class="btn btn-ghost btn-sm" href="/admin/education/programs?edit=<%= p.id %>" title="Edit"><%- h.icon('edit', 15) %></a>
             <form method="post" action="/admin/education/programs/<%= p.id %>" class="inline"><%- include('../../partials/csrf') %><input type="hidden" name="toggle" value="1"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Archive' : 'Restore' %></button></form>
@@ -27,11 +36,14 @@
   <form method="post" action="/admin/education/programs<%= edit ? '/' + edit.id : '' %>" class="card card-pad">
     <%- include('../../partials/csrf') %>
     <h3><%= edit ? 'Edit ' + edit.name : 'Add a program' %></h3>
+    <% if (edit && edit.lms_id) { %><p class="small muted mt-0">From lms.haptags.com. “Sync from LMS” updates its name and fees from the LMS.</p><% } %>
     <div class="field"><label for="p-name">Name</label><input id="p-name" name="name" type="text" value="<%= e.name || '' %>" placeholder="e.g. Full-stack web internship" required></div>
     <div class="field"><label for="p-kind">Type</label><select id="p-kind" name="kind"><% kinds.forEach(function (k) { %><option value="<%= k[0] %>" <%= h.selected(e.kind, k[0]) %>><%= k[1] %></option><% }) %></select></div>
-    <div class="field"><label for="p-fee">Fee (₹)</label><input id="p-fee" name="fee" type="number" min="0" step="1" value="<%= e.fee ? Number(e.fee) / 100 : '' %>"></div>
-    <label class="check small mb-16"><input type="checkbox" name="fee_includes_gst" value="1" <%= edit ? h.checked(e.fee_includes_gst) : 'checked' %>> Fee includes GST<%= settings.gstin ? '' : ' (GST applies once a GSTIN is set in Settings)' %></label>
-    <div class="field"><label for="p-dur">Duration</label><input id="p-dur" name="duration" type="text" value="<%= e.duration || '' %>" placeholder="e.g. 8 weeks"></div>
+    <div class="field"><label for="p-fee">Fee (₹)</label><input id="p-fee" name="fee" type="number" min="0" step="1" value="<%= e.fee ? Number(e.fee) / 100 : '' %>"><div class="hint">The Internship plan for LMS courses.</div></div>
+    <div class="field"><label for="p-cfee">Certificate-only fee (₹) <span class="muted">(optional)</span></label><input id="p-cfee" name="certificate_fee" type="number" min="0" step="1" value="<%= e.certificate_fee ? Number(e.certificate_fee) / 100 : '' %>"><div class="hint">When set, enrolment offers a choice of plan.</div></div>
+    <label class="check small mb-16"><input type="checkbox" name="fee_includes_gst" value="1" <%= edit ? h.checked(e.fee_includes_gst) : 'checked' %>> Fees include GST<%= settings.gstin ? '' : ' (GST applies once a GSTIN is set in Settings)' %></label>
+    <div class="field"><label for="p-cat">Category</label><input id="p-cat" name="category" type="text" value="<%= e.category || '' %>" placeholder="e.g. IT & Software"></div>
+    <div class="field"><label for="p-dur">Duration</label><input id="p-dur" name="duration" type="text" value="<%= e.duration || '' %>" placeholder="e.g. 8 weeks"><div class="hint">Used for the end date on offer letters.</div></div>
     <div class="field"><label for="p-desc">Description</label><textarea id="p-desc" name="description" rows="3"><%= e.description || '' %></textarea></div>
     <div class="row"><button class="btn" type="submit"><%= edit ? 'Save' : 'Add program' %></button><% if (edit) { %><a class="btn btn-ghost" href="/admin/education/programs">Cancel</a><% } %></div>
   </form>
