@@ -182,6 +182,7 @@ router.get('/:id', async (req, res, next) => {
     tax: taxSummary(bundle.lines),
     words: inWords(doc.total, doc.currency),
     nextNumber: doc.status === 'draft' ? await previewNumber(prefixFor(doc.kind, res.locals.profile), doc.issue_date) : null,
+    recipient: docs.recipientForm(doc, bundle.client),
   });
 });
 
@@ -216,6 +217,15 @@ router.post('/:id/cancel', async (req, res, next) => {
   if (!doc) return next();
   await docs.cancel(doc.id, str(req.body.reason, 255), actor(req));
   req.flash('success', `${doc.number} cancelled. The number stays used and the record is kept.`);
+  res.redirect(`/invoices/docs/${doc.id}`);
+});
+
+router.post('/:id/recipient', async (req, res, next) => {
+  const doc = await load(req);
+  if (!doc) return next();
+  const r = await docs.editRecipient(doc.id, req.body, actor(req));
+  const done = [r.changed && `${doc.number || 'The draft'} now shows the corrected name and address`, r.clientUpdated && 'the client is updated for future invoices'].filter(Boolean);
+  req.flash('success', done.length ? `${done.join(', and ')}.`.replace(/^t/, 'T') : 'Nothing was changed.');
   res.redirect(`/invoices/docs/${doc.id}`);
 });
 

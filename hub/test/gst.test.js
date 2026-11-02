@@ -401,6 +401,50 @@ test('the Hub’s own invoices show the authorised signature once issued', async
   assert.match((await b.get(`/admin/invoices/${issued}`)).text, /class="doc-sign-img"/);
 });
 
+test('the name and address on a finalised invoice can be corrected, and nothing else', async () => {
+  const b = new Browser();
+  await b.login('owner@test.local', 'owner-password-1');
+  await b.get('/admin/clients/new');
+  const hubId = idFrom((await b.post('/admin/clients', { name: 'Shree Construtions', address: 'Old Road', city: 'Mysuru', pincode: '570001', state: 'Karnataka', country: 'India', email: 'old@shree.test' })).location);
+  await b.get('/invoices/docs/new?kind=invoice');
+  const id = idFrom((await b.post('/invoices/docs', { kind: 'invoice', action: 'finalise', hub_client_id: hubId, issue_date: today, ...lines([{ rate: '1000' }]) })).location);
+  const before = await docRow(id);
+  assert.equal(before.bill_address, 'Old Road\nMysuru – 570001');
+
+  const page = (await b.get(`/invoices/docs/${id}`)).text;
+  assert.match(page, /id="recipient-dialog"/);
+  assert.match(page, /name="city" type="text" maxlength="100" value="Mysuru"/, 'the form is split like the client record');
+
+  let r = await b.post(`/invoices/docs/${id}/recipient`, {
+    name: 'Shree Constructions', address: '12, 1st Main, Mahadevapura', city: 'Bengaluru', pincode: '560048', contact: 'Ravi', phone: '9000000009', email: 'accounts@shree.test',
+    reason: 'Name misspelt', update_client: '1', bill_gstin: '29AASFH7857G1ZK', total: '1',
+  });
+  assert.equal(r.status, 302);
+  const after = await docRow(id);
+  assert.deepEqual([after.bill_name, after.bill_address, after.bill_email, after.bill_contact], ['Shree Constructions', '12, 1st Main, Mahadevapura\nBengaluru – 560048', 'accounts@shree.test', 'Ravi']);
+  for (const k of ['number', 'status', 'total', 'cgst', 'sgst', 'igst', 'bill_gstin', 'bill_state_code', 'pos_code', 'client_type']) assert.equal(after[k], before[k], k);
+  const note = await db('gst_audit').where({ entity_type: 'document', entity_id: id, action: 'recipient_corrected' }).first();
+  assert.match(note.summary, /Name misspelt/);
+  assert.deepEqual(JSON.parse(note.changes).bill_name, ['Shree Construtions', 'Shree Constructions']);
+  // The client is updated too, so the next invoice prints the same.
+  const hub = await db('clients').where({ id: hubId }).first();
+  assert.deepEqual([hub.name, hub.address, hub.city, hub.pincode, hub.email], ['Shree Constructions', '12, 1st Main, Mahadevapura', 'Bengaluru', '560048', 'accounts@shree.test']);
+  assert.equal((await db('gst_clients').where({ hub_client_id: hubId }).first()).name, 'Shree Constructions');
+
+  // Only this document, when asked.
+  await b.get(`/invoices/docs/${id}`);
+  await b.post(`/invoices/docs/${id}/recipient`, { name: 'Shree Constructions Pvt Ltd', address: '12, 1st Main, Mahadevapura', city: 'Bengaluru', pincode: '560048' });
+  assert.equal((await docRow(id)).bill_name, 'Shree Constructions Pvt Ltd');
+  assert.equal((await db('clients').where({ id: hubId }).first()).name, 'Shree Constructions');
+  // A name is required, and a cancelled invoice stays as issued.
+  r = await b.post(`/invoices/docs/${id}/recipient`, { name: '' });
+  assert.match((await b.get(r.location)).text, /Enter the name to print/);
+  await b.post(`/invoices/docs/${id}/cancel`, { reason: 'test' });
+  await b.post(`/invoices/docs/${id}/recipient`, { name: 'Changed After Cancelling' });
+  assert.equal((await docRow(id)).bill_name, 'Shree Constructions Pvt Ltd');
+  assert.doesNotMatch((await b.get(`/invoices/docs/${id}`)).text, /id="recipient-dialog"/);
+});
+
 test('documents and payments are never deleted, and numbers never change', async () => {
   const doc = await db('gst_documents').whereNotNull('number').first();
   await assert.rejects(() => db('gst_documents').where({ id: doc.id }).del(), /never deleted/);

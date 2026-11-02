@@ -8,7 +8,7 @@
 // connection, so a query outside a running transaction would wait for it forever.
 
 const { db } = require('../../db');
-const { nowSql, todayIST, addDays, isDate, str, int, formatDate } = require('../util');
+const { nowSql, todayIST, addDays, isDate, isEmail, str, int, formatDate } = require('../util');
 const C = require('./constants');
 const { computeDocument, supplyTypeFor, parseDiscount } = require('./tax');
 const { getProfile, homeStateCode, supplierSnapshot } = require('./profile');
@@ -16,7 +16,8 @@ const { GstError, prefixFor, takeNumber } = require('./numbering');
 const { parseGstin } = require('./gstin');
 const { audit, diff } = require('./audit');
 const { money, toMinor } = require('./format');
-const { freshClient } = require('./clients');
+const { freshClient, mirror } = require('./clients');
+const { logActivity } = require('../activity');
 
 const isFinal = (doc) => Boolean(doc.number) && doc.status !== 'draft';
 const isTaxDocument = (kind) => kind !== 'proforma';
@@ -360,6 +361,85 @@ async function convertProforma(id, who) {
   return invoiceId;
 }
 
+// ---------------- Correcting the recipient's name and address ----------------
+// What is printed for the recipient can be corrected after finalising (a misspelt name, a new
+// address). GSTIN, state, place of supply and amounts stay as issued: they change the tax, so they
+// need a note. Every change is in the audit log with its before and after.
+
+const RECIPIENT = ['bill_name', 'bill_address', 'bill_contact', 'bill_email', 'bill_phone'];
+
+/** The correction form, filled from the document (split into address, city and PIN like the client). */
+function recipientForm(doc, client) {
+  const fromClient = client && billingFields(client).bill_address === doc.bill_address;
+  return {
+    name: doc.bill_name,
+    address: fromClient ? client.address || '' : doc.bill_address || '',
+    city: fromClient ? client.city || '' : '',
+    pincode: fromClient ? client.pincode || '' : '',
+    contact: doc.bill_contact || (client && client.contact_person) || '',
+    email: doc.bill_email || (client && client.email) || '',
+    phone: doc.bill_phone || (client && client.phone) || '',
+  };
+}
+
+/**
+ * Saves a corrected name, address and contact details on a document. With `update_client` (always
+ * for a draft, which follows its client), the Hub client gets them too, for future documents.
+ * Returns { changed, clientUpdated }.
+ */
+async function editRecipient(id, body, who) {
+  const doc = await db('gst_documents').where({ id }).first();
+  if (!doc || doc.discarded_at) throw new GstError('That document isn’t available.');
+  const label = doc.number || `this draft ${C.KINDS[doc.kind].short.toLowerCase()}`;
+  if (doc.status === 'cancelled') throw new GstError(`${doc.number} is cancelled, so it stays as it was issued.`);
+  if (doc.irn) throw new GstError(`${doc.number} has an e-invoice IRN, so its details can’t be changed here. Cancel it on the IRP within 24 hours and issue a new invoice.`);
+  const f = {
+    name: str(body.name, 190),
+    address: str(body.address, 1000),
+    city: str(body.city, 100),
+    pincode: str(body.pincode, 12),
+    contact: str(body.contact, 190),
+    email: (str(body.email, 190) || '').toLowerCase() || null,
+    phone: str(body.phone, 40),
+  };
+  if (!f.name) throw new GstError('Enter the name to print on the document.');
+  if (f.email && !isEmail(f.email)) throw new GstError(`${f.email} isn’t a valid email address.`);
+  const after = {
+    bill_name: f.name,
+    bill_address: [f.address, [f.city, f.pincode].filter(Boolean).join(' – ')].filter(Boolean).join('\n') || null,
+    bill_contact: f.contact,
+    bill_email: f.email,
+    bill_phone: f.phone,
+  };
+  const changes = diff(doc, after, RECIPIENT);
+  const reason = str(body.reason, 200);
+
+  const client = await db('gst_clients').where({ id: doc.client_id }).first();
+  const hub = (doc.status === 'draft' || body.update_client) && client && client.hub_client_id
+    ? await db('clients').where({ id: client.hub_client_id }).first() : null;
+  const hubAfter = { name: f.name, address: f.address, city: f.city, pincode: f.pincode, contact_name: f.contact, email: f.email, phone: f.phone };
+  const hubChanges = hub ? diff(hub, hubAfter, Object.keys(hubAfter)) : {};
+
+  await db.transaction(async (trx) => {
+    if (Object.keys(changes).length) {
+      await trx('gst_documents').where({ id }).update({ ...after, updated_at: nowSql(), updated_by: who.id });
+      await audit(who, {
+        entity: 'document', id, action: 'recipient_corrected', changes,
+        summary: `Recipient’s name and address corrected on ${label}${reason ? `: ${reason}` : ''}. GSTIN, place of supply and amounts are unchanged.`,
+      }, trx);
+    }
+    if (Object.keys(hubChanges).length) {
+      await trx('clients').where({ id: hub.id }).update({ ...hubAfter, updated_at: nowSql() });
+      await audit(who, { entity: 'client', id: hub.id, action: 'edited', changes: hubChanges, summary: `Client ${f.name} updated from ${label}` }, trx);
+    }
+  });
+  if (Object.keys(hubChanges).length) {
+    await mirror(hub.id);
+    await logActivity('client', hub.id, who.id, 'system', `Client details updated from GST Invoices (${label})`);
+  }
+  return { changed: Object.keys(changes).length > 0, clientUpdated: Object.keys(hubChanges).length > 0 };
+}
+
 async function loadDocument(id) {
   const doc = await db('gst_documents').where({ id }).first();
   if (!doc) return null;
@@ -379,6 +459,6 @@ async function loadDocument(id) {
 }
 
 module.exports = {
-  parseForm, saveDraft, finalise, cancel, discard, convertProforma, loadDocument, getLines, refreshSettlement,
+  parseForm, saveDraft, finalise, cancel, discard, convertProforma, loadDocument, getLines, refreshSettlement, recipientForm, editRecipient,
   creditable, isFinal, isTaxDocument, termDays, noteOriginal,
 };

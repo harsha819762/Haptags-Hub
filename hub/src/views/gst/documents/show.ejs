@@ -9,6 +9,7 @@
   const activePayments = payments.filter(function (p) { return p.status === 'active'; });
   const label = C.KINDS[doc.kind].label;
   const pdf = '/invoices/docs/' + doc.id + '/pdf';
+  const canEditRecipient = !doc.discarded_at && doc.status !== 'cancelled' && !doc.irn;
 %>
 <%- include('../_nav', { active: type }) %>
 <div class="crumbs"><a href="/invoices/docs?type=<%= type %>"><%= isNote ? 'Credit & debit notes' : C.KINDS[doc.kind].plural %></a> / <%= g.docLabel(doc) %></div>
@@ -30,6 +31,7 @@
       <a class="btn btn-ghost" href="<%= pdf %>?download=1"><%- h.icon('download', 16) %> Download PDF</a>
       <% if (doc.kind !== 'proforma') { %><a class="btn btn-ghost" href="<%= pdf %>?copies=both&amp;download=1" title="Original for recipient and duplicate for supplier"><%- h.icon('copy', 16) %> With duplicate</a><% } %>
       <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener" title="Opens the PDF; print it from there"><%- h.icon('printer', 16) %> Print</a>
+      <% if (canEditRecipient) { %><button class="btn btn-ghost" type="button" data-dialog="#recipient-dialog"><%- h.icon('edit', 16) %> Edit name &amp; address</button><% } %>
       <% if (doc.status !== 'cancelled') { %><button class="btn btn-ghost" type="button" data-dialog="#email-dialog"><%- h.icon('mail', 16) %> Email</button><% } %>
       <% if (open) { %><a class="btn" href="#payments"><%- h.icon('payments', 16) %> Record payment</a><% } %>
       <% if (doc.kind === 'proforma' && doc.status === 'issued') { %>
@@ -50,7 +52,7 @@
   <article class="card gst-doc" aria-label="<%= g.docTitle(doc) %>">
     <header class="gst-doc-head">
       <div>
-        <div class="gst-doc-kicker"><%= isNote ? 'Recipient' : 'Bill to' %></div>
+        <div class="gst-doc-kicker"><%= isNote ? 'Recipient' : 'Bill to' %><% if (canEditRecipient) { %> · <button class="btn-link" type="button" data-dialog="#recipient-dialog">Edit name &amp; address</button><% } %></div>
         <b class="gst-doc-name"><%= doc.bill_name %></b>
         <% if (doc.bill_address) { %><div class="small"><%- h.nl2br(doc.bill_address) %></div><% } %>
         <div class="small"><%= doc.client_type === 'export' ? 'Country: ' + doc.bill_country : 'State: ' + (doc.bill_state_name || '—') + ' (' + (doc.bill_state_code || '—') + ')' %></div>
@@ -249,6 +251,34 @@
     <% } %>
   </div>
 </div>
+
+<% if (canEditRecipient) { %>
+<dialog class="modal" id="recipient-dialog" aria-labelledby="recipient-title">
+  <form method="post" action="/invoices/docs/<%= doc.id %>/recipient">
+    <%- include('../../partials/csrf') %>
+    <div class="modal-head"><h2 id="recipient-title">Edit name &amp; address<%= doc.number ? ' on ' + doc.number : '' %></h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <p class="small muted mt-0">Corrects the <%= isNote ? 'recipient' : 'buyer' %>’s name and address as printed.<% if (final) { %> GSTIN, state, place of supply and amounts stay as issued; correct those with a credit note and a new invoice. The change is kept in the audit trail.<% } %></p>
+      <div class="field"><label for="rc-name">Name *</label><input id="rc-name" name="name" type="text" maxlength="190" required value="<%= recipient.name %>"><% if (doc.bill_gstin) { %><div class="hint">Use the legal or trade name on their GST registration (<span class="mono"><%= doc.bill_gstin %></span>).</div><% } %></div>
+      <div class="field"><label for="rc-address">Address</label><textarea id="rc-address" name="address" rows="3" maxlength="1000"><%= recipient.address %></textarea></div>
+      <div class="form-grid">
+        <div class="field"><label for="rc-city">City</label><input id="rc-city" name="city" type="text" maxlength="100" value="<%= recipient.city %>"></div>
+        <div class="field"><label for="rc-pin">PIN code</label><input id="rc-pin" name="pincode" type="text" maxlength="12" inputmode="numeric" value="<%= recipient.pincode %>"></div>
+        <div class="field"><label for="rc-contact">Contact person</label><input id="rc-contact" name="contact" type="text" maxlength="190" value="<%= recipient.contact %>"></div>
+        <div class="field"><label for="rc-phone">Phone</label><input id="rc-phone" name="phone" type="text" maxlength="40" value="<%= recipient.phone %>"></div>
+        <div class="field full"><label for="rc-email">Email</label><input id="rc-email" name="email" type="email" maxlength="190" value="<%= recipient.email %>"></div>
+      </div>
+      <% if (final) { %>
+      <div class="field"><label for="rc-reason">What was wrong <span class="muted">(optional)</span></label><input id="rc-reason" name="reason" type="text" maxlength="200" placeholder="e.g. client name misspelt"></div>
+      <label class="check small"><input type="checkbox" name="update_client" value="1" checked> Also update <%= client ? client.name : 'the client' %> in Clients, so future invoices use these details</label>
+      <% } else { %>
+      <p class="small muted mb-0">A draft always bills its client’s current details, so this also updates <%= client ? client.name : 'the client' %> in Clients.</p>
+      <% } %>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit"><%- h.icon('check', 16) %> Save</button></div>
+  </form>
+</dialog>
+<% } %>
 
 <% if (final && doc.status !== 'cancelled') { %>
 <dialog class="modal" id="email-dialog" aria-labelledby="email-title">
