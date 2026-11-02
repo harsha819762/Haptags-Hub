@@ -6,12 +6,22 @@
 //   { course_slug, course_title, student_email, student_name }
 // Returns the course's daily doubt-clearing session (creating the meeting on first request
 // of the day), adds the student as a guest and emails them the calendar invite once.
+//
+// POST /api/v1/lms/invoice[?pdf=1]   header X-API-Key: <LMS key>
+//   { merchant_order_id, order_id, transaction_id, paid_at, student: { name, email, phone, college,
+//     state_code? }, course: { lms_id, slug, title }, plan, taxable, discount, gst_rate, total, coupon_code }
+//   (amounts in paise). Issues the official GST tax invoice for a paid LMS order in GST Invoices
+//   (HTG series, SAC 999293, payment recorded) and returns it; the same order always returns the
+//   same invoice. 201 when issued now, 200 when it already existed.
+// GET  /api/v1/lms/invoice/:merchantOrderId[?pdf=1]   the invoice summary (and PDF)
+// GET  /api/v1/lms/invoice/:merchantOrderId/pdf       the PDF itself
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const config = require('../config');
 const { db } = require('../db');
 const { createMeeting, emailInvites, joinUrl } = require('../lib/meetings');
+const lmsInvoices = require('../lib/lms-invoices');
 const { str, isEmail, sha256, safeEqual, todayIST, addDays, istToUtc, addMinutesSql, nowSql } = require('../lib/util');
 
 const router = express.Router();
@@ -97,6 +107,46 @@ router.post('/api/v1/lms/doubt-session', limiter, async (req, res) => {
     join_url: joinUrl(meeting),
     invited,
   });
+});
+
+// ── Official GST tax invoices for LMS payments ──────────────────────────────────────────────
+
+const wantsPdf = (req) => req.query.pdf === '1' || (req.body && req.body.include_pdf === true);
+
+/** A rule the LMS can act on (bad input, GST rule, not found, busy) → JSON with its status; anything else is a server error. */
+function invoiceError(res, err) {
+  const status = err.gst ? 422 : err.status;
+  if (status) return res.status(status).json({ error: err.message });
+  throw err;
+}
+
+router.post('/api/v1/lms/invoice', limiter, async (req, res) => {
+  if (!authorised(req)) return res.status(401).json({ error: 'Missing or invalid API key.' });
+  try {
+    const result = await lmsInvoices.issueInvoice(req.body || {}, { ip: req.ip, pdf: wantsPdf(req) });
+    res.status(result.created ? 201 : 200).json(result);
+  } catch (err) {
+    invoiceError(res, err);
+  }
+});
+
+router.get('/api/v1/lms/invoice/:order', limiter, async (req, res) => {
+  if (!authorised(req)) return res.status(401).json({ error: 'Missing or invalid API key.' });
+  const row = await lmsInvoices.findByOrder(req.params.order);
+  if (!row) return res.status(404).json({ error: 'No invoice has been issued for this order.' });
+  try {
+    res.json({ created: false, ...(await lmsInvoices.summary(row.document_id, { pdf: wantsPdf(req) })) });
+  } catch (err) {
+    invoiceError(res, err);
+  }
+});
+
+router.get('/api/v1/lms/invoice/:order/pdf', limiter, async (req, res) => {
+  if (!authorised(req)) return res.status(401).json({ error: 'Missing or invalid API key.' });
+  const file = await lmsInvoices.invoicePdf(req.params.order);
+  if (!file) return res.status(404).json({ error: 'No invoice has been issued for this order.' });
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${file.filename}"`, 'Cache-Control': 'private, no-store' });
+  res.send(file.pdf);
 });
 
 module.exports = router;
