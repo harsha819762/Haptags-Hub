@@ -9,6 +9,7 @@ const rt = require('../lib/realtime');
 const rooms = require('../lib/rooms');
 const chat = require('../lib/chat');
 const M = require('../lib/meetings');
+const { notifyCall } = require('../lib/team-notify');
 const { ensureClientGroup } = require('../lib/clientchat');
 const { notFound } = require('../lib/middleware');
 const { nowSql, str, int, isEmail, istToUtc, utcToIst, addMinutesSql, todayIST } = require('../lib/util');
@@ -160,7 +161,7 @@ router.post('/meetings/now', async (req, res) => {
   });
   const m = await db('meetings').where({ id }).first();
   if (invited.length) {
-    rt.publish({ users: invited }, 'call.ring', { channelId: null, by: req.user.name, title: m.title, url: `/meet/${m.room_token}` });
+    await notifyCall({ userIds: invited, by: req.user, title: m.title, url: `/meet/${m.room_token}` });
   }
   res.redirect(`/meet/${m.room_token}${req.body.voice ? '?voice=1' : ''}`);
 });
@@ -315,7 +316,7 @@ router.post('/:id/call', channelParam, async (req, res) => {
   const meetingId = await M.createMeeting({ title, startsAt: nowSql(), duration: 30, allowGuests: false, createdBy: req.user.id, userIds: memberIds, channelId: c.id });
   const meeting = await db('meetings').where({ id: meetingId }).first();
   await chat.postMessage({ channelId: c.id, userId: req.user.id, kind: 'call', body: `${req.user.name} started a ${voice ? 'voice' : 'video'} call`, meetingId });
-  rt.publish({ users: memberIds.filter((id) => id !== req.user.id) }, 'call.ring', { channelId: c.id, by: req.user.name, title, url: `/meet/${meeting.room_token}` });
+  await notifyCall({ userIds: memberIds, by: req.user, title, url: `/meet/${meeting.room_token}`, channelId: c.id });
   const url = `/meet/${meeting.room_token}${voice ? '?voice=1' : ''}`;
   if (wantsJson(req)) return res.json({ url });
   res.redirect(url);

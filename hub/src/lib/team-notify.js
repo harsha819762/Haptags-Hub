@@ -27,6 +27,25 @@ async function notifyLeaders({ roles = ['owner', 'admin'], except = null, title,
   return people;
 }
 
+/**
+ * Rings everyone in a call (DM, group or channel) except the caller. Open tabs ring at once; anyone with no
+ * open tab is emailed a Join link, so nobody misses the call. Emails go out in the background.
+ */
+async function notifyCall({ userIds, by, title, url, channelId = null }) {
+  const targets = [...new Set(userIds.map(Number))].filter((id) => id && id !== Number(by.id));
+  if (!targets.length) return [];
+  rt.publish({ users: targets }, 'call.ring', { channelId, by: by.name, title, url });
+  const online = new Set(rt.onlineUsers());
+  const offline = await db('users').whereIn('id', targets.filter((id) => !online.has(id))).where({ is_active: true }).select('name', 'email');
+  const mails = offline.filter((p) => p.email).map((p) => sendMail({
+    to: p.email, subject: `${by.name} is calling you`, heading: `${by.name} is calling`,
+    lines: [`Hi ${String(p.name || '').split(' ')[0]},`, `${by.name} started “${title}”. Join now while it is still live.`],
+    button: { label: 'Join the call', url: `${config.baseUrl}${url}` },
+  }).catch(() => false));
+  notifyCall.lastEmails = Promise.all(mails); // tests wait on this
+  return targets;
+}
+
 /** "Under review" means the client is checking it: owners and admins hear about it straight away. */
 function reviewNotice({ who, kind, name, project, url }) {
   return notifyLeaders({
@@ -39,4 +58,4 @@ function reviewNotice({ who, kind, name, project, url }) {
   }).catch((err) => { console.error('[notify] review', err.message); return []; });
 }
 
-module.exports = { notifyLeaders, reviewNotice };
+module.exports = { notifyLeaders, notifyCall, reviewNotice };

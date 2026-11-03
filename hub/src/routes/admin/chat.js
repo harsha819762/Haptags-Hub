@@ -5,6 +5,7 @@ const { db } = require('../../db');
 const rt = require('../../lib/realtime');
 const chat = require('../../lib/chat');
 const { createMeeting } = require('../../lib/meetings');
+const { notifyCall } = require('../../lib/team-notify');
 const { nowSql, str, int } = require('../../lib/util');
 const { idParam } = require('./_helpers');
 
@@ -199,9 +200,7 @@ router.post('/:id/call', channelParam, async (req, res) => {
   });
   const meeting = await db('meetings').where({ id: meetingId }).first();
   await chat.postMessage({ channelId: c.id, userId: req.user.id, kind: 'call', body: `${req.user.name} started a call`, meetingId });
-  rt.publish({ users: memberIds.filter((id) => id !== req.user.id) }, 'call.ring', {
-    channelId: c.id, by: req.user.name, title, url: `/meet/${meeting.room_token}`,
-  });
+  await notifyCall({ userIds: memberIds, by: req.user, title, url: `/meet/${meeting.room_token}`, channelId: c.id });
   const url = `/meet/${meeting.room_token}`;
   if (req.accepts(['html', 'json']) === 'json') return res.json({ url });
   res.redirect(url);
