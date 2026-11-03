@@ -7,15 +7,15 @@
  *    chats between that client's people and the team are folded into that group, so nothing is lost.
  */
 exports.up = async function up(knex) {
-  await knex.schema.createTable('project_members', (t) => {
+  if (!(await knex.schema.hasTable('project_members'))) await knex.schema.createTable('project_members', (t) => {
     t.increments('id');
     t.integer('project_id').unsigned().notNullable().references('id').inTable('projects').onDelete('CASCADE');
     t.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
     t.datetime('created_at');
     t.unique(['project_id', 'user_id']);
   });
-  await knex.schema.alterTable('users', (t) => { t.boolean('all_projects').notNullable().defaultTo(true); });
-  await knex.schema.alterTable('channels', (t) => { t.integer('client_id').unsigned(); });
+  if (!(await knex.schema.hasColumn('users', 'all_projects'))) await knex.schema.alterTable('users', (t) => { t.boolean('all_projects').notNullable().defaultTo(true); });
+  if (!(await knex.schema.hasColumn('channels', 'client_id'))) await knex.schema.alterTable('channels', (t) => { t.integer('client_id').unsigned(); });
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const clients = await knex('clients').select('id', 'name');
@@ -24,7 +24,9 @@ exports.up = async function up(knex) {
     if (!clientUsers.length) continue;
     const contacts = await knex('client_contacts').where({ client_id: c.id }).pluck('user_id');
 
-    const [gid] = await knex('channels').insert({ kind: 'group', name: `${c.name} × Haptags`, is_private: true, client_id: c.id, created_at: now, last_message_at: now });
+    // An interrupted run may already have made this client's group: carry on with it.
+    const existing = await knex('channels').where({ client_id: c.id }).first();
+    const [gid] = existing ? [existing.id] : await knex('channels').insert({ kind: 'group', name: `${c.name} × Haptags`, is_private: true, client_id: c.id, created_at: now, last_message_at: now });
     const groupId = Array.isArray(gid) ? gid[0] : gid;
 
     // Fold every other conversation these people were in (DMs and groups) into the one group.
@@ -41,6 +43,7 @@ exports.up = async function up(knex) {
     const last = await knex('messages').where({ channel_id: groupId }).max({ m: 'id' }).first();
     const lastId = Number(last.m || 0);
     for (const uid of new Set([...clientUsers, ...team])) {
+      if (await knex('channel_members').where({ channel_id: groupId, user_id: uid }).first()) continue;
       await knex('channel_members').insert({ channel_id: groupId, user_id: uid, last_read_id: lastId, joined_at: now });
     }
     // Contacts are who the client can reach, so keep that list in step with the group.

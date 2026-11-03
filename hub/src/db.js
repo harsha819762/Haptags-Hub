@@ -43,13 +43,50 @@ async function renamePortalMigrations() {
   console.log('[db] Renamed Haptags Portal migration records to this app’s numbering.');
 }
 
+const MIGRATIONS = { directory: path.join(__dirname, 'migrations'), loadExtensions: ['.js'] };
+
+async function clearStaleLock() {
+  if (!(await db.schema.hasTable('knex_migrations_lock'))) return;
+  const lock = await db('knex_migrations_lock').first();
+  if (lock && Number(lock.is_locked) === 1) {
+    console.warn('[db] Clearing a migration lock left by a stopped start.');
+    await db.migrate.forceFreeMigrationsLock(MIGRATIONS);
+  }
+}
+
+async function runMigrations() {
+  await renamePortalMigrations();
+  const [, pending] = await db.migrate.list(MIGRATIONS);
+  if (pending.length) console.log(`[db] Running migrations: ${pending.map((m) => m.file || m.name || m).join(', ')}`);
+  await db.migrate.latest(MIGRATIONS);
+}
+
+/**
+ * On MySQL, knex's own migration lock is a row that stays set if the process is stopped mid-way
+ * (a deploy restarting the app does exactly that), and every later start then refuses to run.
+ * So the real mutex is a MySQL named lock, which the server releases when the connection dies:
+ * whoever holds it knows no one else is migrating and can clear a stale knex lock.
+ */
 async function migrate() {
   if (config.db.client === 'better-sqlite3') {
     await db.raw('PRAGMA foreign_keys = ON');
     await db.raw('PRAGMA journal_mode = WAL');
+    await clearStaleLock(); // SQLite means one app process on one server, so a set lock is a stale one
+    return runMigrations();
   }
-  await renamePortalMigrations();
-  await db.migrate.latest({ directory: path.join(__dirname, 'migrations'), loadExtensions: ['.js'] });
+  const conn = await db.client.acquireConnection();
+  try {
+    const [rows] = await db.raw("SELECT GET_LOCK('haptags_hub_migrate', 120) AS got").connection(conn);
+    if (!rows || Number(rows[0].got) !== 1) throw new Error('Another copy of the app is running the migrations; try again shortly.');
+    try {
+      await clearStaleLock();
+      await runMigrations();
+    } finally {
+      await db.raw("SELECT RELEASE_LOCK('haptags_hub_migrate')").connection(conn).catch(() => {});
+    }
+  } finally {
+    await db.client.releaseConnection(conn);
+  }
 }
 
 module.exports = { db, migrate };

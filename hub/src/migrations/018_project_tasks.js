@@ -2,6 +2,7 @@
 
 /** Tasks live inside a project and move across the project's To do / In progress / Under review / Completed board. */
 exports.up = async function up(knex) {
+  if (await knex.schema.hasTable('project_tasks')) return; // safe to re-run after an interrupted start
   await knex.schema.createTable('project_tasks', (t) => {
     t.increments('id');
     t.integer('project_id').unsigned().notNullable().references('id').inTable('projects').onDelete('CASCADE');

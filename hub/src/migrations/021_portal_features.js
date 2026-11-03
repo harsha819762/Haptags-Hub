@@ -1,19 +1,20 @@
 'use strict';
 
 /** Task details and comments, project files, billing status, notification read-state, and profile fields. */
+// Each step checks first, so a start that was stopped half-way can finish the rest.
 exports.up = async function up(knex) {
-  await knex.schema.alterTable('billing_docs', (t) => {
+  if (!(await knex.schema.hasColumn('billing_docs', 'status'))) await knex.schema.alterTable('billing_docs', (t) => {
     t.string('status', 12).notNullable().defaultTo('open'); // open | paid | accepted | void
     t.integer('source_id').unsigned(); // the document this one was made from
   });
 
-  await knex.schema.alterTable('project_tasks', (t) => {
+  if (!(await knex.schema.hasColumn('project_tasks', 'description'))) await knex.schema.alterTable('project_tasks', (t) => {
     t.text('description');
     t.string('priority', 10).notNullable().defaultTo('normal'); // low | normal | high
     t.datetime('approved_at');
   });
 
-  await knex.schema.createTable('task_comments', (t) => {
+  if (!(await knex.schema.hasTable('task_comments'))) await knex.schema.createTable('task_comments', (t) => {
     t.increments('id');
     t.integer('task_id').unsigned().notNullable().references('id').inTable('project_tasks').onDelete('CASCADE');
     t.integer('user_id').unsigned().references('id').inTable('users').onDelete('SET NULL');
@@ -22,7 +23,7 @@ exports.up = async function up(knex) {
     t.index(['task_id']);
   });
 
-  await knex.schema.createTable('project_files', (t) => {
+  if (!(await knex.schema.hasTable('project_files'))) await knex.schema.createTable('project_files', (t) => {
     t.increments('id');
     t.integer('project_id').unsigned().notNullable().references('id').inTable('projects').onDelete('CASCADE');
     t.integer('task_id').unsigned().references('id').inTable('project_tasks').onDelete('CASCADE');
@@ -37,7 +38,7 @@ exports.up = async function up(knex) {
     t.index(['task_id']);
   });
 
-  await knex.schema.createTable('notification_reads', (t) => {
+  if (!(await knex.schema.hasTable('notification_reads'))) await knex.schema.createTable('notification_reads', (t) => {
     t.increments('id');
     t.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
     t.string('key', 120).notNullable();
@@ -45,7 +46,7 @@ exports.up = async function up(knex) {
     t.unique(['user_id', 'key']);
   });
 
-  await knex.schema.alterTable('users', (t) => {
+  if (!(await knex.schema.hasColumn('users', 'avatar_file_id'))) await knex.schema.alterTable('users', (t) => {
     t.integer('avatar_file_id').unsigned();
     t.string('job_title', 120);
     t.boolean('email_updates').notNullable().defaultTo(true);

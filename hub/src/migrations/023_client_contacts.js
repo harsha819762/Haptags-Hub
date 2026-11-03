@@ -5,7 +5,7 @@
  * only the team can read. Existing clients start with the owner plus anyone the team has already chatted with them.
  */
 exports.up = async function up(knex) {
-  await knex.schema.createTable('client_contacts', (t) => {
+  if (!(await knex.schema.hasTable('client_contacts'))) await knex.schema.createTable('client_contacts', (t) => {
     t.increments('id');
     t.integer('client_id').unsigned().notNullable().references('id').inTable('clients').onDelete('CASCADE');
     t.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
@@ -13,7 +13,7 @@ exports.up = async function up(knex) {
     t.unique(['client_id', 'user_id']);
   });
 
-  await knex.schema.alterTable('task_comments', (t) => {
+  if (!(await knex.schema.hasColumn('task_comments', 'internal'))) await knex.schema.alterTable('task_comments', (t) => {
     t.boolean('internal').notNullable().defaultTo(false);
   });
 
@@ -25,6 +25,7 @@ exports.up = async function up(knex) {
     const key = `${client_id}:${user_id}`;
     if (seen.has(key)) return;
     seen.add(key);
+    if (await knex('client_contacts').where({ client_id, user_id }).first()) return; // already there from an interrupted run
     await knex('client_contacts').insert({ client_id, user_id, created_at: now });
   };
   for (const c of clients) if (owner) await add(c.id, owner.id);

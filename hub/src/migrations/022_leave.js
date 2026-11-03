@@ -2,6 +2,7 @@
 
 /** Leave requests from the Haptags team, approved or rejected by an owner or admin. */
 exports.up = async function up(knex) {
+  if (await knex.schema.hasTable('leave_requests')) return; // safe to re-run after an interrupted start
   await knex.schema.createTable('leave_requests', (t) => {
     t.increments('id');
     t.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');

@@ -2,6 +2,7 @@
 
 /** Sales logged by the team: who sold what, to whom, for how much. Owners and admins see everyone's; teammates see their own. */
 exports.up = async function up(knex) {
+  if (await knex.schema.hasTable('sales')) return; // safe to re-run after an interrupted start
   await knex.schema.createTable('sales', (t) => {
     t.increments('id');
     t.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE'); // credited to

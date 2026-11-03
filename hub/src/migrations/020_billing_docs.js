@@ -2,6 +2,7 @@
 
 /** Quotations, invoices and receipts made with the simple document builder. Money is in paise. */
 exports.up = async function up(knex) {
+  if (await knex.schema.hasTable('billing_docs')) return; // safe to re-run after an interrupted start
   await knex.schema.createTable('billing_docs', (t) => {
     t.increments('id');
     t.integer('client_id').unsigned().notNullable().references('id').inTable('clients').onDelete('CASCADE');
