@@ -1,5 +1,6 @@
 <%
-  const ROLE = { owner: ['Owner', 'violet', 'Full access, including finance and team'], admin: ['Admin', 'blue', 'Manages clients, billing and the team'], staff: ['Staff', 'grey', 'Works on projects and talks to clients'] };
+  const ROLE = { owner: ['Owner', 'violet', 'Full access, and can make other owners'], admin: ['Admin', 'blue', 'Full access to every section and the team'], staff: ['Staff', 'grey', 'Projects, tasks, chat, sales, leave and calendar, plus any section opened to them'] };
+  const permName = function (k) { return (PERMISSIONS.find(function (x) { return x[0] === k; }) || [k, k])[1]; };
 %>
 <div class="page-head"><div><h1>Team</h1><div class="sub">Everyone in the Haptags organisation and what they can do.</div></div></div>
 
@@ -17,16 +18,29 @@
       <div class="row" style="flex-wrap:nowrap"><input id="invite-link" type="text" readonly value="<%= inviteLink.link %>"><button class="btn btn-ghost btn-sm" type="button" data-copy="#invite-link">Copy</button></div>
     </div><% } %>
     <ul class="list people-list">
-      <% people.forEach(function (p) { const r = ROLE[p.role]; const locked = p.role === 'owner' || p.id === user.id; %>
+      <% people.forEach(function (p) { const r = ROLE[p.role]; const locked = p.id === user.id || (p.role === 'owner' && !isOwner); const grants = p.role === 'staff' ? grantsOf(p) : []; %>
       <li class="<%= p.is_active ? '' : 'is-read' %>">
         <span class="avatar<%= online.has(p.id) ? ' online' : '' %>"><%= h.initials(p.name) %></span>
         <div class="grow">
           <span class="title"><%= p.name %><%= p.id === user.id ? ' (you)' : '' %></span>
           <span class="meta"><%= p.email %><%= p.job_title ? ' · ' + p.job_title : '' %></span>
+          <% if (p.role === 'staff' && grants.length) { %><span class="meta access-chips"><% grants.forEach(function (k) { %><span class="chip"><%- h.icon('check', 11) %> <%= permName(k) %></span><% }) %></span><% } %>
           <% if (manage && p.is_active && sales[p.id]) { %><span class="meta">Sales this month: <b><%= h.inr(sales[p.id].total) %></b> · <%= sales[p.id].n %></span><% } %>
           <span class="meta"><% if (!p.is_active) { %>Access removed<% } else if (!p.password_hash) { %><span class="badge tone-amber">Invite pending</span><% } else { %><%= online.has(p.id) ? 'Online now' : p.last_login_at ? 'Last seen ' + h.ago(p.last_login_at) : 'Hasn’t signed in yet' %><% } %></span>
         </div>
         <% if (manage && !locked) { %>
+        <% if (p.role === 'staff') { %>
+        <details class="access-edit">
+          <summary class="btn btn-ghost btn-sm"><%- h.icon('lock', 13) %> Access</summary>
+          <form method="post" action="/team/people/<%= p.id %>" class="access-form"><%- include('../partials/csrf') %><input type="hidden" name="action" value="access">
+            <div class="small muted mb-8">Open sections to <%= p.name.split(' ')[0] %> on top of the standard staff access.</div>
+            <% PERMISSIONS.forEach(function (perm) { %>
+            <label class="check perm-check"><input type="checkbox" name="perms" value="<%= perm[0] %>" <%= grants.includes(perm[0]) ? 'checked' : '' %>> <span><b><%= perm[1] %></b><small><%= perm[2] %></small></span></label>
+            <% }) %>
+            <button class="btn btn-sm" type="submit"><%- h.icon('check', 14) %> Save access</button>
+          </form>
+        </details>
+        <% } %>
         <details class="access-edit">
           <summary class="btn btn-ghost btn-sm">Edit</summary>
           <form method="post" action="/team/people/<%= p.id %>" class="access-form"><%- include('../partials/csrf') %><input type="hidden" name="action" value="details">
@@ -40,7 +54,8 @@
           </form>
         </details>
         <form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="role">
-          <select name="role" data-autosubmit class="sel-sm" aria-label="Role"><option value="staff" <%= p.role === 'staff' ? 'selected' : '' %>>Staff</option><option value="admin" <%= p.role === 'admin' ? 'selected' : '' %>>Admin</option></select></form>
+          <select name="role" data-autosubmit class="sel-sm" aria-label="Role"><% if (p.role === 'owner') { %><option value="owner" selected disabled>Owner</option><% } %><option value="staff" <%= p.role === 'staff' ? 'selected' : '' %>>Staff</option><option value="admin" <%= p.role === 'admin' ? 'selected' : '' %>>Admin</option></select></form>
+        <% if (isOwner && p.role !== 'owner' && p.is_active) { %><form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="Make <%= p.name %> an owner? Owners have full access to everything, including making or removing other owners."><%- include('../partials/csrf') %><input type="hidden" name="action" value="role"><input type="hidden" name="role" value="owner"><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('lock', 13) %> Make owner</button></form><% } %>
         <% if (p.is_active && !p.password_hash) { %><form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="resend"><button class="btn btn-ghost btn-sm" type="submit">Resend invite</button></form><% } %>
         <form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="<%= p.is_active ? 'Remove ' + p.name + '’s access?' : 'Restore access?' %>"><%- include('../partials/csrf') %><input type="hidden" name="action" value="toggle"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Remove' : 'Restore' %></button></form>
         <% } else { %><span class="badge tone-<%= r[1] %>"><%= r[0] %></span><% } %>
@@ -62,9 +77,12 @@
       <div class="field"><label for="pe">Work email</label><input id="pe" name="email" type="email" required></div>
       <div class="field"><label for="pp">Password <span class="muted">(optional)</span></label><input id="pp" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Set one now, or leave empty to email an invite"><div class="hint">If you set a password they can sign in straight away, with no email needed.</div></div>
       <div class="form-grid">
-        <div class="field"><label for="pr">Role</label><select id="pr" name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+        <div class="field"><label for="pr">Role</label><select id="pr" name="role"><option value="staff">Staff</option><option value="admin">Admin</option><% if (isOwner) { %><option value="owner">Owner</option><% } %></select></div>
         <div class="field"><label for="pt">Job title <span class="muted">(optional)</span></label><input id="pt" name="job_title" type="text" maxlength="120"></div>
       </div>
+      <details class="mb-16"><summary class="small"><b>Extra access</b> <span class="muted">(staff only)</span></summary>
+        <% PERMISSIONS.forEach(function (perm) { %><label class="check perm-check"><input type="checkbox" name="perms" value="<%= perm[0] %>"> <span><b><%= perm[1] %></b><small><%= perm[2] %></small></span></label><% }) %>
+      </details>
       <button class="btn" type="submit"><%- h.icon('plus', 16) %> Add member</button>
     </form>
     <% } else { %><section class="card card-pad small muted">Only owners and admins can add people or change roles.</section><% } %>

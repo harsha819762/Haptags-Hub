@@ -388,3 +388,13 @@ select.sel-sm.tone-grey { background-color: var(--grey-bg); color: var(--grey); 
 .inv-mini > li { padding-left: 0; padding-right: 0; }
 .inv-mini > li:hover { background: none; }
 .theme-switch { padding: 10px 6px 0; }
+
+/* Team page: per-person section access */
+.perm-check { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 8px; font-weight: 400; }
+.perm-check input { margin-top: 3px; flex: none; }
+.perm-check span { display: grid; gap: 1px; }
+.perm-check small { color: var(--text-3); font-size: 12px; line-height: 1.35; }
+.access-form:has(.perm-check) { width: 330px; }
+.access-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.access-chips .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font: 600 11.5px var(--font-body); background: var(--blue-50); color: var(--blue-600); }
+[data-theme=dark] .access-chips .chip { background: rgba(0, 122, 245, .16); color: #8cc4ff; }

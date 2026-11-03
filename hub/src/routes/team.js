@@ -6,6 +6,7 @@ const express = require('express');
 const { db } = require('../db');
 const chatRouter = require('./portal-chat');
 const { requireAdmin } = require('../lib/auth');
+const { can, requireAccess } = require('../lib/permissions');
 const L = require('../lib/leave');
 const M = require('../lib/meetings');
 const money = require('../lib/money');
@@ -24,7 +25,9 @@ router.use(async (req, res, next) => {
   res.locals.chatBase = '/team/chat';
   res.locals.brandSub = 'Company';
   const admin = ['owner', 'admin'].includes(req.user.role);
-  res.locals.showMoney = admin;
+  const allowed = (key) => can(req.user, key);
+  res.locals.can = allowed;
+  res.locals.showMoney = allowed('billing'); // money on clients, projects and the overview
   res.locals.isApprover = admin;
   const chatUnread = await require('../lib/chat').unreadTotal(req.user.id);
   const leaveWaiting = admin ? (await L.pendingFor(req.user)).length : 0;
@@ -34,7 +37,8 @@ router.use(async (req, res, next) => {
     ['/team', 'home', 'Overview', true],
     ['/team/clients', 'clients', 'Clients'],
     ['/team/projects', 'projects', 'Projects'],
-    ...(admin ? [['/team/billing', 'payments', 'Billing'], ['/team/gst', 'gst', 'GST Invoices'], ['/team/education', 'education', 'Education'], ['/team/finance', 'finance', 'Income & expenses']] : []),
+    ...[['billing', '/team/billing', 'payments', 'Billing'], ['gst', '/team/gst', 'gst', 'GST Invoices'], ['education', '/team/education', 'education', 'Education'], ['finance', '/team/finance', 'finance', 'Income & expenses']]
+      .filter((x) => allowed(x[0])).map((x) => x.slice(1)),
     ['/team/sales', 'trophy', 'Sales'],
     ['/team/support', 'tickets', 'Support', false, openTickets],
     ['/team/chat', 'chat', 'Chat & Calls', false, chatUnread],
@@ -87,7 +91,7 @@ router.get('/', async (req, res) => {
   const review = tasks.filter((t) => t.status === 'review');
   const late = tasks.filter((t) => t.due_date && String(t.due_date).slice(0, 10) < today);
   const tickets = await db('tickets as t').join('clients as c', 'c.id', 't.client_id').where('t.status', 'open').orderBy('t.last_reply_at', 'desc').limit(5).select('t.id', 't.subject', 't.priority', 'c.name as client_name');
-  const pendingPayments = ['owner', 'admin'].includes(req.user.role) ? Number((await db('payments').where({ status: 'pending' }).count({ n: '*' }).first()).n) : 0;
+  const pendingPayments = can(req.user, 'billing') ? Number((await db('payments').where({ status: 'pending' }).count({ n: '*' }).first()).n) : 0;
   res.render('team/overview', { tickets, pendingPayments,
     title: 'Overview', clients: Number(clients.n), projects, outstanding, overdue, review, late, comments, meetings,
     overdueTotal: overdue.reduce((s, i) => s + balance(i), 0), balance, leave,
@@ -104,7 +108,7 @@ router.get('/clients', async (req, res) => {
     db.raw("(select coalesce(sum(i.total - i.amount_paid), 0) from invoices i where i.client_id = c.id and i.status in ('sent','partially_paid','overdue')) as owed"));
   if (q) query.where((w) => w.where('c.name', 'like', `%${q}%`).orWhere('c.contact_name', 'like', `%${q}%`).orWhere('c.email', 'like', `%${q}%`));
   const archivedCount = Number((await db('clients').where({ status: 'archived', segment: 'business' }).count({ n: '*' }).first()).n);
-  res.render('team/clients', { title: 'Clients', clients: await query, q, archived, archivedCount, manage: ['owner', 'admin'].includes(req.user.role) });
+  res.render('team/clients', { title: 'Clients', clients: await query, q, archived, archivedCount, manage: can(req.user, 'clients') });
 });
 
 // ---- Add a client and invite their people (owners and admins) ----
@@ -114,9 +118,9 @@ const idList = (v) => [].concat(v || []).map((x) => int(x, 0)).filter(Boolean);
 const isEmailLike = (e) => /^\S+@\S+\.\S+$/.test(e || '');
 const takeInvite = (req) => { const v = req.session.inviteLink || null; delete req.session.inviteLink; return v; };
 
-router.get('/clients/new', requireAdmin, (req, res) => res.render('team/client-new', { title: 'Add a client', values: {}, errors: {} }));
+router.get('/clients/new', requireAccess('clients'), (req, res) => res.render('team/client-new', { title: 'Add a client', values: {}, errors: {} }));
 
-router.post('/clients', requireAdmin, async (req, res) => {
+router.post('/clients', requireAccess('clients'), async (req, res) => {
   const values = {
     name: str(req.body.name, 190), gstin: (str(req.body.gstin, 20) || '').toUpperCase(), phone: str(req.body.phone, 40), address: str(req.body.address, 500),
     city: str(req.body.city, 100), state: str(req.body.state, 100), pincode: str(req.body.pincode, 12),
@@ -152,7 +156,7 @@ router.post('/clients', requireAdmin, async (req, res) => {
 });
 
 // Archive a client: hidden from the list and its people can no longer sign in. Nothing is deleted, so it can be restored.
-router.post('/clients/:id/archive', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/archive', requireAccess('clients'), async (req, res, next) => {
   const client = await db('clients').where({ id: int(req.params.id, 0), segment: 'business' }).first();
   if (!client) return next();
   await db('clients').where({ id: client.id }).update({ status: 'archived', updated_at: nowSql() });
@@ -162,7 +166,7 @@ router.post('/clients/:id/archive', requireAdmin, async (req, res, next) => {
   res.redirect('/team/clients');
 });
 
-router.post('/clients/:id/restore', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/restore', requireAccess('clients'), async (req, res, next) => {
   const client = await db('clients').where({ id: int(req.params.id, 0), segment: 'business' }).first();
   if (!client) return next();
   await db('clients').where({ id: client.id }).update({ status: 'active', updated_at: nowSql() });
@@ -174,7 +178,7 @@ router.post('/clients/:id/restore', requireAdmin, async (req, res, next) => {
 });
 
 // Delete for good: only an archived client that has never been billed (billing records must be kept).
-router.post('/clients/:id/delete', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/delete', requireAccess('clients'), async (req, res, next) => {
   const client = await db('clients').where({ id: int(req.params.id, 0), segment: 'business' }).first();
   if (!client) return next();
   if (client.status !== 'archived') {
@@ -197,7 +201,7 @@ router.post('/clients/:id/delete', requireAdmin, async (req, res, next) => {
 });
 
 // Another person at an existing client.
-router.post('/clients/:id/people', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/people', requireAccess('clients'), async (req, res, next) => {
   const client = await db('clients').where({ id: int(req.params.id, 0) }).first();
   if (!client) return next();
   const name = str(req.body.name, 190);
@@ -222,7 +226,7 @@ router.post('/clients/:id/people', requireAdmin, async (req, res, next) => {
   res.redirect(`/team/clients/${client.id}`);
 });
 
-router.post('/clients/:id/people/:uid', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/people/:uid', requireAccess('clients'), async (req, res, next) => {
   const user = await db('users').where({ id: int(req.params.uid, 0), client_id: int(req.params.id, 0), role: 'client' }).first();
   if (!user) return next();
   if (req.body.action === 'resend') {
@@ -247,7 +251,7 @@ router.post('/clients/:id/people/:uid', requireAdmin, async (req, res, next) => 
   res.redirect(`/team/clients/${user.client_id}`);
 });
 
-router.post('/clients/:id/projects', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/projects', requireAccess('projects'), async (req, res, next) => {
   const client = await db('clients').where({ id: int(req.params.id, 0) }).first();
   if (!client) return next();
   const name = str(req.body.name, 190);
@@ -262,7 +266,7 @@ router.post('/clients/:id/projects', requireAdmin, async (req, res, next) => {
 });
 
 // Which Haptags people this client can see and message.
-router.post('/clients/:id/contacts', requireAdmin, async (req, res, next) => {
+router.post('/clients/:id/contacts', requireAccess('clients'), async (req, res, next) => {
   const client = await db('clients').where({ id: int(req.params.id, 0) }).first();
   const user = await db('users').where({ id: int(req.body.user_id, 0), is_active: true }).whereIn('role', ['owner', 'admin', 'staff']).first();
   if (!client) return next();
@@ -274,7 +278,7 @@ router.post('/clients/:id/contacts', requireAdmin, async (req, res, next) => {
   res.redirect(`/team/clients/${client.id}`);
 });
 
-router.post('/clients/:id/contacts/:uid/remove', requireAdmin, async (req, res) => {
+router.post('/clients/:id/contacts/:uid/remove', requireAccess('clients'), async (req, res) => {
   await db('client_contacts').where({ client_id: int(req.params.id, 0), user_id: int(req.params.uid, 0) }).del();
   const gid = await groupIdFor(int(req.params.id, 0));
   if (gid) await db('channel_members').where({ channel_id: gid, user_id: int(req.params.uid, 0) }).del();
@@ -297,7 +301,7 @@ router.get('/clients/:id', async (req, res, next) => {
   const access = {};
   members.forEach((m) => { (access[m.user_id] = access[m.user_id] || []).push({ id: m.id, name: m.name }); });
   const groupId = await ensureClientGroup(client.id);
-  res.render('team/client', { access, groupId, canOpenChat: ['owner', 'admin'].includes(req.user.role) || contacts.some((c) => c.id === req.user.id), title: client.name, client, projects, invoices, docs, people, contacts, staffOptions, DOC_LABEL, inviteLink: takeInvite(req), manage: ['owner', 'admin'].includes(req.user.role) });
+  res.render('team/client', { access, groupId, canOpenChat: can(req.user, 'clients') || contacts.some((c) => c.id === req.user.id), title: client.name, client, projects, invoices, docs, people, contacts, staffOptions, DOC_LABEL, inviteLink: takeInvite(req), manage: can(req.user, 'clients') });
 });
 
 // ---- Projects ----
@@ -317,7 +321,7 @@ router.get('/projects', async (req, res) => {
   if (view === 'list' && status === 'completed') query.where('p.status', 'completed');
   if (view === 'list' && status === 'on_hold') query.where('p.status', 'on_hold');
   if (q) query.where((w) => w.where('p.name', 'like', `%${q}%`).orWhere('c.name', 'like', `%${q}%`));
-  const canCreate = ['owner', 'admin'].includes(req.user.role);
+  const canCreate = can(req.user, 'projects');
   const clients = canCreate ? await db('clients').where({ status: 'active', segment: 'business' }).orderBy('name').select('id', 'name') : [];
   res.render('team/projects', {
     title: 'Projects', styles: ['board'], scripts: ['projects'], projects: await query, status, q, view, canCreate, clients, TASK_LABEL, PROJECT_COLUMN,
@@ -355,14 +359,14 @@ router.post('/projects/:id/assign', async (req, res) => {
 });
 
 // ---- New project from the Projects page (owners and admins): pick or type the client, optional first tasks ----
-router.post('/projects', requireAdmin, async (req, res) => {
+router.post('/projects', requireAccess('projects'), async (req, res) => {
   const name = str(req.body.name, 190);
   const isNew = req.body.client_id === 'new';
   const newClient = str(req.body.new_client, 190);
   const due = /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null;
   const firstTasks = String(req.body.tasks || '').split(/\r?\n/).map((t) => t.replace(/\s+/g, ' ').trim().slice(0, 255)).filter(Boolean).slice(0, 30);
   const client = isNew ? null : await db('clients').where({ id: int(req.body.client_id, 0), status: 'active', segment: 'business' }).first();
-  const problem = !name ? 'Give the project a name.' : isNew && !newClient ? 'Type the new client’s name.' : !isNew && !client ? 'Pick which client this project is for.' : null;
+  const problem = !name ? 'Give the project a name.' : isNew && !can(req.user, 'clients') ? 'Only people who manage clients can add a new one. Pick an existing client.' : isNew && !newClient ? 'Type the new client’s name.' : !isNew && !client ? 'Pick which client this project is for.' : null;
   if (problem) {
     req.flash('error', problem);
     return res.redirect('/team/projects?new=1');
@@ -394,7 +398,7 @@ router.get('/projects/:id', async (req, res, next) => {
     db('invoices').where({ project_id: project.id }).whereNot('status', 'draft').orderBy('id', 'desc'),
   ]);
   const team = await db('users').whereIn('role', ['owner', 'admin', 'staff']).where({ is_active: true }).orderBy('name').select('id', 'name');
-  const canManage = ['owner', 'admin'].includes(req.user.role);
+  const canManage = can(req.user, 'projects');
   const clients = canManage ? await db('clients').where({ segment: 'business' }).where((w) => w.where({ status: 'active' }).orWhere({ id: project.client_id })).orderBy('name').select('id', 'name') : [];
   res.render('team/project', {
     title: project.name, styles: ['board'], scripts: ['projects'], project, tasks, updates, files, invoices, team, TASK_LABEL, TASK_STATUS,
@@ -424,7 +428,7 @@ const { SERVICES } = require('../lib/constants');
 const PROJECT_STATUSES_ALL = ['planning', 'in_progress', 'review', 'on_hold', 'completed', 'cancelled'];
 const isoDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null);
 
-router.post('/projects/:id/edit', requireAdmin, async (req, res, next) => {
+router.post('/projects/:id/edit', requireAccess('projects'), async (req, res, next) => {
   const project = await db('projects').where({ id: int(req.params.id, 0) }).first();
   if (!project) return next();
   const name = str(req.body.name, 190);
@@ -455,7 +459,7 @@ router.post('/projects/:id/edit', requireAdmin, async (req, res, next) => {
   res.redirect(`/team/projects/${project.id}`);
 });
 
-router.post('/projects/:id/delete', requireAdmin, async (req, res, next) => {
+router.post('/projects/:id/delete', requireAccess('projects'), async (req, res, next) => {
   const project = await db('projects').where({ id: int(req.params.id, 0) }).first();
   if (!project) return next();
   const typed = (str(req.body.confirm_name, 190) || '').trim().toLowerCase();
@@ -679,7 +683,7 @@ router.post('/support/:id/status', loadTicket, async (req, res) => {
 });
 
 // ---- Payments: confirm what clients report, or record money you received (owners and admins) ----
-router.post('/payments/:id/status', requireAdmin, async (req, res, next) => {
+router.post('/payments/:id/status', requireAccess('billing'), async (req, res, next) => {
   const p = await db('payments').where({ id: int(req.params.id, 0) }).first();
   if (!p) return next();
   const to = ['confirmed', 'rejected'].includes(req.body.status) ? req.body.status : null;
@@ -704,7 +708,7 @@ router.post('/payments/:id/status', requireAdmin, async (req, res, next) => {
   res.redirect('/team/billing');
 });
 
-router.post('/billing/invoices/:id/payment', requireAdmin, async (req, res, next) => {
+router.post('/billing/invoices/:id/payment', requireAccess('billing'), async (req, res, next) => {
   const inv = await db('invoices').where({ id: int(req.params.id, 0) }).whereNotIn('status', ['draft', 'void']).first();
   if (!inv) return next();
   const amount = toPaise(req.body.amount);
@@ -723,7 +727,7 @@ router.post('/billing/invoices/:id/payment', requireAdmin, async (req, res, next
 });
 
 // ---- Billing across all clients (owners and admins only) ----
-router.use('/billing', requireAdmin);
+router.use('/billing', requireAccess('billing'));
 router.get('/billing', async (req, res) => {
   const tab = ['invoices', 'quotations', 'receipts', 'overdue'].includes(req.query.tab) ? req.query.tab : 'all';
   const today = todayIST();
@@ -822,10 +826,10 @@ router.use('/people', require('./team-people'));
 router.use('/sales', require('./team-sales'));
 router.use('/leave', require('./team-leave'));
 router.use('/calendar', require('./team-calendar'));
-router.use('/finance', requireAdmin, require('./team-finance'));
+router.use('/finance', requireAccess('finance'), require('./team-finance'));
 // GST tax invoices, and students with their fee invoices and internship offer letters (owners and admins: both handle money).
-router.use('/gst', requireAdmin, require('./gst'));
-router.use('/education', requireAdmin, require('./admin/education'));
+router.use('/gst', requireAccess('gst'), require('./gst'));
+router.use('/education', requireAccess('education'), require('./admin/education'));
 router.use('/chat', chatRouter({ base: '/team/chat', audience: 'team' }));
 
 module.exports = router;
