@@ -155,14 +155,14 @@ test('an owner makes Abhay an owner; admins can’t make or change owners', asyn
 
   const abhay = await new Browser().login('abhay@test.local', 'member-password-1');
   for (const url of Object.values(SECTIONS)) assert.equal((await abhay.get(url)).status, 200, `owner Abhay opens ${url}`);
-  // Owners can change each other, never themselves.
+  // Once an owner, always protected: not by themselves, not by another owner.
   await abhay.get('/team/people');
   await abhay.post(`/team/people/${world.abhay}`, { action: 'role', role: 'staff' });
   assert.equal(await role(world.abhay), 'owner', 'nobody changes their own role');
   await owner.post(`/team/people/${world.abhay}`, { action: 'role', role: 'admin' });
-  assert.equal(await role(world.abhay), 'admin', 'an owner can change another owner');
-  await owner.post(`/team/people/${world.abhay}`, { action: 'role', role: 'owner' });
-  assert.equal(await role(world.abhay), 'owner');
+  assert.equal(await role(world.abhay), 'owner', 'another owner can’t demote Abhay');
+  await abhay.post(`/team/people/${world.owner}`, { action: 'toggle' });
+  assert.equal((await db('users').where({ id: world.owner }).first()).is_active ? 1 : 0, 1, 'and Abhay can’t remove the first owner');
 
   r = await owner.post('/team/people', { name: 'Second Owner', email: 'second@test.local', role: 'owner', password: 'second-password-1' });
   assert.equal((await db('users').where({ email: 'second@test.local' }).first()).role, 'owner', 'owners can add owners');
@@ -170,30 +170,26 @@ test('an owner makes Abhay an owner; admins can’t make or change owners', asyn
   assert.deepEqual(JSON.parse((await db('users').where({ email: 'clerk@test.local' }).first()).permissions), ['gst'], 'access can be set when adding someone');
 });
 
-test('an owner removes another owner: their owner role, or their access entirely', async () => {
+test('owners are protected: nobody can remove an owner’s access, role or details, not even another owner', async () => {
   const owner = await new Browser().login('owner@test.local', 'owner-password-1');
   const [co] = await db('users').insert({ name: 'Co Owner', email: 'co@test.local', role: 'owner', password_hash: await hashPassword('co-password-123'), is_active: true, token_version: 1, created_at: NOW, updated_at: NOW });
   const page = (await owner.get('/team/people')).text;
   const row = page.slice(page.indexOf('Co Owner'), page.indexOf('</li>', page.indexOf('Co Owner')));
-  assert.match(row, />Remove owner role</);
-  assert.match(row, />Remove access</);
-  assert.match(page, /You can’t change your own role or access\. Another owner can\./, 'your own row says why it is locked');
+  assert.doesNotMatch(row, /Remove access|Remove owner role|name="action"/, 'no controls on another owner’s row');
+  assert.match(row, /Owners are protected\. Nobody can remove or change an owner\./);
+  assert.match(page, /You can’t change your own role or access\./);
 
-  await owner.post(`/team/people/${co}`, { action: 'role', role: 'admin' });
-  assert.equal(await role(co), 'admin', 'owner role removed');
-  await owner.post(`/team/people/${co}`, { action: 'role', role: 'owner' });
-  assert.equal(await role(co), 'owner');
-
-  const coSession = await new Browser().login('co@test.local', 'co-password-123');
-  await owner.post(`/team/people/${co}`, { action: 'toggle' });
+  const before = await db('users').where({ id: co }).first();
+  for (const body of [{ action: 'toggle' }, { action: 'role', role: 'admin' }, { action: 'role', role: 'staff' }, { action: 'details', name: 'Renamed' }, { action: 'password', password: 'new-password-123' }, { action: 'access', perms: 'gst' }]) {
+    await owner.post(`/team/people/${co}`, body);
+  }
   const after = await db('users').where({ id: co }).first();
-  assert.equal(after.is_active ? 1 : 0, 0, 'access removed');
-  assert.equal((await coSession.get('/team')).status, 302, 'and they are signed out');
-  assert.match((await owner.get('/team/people')).text, />Restore access</);
+  assert.deepEqual([after.role, Boolean(after.is_active), after.name, after.password_hash, after.token_version], [before.role, Boolean(before.is_active), before.name, before.password_hash, before.token_version], 'nothing about the owner changed');
+  assert.match((await owner.get('/team/people')).text, /Co Owner is an owner\. Owners can’t be removed or changed, even by another owner\./);
 
   const adele = await new Browser().login('adele@test.local', 'member-password-1');
-  const adminView = (await adele.get('/team/people')).text;
-  assert.match(adminView, /Only an owner can change or remove an owner\./, 'admins are told why owner rows are locked');
+  await adele.get('/team/people');
   await adele.post(`/team/people/${co}`, { action: 'toggle' });
-  assert.equal((await db('users').where({ id: co }).first()).is_active ? 1 : 0, 0, 'an admin can’t restore or change an owner');
+  assert.equal((await db('users').where({ id: co }).first()).is_active ? 1 : 0, 1, 'admins can’t either');
+  assert.ok(await new Browser().login('co@test.local', 'co-password-123'), 'the owner still signs in');
 });

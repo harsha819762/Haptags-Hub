@@ -71,9 +71,10 @@ router.post('/:id', async (req, res, next) => {
   if (!canManage(req.user)) return res.redirect('/team/people');
   const user = await db('users').where({ id: int(req.params.id, 0) }).whereIn('role', ORG_ROLES).first();
   if (!user) return next();
-  // Nobody changes their own access here. Only an owner can change another owner (or make someone an owner).
-  if (user.id === req.user.id || (user.role === 'owner' && req.user.role !== 'owner')) {
-    req.flash('error', user.id === req.user.id ? 'You can’t change your own access here.' : 'Only an owner can change another owner’s access.');
+  // Owners are protected: nobody, not even another owner, can remove, demote or change an owner here.
+  // Nobody changes their own access either. Owners can still make someone else an owner.
+  if (user.id === req.user.id || user.role === 'owner') {
+    req.flash('error', user.id === req.user.id ? 'You can’t change your own access here.' : `${user.name} is an owner. Owners can’t be removed or changed, even by another owner.`);
     return res.redirect('/team/people');
   }
   if (req.body.action === 'toggle') {

@@ -1,5 +1,5 @@
 <%
-  const ROLE = { owner: ['Owner', 'violet', 'Full access, and can make other owners'], admin: ['Admin', 'blue', 'Full access to every section and the team'], staff: ['Staff', 'grey', 'Projects, tasks, chat, sales, leave and calendar, plus any section opened to them'] };
+  const ROLE = { owner: ['Owner', 'violet', 'Full access, can make other owners, and can’t be removed or changed'], admin: ['Admin', 'blue', 'Full access to every section and the team'], staff: ['Staff', 'grey', 'Projects, tasks, chat, sales, leave and calendar, plus any section opened to them'] };
   const permName = function (k) { return (PERMISSIONS.find(function (x) { return x[0] === k; }) || [k, k])[1]; };
 %>
 <div class="page-head"><div><h1>Team</h1><div class="sub">Everyone in the Haptags organisation and what they can do.</div></div></div>
@@ -18,7 +18,7 @@
       <div class="row" style="flex-wrap:nowrap"><input id="invite-link" type="text" readonly value="<%= inviteLink.link %>"><button class="btn btn-ghost btn-sm" type="button" data-copy="#invite-link">Copy</button></div>
     </div><% } %>
     <ul class="list people-list">
-      <% people.forEach(function (p) { const r = ROLE[p.role]; const locked = p.id === user.id || (p.role === 'owner' && !isOwner); const grants = p.role === 'staff' ? grantsOf(p) : []; %>
+      <% people.forEach(function (p) { const r = ROLE[p.role]; const locked = p.id === user.id || p.role === 'owner'; const grants = p.role === 'staff' ? grantsOf(p) : []; %>
       <li class="<%= p.is_active ? '' : 'is-read' %>">
         <span class="avatar<%= online.has(p.id) ? ' online' : '' %>"><%= h.initials(p.name) %></span>
         <div class="grow">
@@ -54,16 +54,15 @@
           </form>
         </details>
         <form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="role">
-          <select name="role" data-autosubmit class="sel-sm" aria-label="Role"><% if (p.role === 'owner') { %><option value="owner" selected disabled>Owner</option><% } %><option value="staff" <%= p.role === 'staff' ? 'selected' : '' %>>Staff</option><option value="admin" <%= p.role === 'admin' ? 'selected' : '' %>>Admin</option></select></form>
-        <% if (isOwner && p.role === 'owner') { %><form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="Remove <%= p.name %> as an owner? They become an admin, with full access to every section but no say over owners."><%- include('../partials/csrf') %><input type="hidden" name="action" value="role"><input type="hidden" name="role" value="admin"><button class="btn btn-ghost btn-sm" type="submit">Remove owner role</button></form><% } %>
+          <select name="role" data-autosubmit class="sel-sm" aria-label="Role"><option value="staff" <%= p.role === 'staff' ? 'selected' : '' %>>Staff</option><option value="admin" <%= p.role === 'admin' ? 'selected' : '' %>>Admin</option></select></form>
         <% if (isOwner && p.role !== 'owner' && p.is_active) { %><form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="Make <%= p.name %> an owner? Owners have full access to everything, including making or removing other owners."><%- include('../partials/csrf') %><input type="hidden" name="action" value="role"><input type="hidden" name="role" value="owner"><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('lock', 13) %> Make owner</button></form><% } %>
         <% if (p.is_active && !p.password_hash) { %><form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="resend"><button class="btn btn-ghost btn-sm" type="submit">Resend invite</button></form><% } %>
         <form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="<%= p.is_active ? 'Remove ' + p.name + '’s access?' : 'Restore access?' %>"><%- include('../partials/csrf') %><input type="hidden" name="action" value="toggle"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Remove access' : 'Restore access' %></button></form>
         <% } else { %>
         <span class="row" style="gap:8px;flex-wrap:wrap;justify-content:flex-end">
           <span class="badge tone-<%= r[1] %>"><%= r[0] %></span>
-          <% if (manage && p.id === user.id) { %><span class="small muted locked-why">You can’t change your own role or access. <%= user.role === 'owner' ? 'Another owner can.' : 'An owner can.' %></span>
-          <% } else if (manage && p.role === 'owner') { %><span class="small muted locked-why">Only an owner can change or remove an owner.</span><% } %>
+          <% if (manage && p.id === user.id) { %><span class="small muted locked-why">You can’t change your own role or access. <%= user.role === 'owner' ? '' : 'An owner can.' %></span>
+          <% } else if (manage && p.role === 'owner') { %><span class="small muted locked-why">Owners are protected. Nobody can remove or change an owner.</span><% } %>
         </span>
         <% } %>
       </li>
