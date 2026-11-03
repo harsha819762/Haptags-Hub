@@ -300,12 +300,12 @@ router.get('/clients/:id', async (req, res, next) => {
 });
 
 // ---- Projects ----
-// The Projects page is a board by default: each project is a card in To do, In progress, Under review or Done.
+// The Projects page opens as the list; each project opens its own task board. ?view=board shows every project as a card by phase.
 const PROJECT_COLUMN = { planning: 'todo', in_progress: 'doing', on_hold: 'doing', review: 'review', completed: 'done' };
 const COLUMN_STATUS = { todo: 'planning', doing: 'in_progress', review: 'review', done: 'completed' };
 
 router.get('/projects', async (req, res) => {
-  const view = req.query.view === 'list' ? 'list' : 'board';
+  const view = req.query.view === 'board' ? 'board' : 'list';
   const status = ['active', 'completed', 'on_hold'].includes(req.query.status) ? req.query.status : 'all';
   const q = (str(req.query.q, 80) || '').trim();
   const query = db('projects as p').join('clients as c', 'c.id', 'p.client_id').whereNot('p.status', 'cancelled').orderBy('p.id', 'desc').select('p.*', 'c.name as client_name',

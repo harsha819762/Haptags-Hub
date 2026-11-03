@@ -196,12 +196,18 @@ test('clients never reach the team board or its actions', async () => {
   assert.equal((await priya.post('/team/projects', { name: 'Mine', client_id: String(world.acme) })).status, 404);
 });
 
-test('the Projects page is a board of projects by phase, with a List view kept', async () => {
+test('the Projects page opens as the list, each project opens its own board, and Board shows all projects by phase', async () => {
   const owner = await new Browser().login('owner@test.local', 'owner-password-1');
   const [held] = await db('projects').insert({ client_id: world.acme, name: 'Paused app', status: 'on_hold', progress: 20, budget: 0, created_at: NOW, updated_at: NOW });
   const [fresh] = await db('projects').insert({ client_id: world.acme, name: 'Fresh logo', status: 'planning', progress: 0, budget: 0, created_at: NOW, updated_at: NOW });
   world.fresh = fresh;
-  const page = (await owner.get('/team/projects')).text;
+  const list0 = (await owner.get('/team/projects')).text;
+  assert.match(list0, /class="plist-row tl" href="\/team\/projects\/\d+"/, 'the list is the default, and each row opens its project');
+  assert.doesNotMatch(list0, /id="board"/);
+  assert.match(list0, /aria-current="page"><svg[^]*?List<\/a>/, 'List is the current view');
+  assert.match((await owner.get(`/team/projects/${fresh}`)).text, /id="board" data-move-url="\/team\/tasks\/\{id\}\/move"/, 'the project shows its task board');
+
+  const page = (await owner.get('/team/projects?view=board')).text;
   assert.match(page, /id="board" data-kind="project"/);
   const column = (col) => page.split(`data-col="${col}"`)[1].split('data-col=')[0];
   assert.match(column('todo'), /Fresh logo/);
@@ -209,7 +215,7 @@ test('the Projects page is a board of projects by phase, with a List view kept',
   assert.match(column('doing'), /On hold/);
   assert.match(page, /aria-current="page"><svg[^]*?Board<\/a>/, 'Board is the current view');
 
-  const list = (await owner.get('/team/projects?view=list&status=on_hold')).text;
+  const list = (await owner.get('/team/projects?status=on_hold')).text;
   assert.match(list, /class="plist-row tl"/);
   assert.match(list, /Paused app/);
   assert.doesNotMatch(list, /Fresh logo/, 'list filters still work');
@@ -240,7 +246,7 @@ test('dragging a project card changes its phase, and Assign to sets its owner', 
   assert.equal(r.body.name, 'Ria Rao');
   const p = await db('projects').where({ id }).first();
   assert.equal(p.assigned_to, world.ria);
-  assert.match((await sam.get('/team/projects')).text, new RegExp(`<option value="${world.ria}" selected>Ria Rao</option>`));
+  assert.match((await sam.get('/team/projects?view=board')).text, new RegExp(`<option value="${world.ria}" selected>Ria Rao</option>`));
   r = await sam.json(`/team/projects/${id}/assign`, { user_id: '' });
   assert.equal((await db('projects').where({ id }).first()).assigned_to, null);
 
@@ -261,10 +267,10 @@ test('every column has its own add box: tasks land in that column, projects in t
   await owner.post(`/team/projects/${world.project}/tasks`, { title: 'Odd column', status: 'nowhere' });
   assert.equal((await db('project_tasks').where({ title: 'Odd column' }).first()).status, 'todo');
 
-  const board = (await owner.get('/team/projects')).text;
+  const board = (await owner.get('/team/projects?view=board')).text;
   for (const col of ['todo', 'doing', 'review', 'done']) assert.match(board, new RegExp(`data-phase="${col}"`), `${col} has New project`);
   const r = await owner.post('/team/projects', { name: 'Already rolling', client_id: String(world.acme), phase: 'doing' });
   assert.equal((await db('projects').where({ id: idFrom(r.location) }).first()).status, 'in_progress');
   const sam = await new Browser().login('sam@test.local', 'staff-password-1');
-  assert.doesNotMatch((await sam.get('/team/projects')).text, /data-phase=/, 'staff don’t get New project');
+  assert.doesNotMatch((await sam.get('/team/projects?view=board')).text, /data-phase=/, 'staff don’t get New project');
 });

@@ -3,16 +3,16 @@
   const today = new Date().toISOString().slice(0, 10);
   const qs = function (extra) { const p = []; if (q) p.push('q=' + encodeURIComponent(q)); Object.keys(extra).forEach(function (k) { if (extra[k]) p.push(k + '=' + extra[k]); }); return p.length ? '?' + p.join('&') : ''; };
 %>
-<div class="page-head"><div><h1>Projects</h1><div class="sub"><%= view === 'board' ? 'Drag a project to its next phase. Assign each one to the person who owns it.' : 'Every project across all clients.' %></div></div>
+<div class="page-head"><div><h1>Projects</h1><div class="sub"><%= view === 'board' ? 'Drag a project to its next phase. Assign each one to the person who owns it.' : 'Every project across all clients. Open one to see and move its tasks on its board.' %></div></div>
   <div class="actions">
     <div class="seg" role="group" aria-label="View">
-      <a class="<%= view === 'board' ? 'active' : '' %>" href="/team/projects<%= qs({}) %>" <%- view === 'board' ? 'aria-current="page"' : '' %>><%- h.icon('projects', 15) %> Board</a>
-      <a class="<%= view === 'list' ? 'active' : '' %>" href="/team/projects<%= qs({ view: 'list' }) %>" <%- view === 'list' ? 'aria-current="page"' : '' %>><%- h.icon('list', 15) %> List</a>
+      <a class="<%= view === 'list' ? 'active' : '' %>" href="/team/projects<%= qs({}) %>" <%- view === 'list' ? 'aria-current="page"' : '' %>><%- h.icon('menu', 15) %> List</a>
+      <a class="<%= view === 'board' ? 'active' : '' %>" href="/team/projects<%= qs({ view: 'board' }) %>" <%- view === 'board' ? 'aria-current="page"' : '' %>><%- h.icon('dashboard', 15) %> Board</a>
     </div>
     <% if (canCreate) { %><button class="btn" type="button" data-dialog="#new-project"><%- h.icon('plus', 16) %> New project</button><% } %>
   </div>
 </div>
-<form method="get" action="/team/projects" class="search-big" role="search"><%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search projects or clients…" aria-label="Search projects"><% if (view === 'list') { %><input type="hidden" name="view" value="list"><% } %><% if (view === 'list' && status !== 'all') { %><input type="hidden" name="status" value="<%= status %>"><% } %><button class="btn" type="submit">Search</button></form>
+<form method="get" action="/team/projects" class="search-big" role="search"><%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search projects or clients…" aria-label="Search projects"><% if (view === 'board') { %><input type="hidden" name="view" value="board"><% } %><% if (view === 'list' && status !== 'all') { %><input type="hidden" name="status" value="<%= status %>"><% } %><button class="btn" type="submit">Search</button></form>
 
 <% if (view === 'board') {
   const COLS = [['todo', 'grey', 'Not started yet'], ['doing', 'blue', 'Being worked on'], ['review', 'amber', 'With the client for review'], ['done', 'green', 'Delivered']];
@@ -56,7 +56,7 @@
 </div>
 <% } %>
 <% } else { %>
-<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/projects<%= qs({ view: 'list', status: t[0] === 'all' ? '' : t[0] }) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %></div>
+<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/projects<%= qs({ status: t[0] === 'all' ? '' : t[0] }) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %></div>
 <div class="card plist">
   <% if (!projects.length) { %><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b>No projects match</b><% if (canCreate && !q) { %><button class="btn btn-sm mt-8" type="button" data-dialog="#new-project"><%- h.icon('plus', 14) %> Create the first one</button><% } %></div><% } else { %>
   <div class="plist-head tl"><span>Project</span><span>Status</span><span>Progress</span><span>Target</span><span>Tasks</span></div>
