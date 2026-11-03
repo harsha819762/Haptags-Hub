@@ -14,38 +14,72 @@
 </div>
 
 <section class="card card-pad mb-16">
-  <div class="row-between mb-8"><b>Overall progress</b><b><%= project.progress %>%</b></div>
-  <div class="progress <%= project.status === 'completed' ? 'done' : '' %>" style="height:12px"><span style="width:<%= project.progress %>%"></span></div>
+  <div class="row-between mb-8"><b>Overall progress</b><b data-overall-pct><%= project.progress %>%</b></div>
+  <div class="progress <%= project.status === 'completed' ? 'done' : '' %>" style="height:12px"><span data-overall-bar style="width:<%= project.progress %>%"></span></div>
+</section>
+
+<%
+  const COLS = [
+    ['todo', 'grey', 'Not started yet'],
+    ['doing', 'blue', 'Being worked on'],
+    ['review', 'amber', 'Waiting for the client’s approval'],
+    ['done', 'green', 'Finished'],
+  ];
+  const initials = function (n) { return n ? n.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() : '?'; };
+  const assignedId = function (t) {
+    if (t.assigned_to && team.some(function (m) { return m.id === t.assigned_to; })) return t.assigned_to;
+    const m = t.assignee && team.find(function (x) { return x.name.toLowerCase() === String(t.assignee).toLowerCase(); });
+    return m ? m.id : null;
+  };
+%>
+<section class="mb-16 team-board-wrap" aria-labelledby="board-title">
+  <div class="row-between mb-8" style="flex-wrap:wrap;gap:8px">
+    <h2 id="board-title" class="mb-0">Project board</h2>
+    <span class="muted small"><span data-done-count><%= tasks.filter(function (t) { return t.status === 'done'; }).length %></span>/<%= tasks.length %> done · drag a card to move it</span>
+  </div>
+  <form method="post" action="/team/projects/<%= project.id %>/tasks" class="card card-pad row mb-16 board-add" style="flex-wrap:wrap;gap:8px">
+    <%- include('../partials/csrf') %>
+    <input type="text" name="title" placeholder="Add a task with an assignee, due date and priority…" maxlength="255" aria-label="New task" style="flex:3;min-width:200px" required>
+    <select name="user_id" aria-label="Assign to" style="flex:1;min-width:150px"><option value="">Assign to…</option><% team.forEach(function (m) { %><option value="<%= m.id %>"><%= m.name %></option><% }) %></select>
+    <input type="date" name="due_date" aria-label="Due date" style="max-width:160px">
+    <select name="priority" aria-label="Priority" style="max-width:120px"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select>
+    <button class="btn" type="submit"><%- h.icon('plus', 15) %> Add task</button>
+  </form>
+  <div class="board team-board" id="board" data-move-url="/team/tasks/{id}/move" data-assign-url="/team/tasks/{id}/assign">
+    <% COLS.forEach(function (c) { const cards = tasks.filter(function (t) { return t.status === c[0]; }); %>
+    <div class="col col-<%= c[1] %>" data-col="<%= c[0] %>">
+      <header><span class="dotc"></span><div><b><%= TASK_LABEL[c[0]] %></b><small><%= c[2] %></small></div><span class="n"><%= cards.length %></span></header>
+      <div class="col-body">
+        <% if (!cards.length) { %><div class="col-empty">Nothing here</div><% } %>
+        <% cards.forEach(function (t) { const late = t.due_date && String(t.due_date).slice(0, 10) < today && t.status !== 'done'; const aid = assignedId(t); const aname = aid ? team.find(function (m) { return m.id === aid; }).name : t.assignee; %>
+        <article class="bcard task" draggable="true" data-id="<%= t.id %>">
+          <div class="task-top"><a class="bt" href="/team/tasks/<%= t.id %>"><%= t.title %></a></div>
+          <div class="task-chips"><% if (t.priority === 'high') { %><span class="chip chip-red">High priority</span><% } %><% if (t.due_date) { %><span class="chip <%= late ? 'chip-red' : '' %>"><%- h.icon('calendar', 12) %> <%= h.date(t.due_date) %></span><% } %><% if (Number(t.comments)) { %><span class="chip"><%- h.icon('chat', 12) %> <%= t.comments %></span><% } %></div>
+          <div class="assign">
+            <span class="avatar sm <%= aname ? '' : 'unset' %>" aria-hidden="true"><%= initials(aname) %></span>
+            <select class="assign-select" aria-label="Assign “<%= t.title %>” to">
+              <option value="" <%= aname ? '' : 'selected' %>>Assign to…</option>
+              <% if (aname && !aid) { %><option value="keep" selected disabled><%= aname %></option><% } %>
+              <% team.forEach(function (m) { %><option value="<%= m.id %>" <%= aid === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
+            </select>
+            <select class="move-select" aria-label="Move “<%= t.title %>” to"><% COLS.forEach(function (o) { %><option value="<%= o[0] %>" <%= o[0] === t.status ? 'selected' : '' %>><%= TASK_LABEL[o[0]] %></option><% }) %></select>
+          </div>
+        </article>
+        <% }) %>
+      </div>
+      <form method="post" action="/team/projects/<%= project.id %>/tasks" class="col-add">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="status" value="<%= c[0] %>">
+        <input type="text" name="title" maxlength="255" required placeholder="+ Add a task" aria-label="Add a task to <%= TASK_LABEL[c[0]] %>">
+        <button class="btn btn-sm" type="submit" aria-label="Add to <%= TASK_LABEL[c[0]] %>"><%- h.icon('plus', 14) %></button>
+      </form>
+    </div>
+    <% }) %>
+  </div>
 </section>
 
 <div class="split">
   <div class="stack">
-    <section class="card">
-      <div class="card-head"><h3>Tasks</h3><span class="muted small"><%= tasks.filter(function (t) { return t.status === 'done'; }).length %>/<%= tasks.length %> completed</span></div>
-      <form method="post" action="/team/projects/<%= project.id %>/tasks" class="card-body row" style="border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <%- include('../partials/csrf') %>
-        <input type="text" name="title" placeholder="Add a task…" maxlength="255" aria-label="New task" style="flex:2;min-width:180px" required>
-        <input type="text" name="assignee" placeholder="Assigned to" maxlength="80" aria-label="Assigned to" style="flex:1;min-width:120px">
-        <input type="date" name="due_date" aria-label="Due date" style="max-width:150px">
-        <select name="priority" aria-label="Priority" style="max-width:110px"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select>
-        <button class="btn btn-sm" type="submit"><%- h.icon('plus', 14) %> Add</button>
-      </form>
-      <% if (!tasks.length) { %><div class="empty" style="padding:26px">No tasks yet. Add the first one above — the client only sees the ones you send for approval.</div><% } else { %>
-      <div class="table-wrap"><table class="table">
-        <thead><tr><th>Task</th><th>Status</th><th>Due</th><th>Assigned</th></tr></thead>
-        <tbody>
-          <% tasks.forEach(function (t) { const late = t.due_date && String(t.due_date).slice(0, 10) < today && t.status !== 'done'; %>
-          <tr>
-            <td><a class="strong" href="/team/tasks/<%= t.id %>"><%= t.title %></a><span class="sub"><%= t.priority === 'high' ? 'High priority · ' : '' %><%= Number(t.comments) ? t.comments + ' comment' + (Number(t.comments) === 1 ? '' : 's') : 'No comments' %></span></td>
-            <td><form method="post" action="/team/tasks/<%= t.id %>/status"><%- include('../partials/csrf') %><input type="hidden" name="back" value="project"><select name="status" class="sel-sm tone-<%= tone[t.status] %>" data-autosubmit aria-label="Task status"><% Object.keys(TASK_LABEL).forEach(function (k) { %><option value="<%= k %>" <%= t.status === k ? 'selected' : '' %>><%= TASK_LABEL[k] %></option><% }) %></select></form></td>
-            <td class="nowrap <%= late ? 'late' : '' %>"><%= t.due_date ? h.date(t.due_date) : '—' %></td>
-            <td><form method="post" action="/team/tasks/<%= t.id %>/assign" class="row" style="flex-wrap:nowrap"><%- include('../partials/csrf') %><input type="hidden" name="back" value="project"><input class="sel-sm" type="text" name="assignee" value="<%= t.assignee || '' %>" placeholder="Assign…" maxlength="80" aria-label="Assigned to"></form></td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table></div><% } %>
-    </section>
-
     <section class="card">
       <div class="card-head"><h3>Updates for the client</h3></div>
       <form method="post" action="/team/projects/<%= project.id %>/updates" class="card-body" style="border-bottom:1px solid var(--border)">

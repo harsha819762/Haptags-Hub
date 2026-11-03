@@ -1,12 +1,64 @@
 <%
   const tabs = [['all', 'All'], ['active', 'Active'], ['on_hold', 'On hold'], ['completed', 'Completed']];
   const today = new Date().toISOString().slice(0, 10);
+  const qs = function (extra) { const p = []; if (q) p.push('q=' + encodeURIComponent(q)); Object.keys(extra).forEach(function (k) { if (extra[k]) p.push(k + '=' + extra[k]); }); return p.length ? '?' + p.join('&') : ''; };
 %>
-<div class="page-head"><div><h1>Projects</h1><div class="sub">Every project across all clients.</div></div></div>
-<form method="get" action="/team/projects" class="search-big" role="search"><%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search projects or clients…" aria-label="Search projects"><% if (status !== 'all') { %><input type="hidden" name="status" value="<%= status %>"><% } %><button class="btn" type="submit">Search</button></form>
-<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/projects<%= t[0] === 'all' ? '' : '?status=' + t[0] %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %></div>
+<div class="page-head"><div><h1>Projects</h1><div class="sub"><%= view === 'board' ? 'Drag a project to its next phase. Assign each one to the person who owns it.' : 'Every project across all clients.' %></div></div>
+  <div class="actions">
+    <div class="seg" role="group" aria-label="View">
+      <a class="<%= view === 'board' ? 'active' : '' %>" href="/team/projects<%= qs({}) %>" <%- view === 'board' ? 'aria-current="page"' : '' %>><%- h.icon('projects', 15) %> Board</a>
+      <a class="<%= view === 'list' ? 'active' : '' %>" href="/team/projects<%= qs({ view: 'list' }) %>" <%- view === 'list' ? 'aria-current="page"' : '' %>><%- h.icon('list', 15) %> List</a>
+    </div>
+    <% if (canCreate) { %><button class="btn" type="button" data-dialog="#new-project"><%- h.icon('plus', 16) %> New project</button><% } %>
+  </div>
+</div>
+<form method="get" action="/team/projects" class="search-big" role="search"><%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search projects or clients…" aria-label="Search projects"><% if (view === 'list') { %><input type="hidden" name="view" value="list"><% } %><% if (view === 'list' && status !== 'all') { %><input type="hidden" name="status" value="<%= status %>"><% } %><button class="btn" type="submit">Search</button></form>
+
+<% if (view === 'board') {
+  const COLS = [['todo', 'grey', 'Not started yet'], ['doing', 'blue', 'Being worked on'], ['review', 'amber', 'With the client for review'], ['done', 'green', 'Delivered']];
+  const initials = function (n) { return n ? n.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase() : '?'; };
+  const assignedId = function (p) {
+    if (p.assigned_to && team.some(function (m) { return m.id === p.assigned_to; })) return p.assigned_to;
+    const m = p.assignee && team.find(function (x) { return x.name.toLowerCase() === String(p.assignee).toLowerCase(); });
+    return m ? m.id : null;
+  };
+%>
+<% if (!projects.length) { %>
+<div class="card"><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b><%= q ? 'No projects match' : 'No projects yet' %></b><% if (canCreate && !q) { %><button class="btn btn-sm mt-8" type="button" data-dialog="#new-project"><%- h.icon('plus', 14) %> Create the first one</button><% } %></div></div>
+<% } else { %>
+<div class="board team-board project-board" id="board" data-kind="project" data-move-url="/team/projects/{id}/move" data-assign-url="/team/projects/{id}/assign">
+  <% COLS.forEach(function (c) { const cards = projects.filter(function (p) { return PROJECT_COLUMN[p.status] === c[0]; }); %>
+  <div class="col col-<%= c[1] %>" data-col="<%= c[0] %>">
+    <header><span class="dotc"></span><div><b><%= TASK_LABEL[c[0]] %></b><small><%= c[2] %></small></div><span class="n"><%= cards.length %></span></header>
+    <div class="col-body">
+      <% if (!cards.length) { %><div class="col-empty">Nothing here</div><% } %>
+      <% cards.forEach(function (p) { const late = p.due_date && String(p.due_date).slice(0, 10) < today && p.status !== 'completed'; const aid = assignedId(p); const aname = aid ? team.find(function (m) { return m.id === aid; }).name : p.assignee; %>
+      <article class="bcard task" draggable="true" data-id="<%= p.id %>">
+        <div class="task-top"><a class="bt" href="/team/projects/<%= p.id %>"><%= p.name %></a></div>
+        <div class="bm"><%= p.client_name %><%= p.service ? ' · ' + h.service(p.service) : '' %></div>
+        <div class="row" style="gap:8px;align-items:center"><span class="progress <%= p.status === 'completed' ? 'done' : '' %>" style="flex:1"><span data-card-bar style="width:<%= p.progress %>%"></span></span><em class="small muted" data-card-pct><%= p.progress %>%</em></div>
+        <div class="task-chips"><% if (p.status === 'on_hold') { %><span class="chip chip-amber">On hold</span><% } %><% if (p.due_date) { %><span class="chip <%= late ? 'chip-red' : '' %>"><%- h.icon('calendar', 12) %> <%= h.date(p.due_date) %></span><% } %><% if (Number(p.task_count)) { %><span class="chip"><%- h.icon('check', 12) %> <%= p.tasks_done %>/<%= p.task_count %> tasks</span><% } %><% if (Number(p.in_review)) { %><span class="chip chip-amber"><%= p.in_review %> to approve</span><% } %></div>
+        <div class="assign">
+          <span class="avatar sm <%= aname ? '' : 'unset' %>" aria-hidden="true"><%= initials(aname) %></span>
+          <select class="assign-select" aria-label="Assign “<%= p.name %>” to">
+            <option value="" <%= aname ? '' : 'selected' %>>Assign to…</option>
+            <% if (aname && !aid) { %><option value="keep" selected disabled><%= aname %></option><% } %>
+            <% team.forEach(function (m) { %><option value="<%= m.id %>" <%= aid === m.id ? 'selected' : '' %>><%= m.name %></option><% }) %>
+          </select>
+          <select class="move-select" aria-label="Move “<%= p.name %>” to"><% COLS.forEach(function (o) { %><option value="<%= o[0] %>" <%= o[0] === PROJECT_COLUMN[p.status] ? 'selected' : '' %>><%= TASK_LABEL[o[0]] %></option><% }) %></select>
+        </div>
+      </article>
+      <% }) %>
+    </div>
+    <% if (canCreate) { %><button class="col-add-btn" type="button" data-dialog="#new-project" data-phase="<%= c[0] %>"><%- h.icon('plus', 14) %> New project</button><% } %>
+  </div>
+  <% }) %>
+</div>
+<% } %>
+<% } else { %>
+<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/projects<%= qs({ view: 'list', status: t[0] === 'all' ? '' : t[0] }) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %></div>
 <div class="card plist">
-  <% if (!projects.length) { %><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b>No projects match</b></div><% } else { %>
+  <% if (!projects.length) { %><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b>No projects match</b><% if (canCreate && !q) { %><button class="btn btn-sm mt-8" type="button" data-dialog="#new-project"><%- h.icon('plus', 14) %> Create the first one</button><% } %></div><% } else { %>
   <div class="plist-head tl"><span>Project</span><span>Status</span><span>Progress</span><span>Target</span><span>Tasks</span></div>
   <% projects.forEach(function (p) { const late = p.due_date && String(p.due_date).slice(0, 10) < today && p.status !== 'completed'; %>
   <a class="plist-row tl" href="/team/projects/<%= p.id %>">
@@ -20,3 +72,29 @@
   <% }) %>
   <% } %>
 </div>
+<% } %>
+
+<% if (canCreate) { %>
+<dialog class="modal" id="new-project" aria-labelledby="new-project-title"<%= openNew ? ' data-open' : '' %>>
+  <form method="post" action="/team/projects">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="phase" value="todo" data-phase-input>
+    <div class="modal-head"><h2 id="new-project-title">New project</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="np-name">Project name *</label><input id="np-name" name="name" type="text" maxlength="190" required placeholder="e.g. Website redesign" autofocus></div>
+      <div class="field">
+        <label for="np-client">Client *</label>
+        <select id="np-client" name="client_id" required data-new-client>
+          <option value="" disabled <%= preselect ? '' : 'selected' %>>Choose a client…</option>
+          <% clients.forEach(function (c) { %><option value="<%= c.id %>" <%= preselect === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+          <option value="new">+ New client…</option>
+        </select>
+      </div>
+      <div class="field" data-new-client-field hidden><label for="np-new-client">New client’s name *</label><input id="np-new-client" name="new_client" type="text" maxlength="190" placeholder="Company name"><div class="hint">You can add their contact person and GSTIN later from Clients.</div></div>
+      <div class="field"><label for="np-due">Target date</label><input id="np-due" name="due_date" type="date"></div>
+      <div class="field"><label for="np-tasks">First tasks <span class="muted">(optional, one per line)</span></label><textarea id="np-tasks" name="tasks" rows="4" placeholder="Wireframes&#10;Homepage design&#10;Content from client"></textarea><div class="hint">They start in To do on the project board.</div></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit"><%- h.icon('check', 16) %> Create project</button></div>
+  </form>
+</dialog>
+<% } %>

@@ -212,6 +212,11 @@
       chime(2);
       notify(d.name + ' is waiting in the lobby', d.title, d.url, 'knock-' + d.id);
     },
+    'task.assigned': function (d) {
+      var what = d.kind === 'project' ? 'a project' : 'a task';
+      toast({ title: d.by + ' assigned you ' + what, body: d.title + (d.project ? ' · ' + d.project : ''), href: d.url });
+      notify(d.by + ' assigned you ' + what, d.title, d.url, 'task-' + d.id);
+    },
     announcement: function (d) {
       badge('announcements', 1);
       toast({ title: (d.important ? 'Important: ' : 'Announcement: ') + d.title, body: 'From ' + d.by, href: '/admin/announcements', sticky: d.important, tone: d.important ? 'important' : '' });

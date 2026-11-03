@@ -59,3 +59,27 @@ a.chip:hover { text-decoration: none; filter: brightness(.96); }
 .add-link { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: 8px; border-top: 1px solid var(--border); }
 .add-link input { padding: 8px 10px; font-size: 13px; }
 @media (max-width: 600px) { .add-link { grid-template-columns: 1fr; } }
+
+/* ----- Team project board: assign picker and a compact "Move to" menu on every card ----- */
+.team-board .assign { flex-wrap: wrap; row-gap: 8px; }
+.team-board .assign-select { flex: 1 1 120px; font: 600 12.5px var(--font-body); color: var(--text-2); border-radius: 8px; padding: 4px 6px; }
+.team-board .assign-select:hover, .team-board .assign-select:focus { background: var(--grey-bg); }
+.team-board .move-select { display: block; margin: 0 0 0 auto; width: auto; font-size: 12px; padding: 4px 8px; border-radius: 8px; }
+.team-board .col > header small { display: block; }
+.board-add input, .board-add select { padding: 9px 12px; }
+/* All four columns are always on screen: side by side, then 2 x 2, then stacked on a phone. Never a sideways scroll. */
+.board.team-board { grid-template-columns: repeat(4, minmax(0, 1fr)); overflow-x: visible; scroll-snap-type: none; }
+.board.team-board .col { min-width: 0; scroll-snap-align: none; }
+@media (max-width: 1180px) { .board.team-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .board.team-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .board.team-board { grid-template-columns: 1fr; } }
+.col-add { display: flex; gap: 6px; margin-top: 10px; }
+.col-add input { flex: 1; min-width: 0; background: transparent; border: 2px dashed #b7c8e3; border-radius: 12px; padding: 9px 12px; font-size: 13.5px; }
+.col-add input:focus { border-style: solid; background: var(--surface); }
+.col-add button { flex: none; }
+.col-add-btn { width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: 2px dashed #b7c8e3; border-radius: 12px; background: transparent; color: var(--text-2); font: 600 13.5px var(--font-body); cursor: pointer; }
+.col-add-btn:hover { border-color: var(--blue); color: var(--blue-600); background: var(--surface); }
+[data-theme=dark] .col-add input, [data-theme=dark] .col-add-btn { border-color: var(--border-strong); }
+.project-board .bcard .bm { margin: 2px 0 10px; }
+.project-board .progress { height: 6px; }
+.page-head .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

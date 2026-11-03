@@ -14,7 +14,7 @@ const { nowSql, str, int, todayIST, addDays, addMinutesSql } = require('../lib/u
 const router = express.Router();
 
 const TASK_STATUS = ['todo', 'doing', 'review', 'done'];
-const TASK_LABEL = { todo: 'To do', doing: 'In progress', review: 'Under review', done: 'Completed' };
+const TASK_LABEL = { todo: 'To do', doing: 'In progress', review: 'Under review', done: 'Done' };
 const DOC_LABEL = { quotation: 'Quotation', invoice: 'Invoice', receipt: 'Receipt' };
 const OPEN_PROJECT = ['planning', 'in_progress', 'review', 'on_hold'];
 const cleanName = (v) => (str(v, 80) || '').replace(/\s+/g, ' ').trim() || null;
@@ -300,17 +300,87 @@ router.get('/clients/:id', async (req, res, next) => {
 });
 
 // ---- Projects ----
+// The Projects page is a board by default: each project is a card in To do, In progress, Under review or Done.
+const PROJECT_COLUMN = { planning: 'todo', in_progress: 'doing', on_hold: 'doing', review: 'review', completed: 'done' };
+const COLUMN_STATUS = { todo: 'planning', doing: 'in_progress', review: 'review', done: 'completed' };
+
 router.get('/projects', async (req, res) => {
+  const view = req.query.view === 'list' ? 'list' : 'board';
   const status = ['active', 'completed', 'on_hold'].includes(req.query.status) ? req.query.status : 'all';
   const q = (str(req.query.q, 80) || '').trim();
   const query = db('projects as p').join('clients as c', 'c.id', 'p.client_id').whereNot('p.status', 'cancelled').orderBy('p.id', 'desc').select('p.*', 'c.name as client_name',
     db.raw("(select count(*) from project_tasks t where t.project_id = p.id and t.status = 'review') as in_review"),
-    db.raw('(select count(*) from project_tasks t where t.project_id = p.id) as task_count'));
-  if (status === 'active') query.whereIn('p.status', ['planning', 'in_progress', 'review']);
-  if (status === 'completed') query.where('p.status', 'completed');
-  if (status === 'on_hold') query.where('p.status', 'on_hold');
+    db.raw('(select count(*) from project_tasks t where t.project_id = p.id) as task_count'),
+    db.raw("(select count(*) from project_tasks t where t.project_id = p.id and t.status = 'done') as tasks_done"));
+  if (view === 'list' && status === 'active') query.whereIn('p.status', ['planning', 'in_progress', 'review']);
+  if (view === 'list' && status === 'completed') query.where('p.status', 'completed');
+  if (view === 'list' && status === 'on_hold') query.where('p.status', 'on_hold');
   if (q) query.where((w) => w.where('p.name', 'like', `%${q}%`).orWhere('c.name', 'like', `%${q}%`));
-  res.render('team/projects', { title: 'Projects', projects: await query, status, q });
+  const canCreate = ['owner', 'admin'].includes(req.user.role);
+  const clients = canCreate ? await db('clients').where({ status: 'active', segment: 'business' }).orderBy('name').select('id', 'name') : [];
+  res.render('team/projects', {
+    title: 'Projects', styles: ['board'], scripts: ['projects'], projects: await query, status, q, view, canCreate, clients, TASK_LABEL, PROJECT_COLUMN,
+    team: await db('users').whereIn('role', ['owner', 'admin', 'staff']).where({ is_active: true }).orderBy('name').select('id', 'name'),
+    openNew: canCreate && req.query.new === '1', preselect: int(req.query.client, 0),
+  });
+});
+
+// Drag a project card to another phase: { column } in.
+router.post('/projects/:id/move', async (req, res) => {
+  const project = await db('projects').where({ id: int(req.params.id, 0) }).first();
+  if (!project) return res.status(404).json({ ok: false });
+  const status = COLUMN_STATUS[req.body.column];
+  if (!status) return res.status(422).json({ ok: false, error: 'Unknown column.' });
+  const keep = status === 'in_progress' && project.status === 'on_hold'; // dropping an on-hold project back in its own column changes nothing
+  if (!keep && status !== project.status) {
+    await db('projects').where({ id: project.id }).update({ status, ...(status === 'completed' ? { progress: 100 } : {}), updated_at: nowSql() });
+  }
+  const after = await db('projects').where({ id: project.id }).first();
+  res.json({ ok: true, status: after.status, progress: after.progress });
+});
+
+// "Assign to" on a project card: the teammate who owns the project.
+router.post('/projects/:id/assign', async (req, res) => {
+  const project = await db('projects as p').join('clients as c', 'c.id', 'p.client_id').where('p.id', int(req.params.id, 0)).select('p.*', 'c.name as client_name').first();
+  if (!project) return res.status(404).json({ ok: false });
+  const who = await assigneeFrom(req.body);
+  await db('projects').where({ id: project.id }).update({ ...who, updated_at: nowSql() });
+  if (who.assigned_to && who.assigned_to !== req.user.id && who.assigned_to !== project.assigned_to) {
+    require('../lib/realtime').publish({ users: [who.assigned_to] }, 'task.assigned', {
+      id: `p${project.id}`, title: project.name, project: project.client_name, by: req.user.name, url: `/team/projects/${project.id}`, kind: 'project',
+    });
+  }
+  res.json({ ok: true, name: who.assignee, userId: who.assigned_to });
+});
+
+// ---- New project from the Projects page (owners and admins): pick or type the client, optional first tasks ----
+router.post('/projects', requireAdmin, async (req, res) => {
+  const name = str(req.body.name, 190);
+  const isNew = req.body.client_id === 'new';
+  const newClient = str(req.body.new_client, 190);
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null;
+  const firstTasks = String(req.body.tasks || '').split(/\r?\n/).map((t) => t.replace(/\s+/g, ' ').trim().slice(0, 255)).filter(Boolean).slice(0, 30);
+  const client = isNew ? null : await db('clients').where({ id: int(req.body.client_id, 0), status: 'active', segment: 'business' }).first();
+  const problem = !name ? 'Give the project a name.' : isNew && !newClient ? 'Type the new client’s name.' : !isNew && !client ? 'Pick which client this project is for.' : null;
+  if (problem) {
+    req.flash('error', problem);
+    return res.redirect('/team/projects?new=1');
+  }
+  let clientId = client && client.id;
+  if (isNew) {
+    const [cid] = await db('clients').insert({ name: newClient, status: 'active', created_at: nowSql(), updated_at: nowSql() });
+    clientId = Array.isArray(cid) ? cid[0] : cid;
+    await db('client_contacts').insert({ client_id: clientId, user_id: req.user.id, created_at: nowSql() });
+    await ensureClientGroup(clientId);
+  }
+  const status = COLUMN_STATUS[req.body.phase] || 'planning';
+  const [pid] = await db('projects').insert({ client_id: clientId, name, status, progress: status === 'completed' ? 100 : 0, due_date: due, budget: 0, created_at: nowSql(), updated_at: nowSql() });
+  const projectId = Array.isArray(pid) ? pid[0] : pid;
+  for (const title of firstTasks) {
+    await db('project_tasks').insert({ project_id: projectId, title, status: 'todo', priority: 'normal', created_at: nowSql(), updated_at: nowSql() });
+  }
+  req.flash('success', `Project “${name}” created${isNew ? ` with the new client ${newClient}` : ''}. Add tasks and drag them across the board as work moves.`);
+  res.redirect(`/team/projects/${projectId}`);
 });
 
 router.get('/projects/:id', async (req, res, next) => {
@@ -322,7 +392,8 @@ router.get('/projects/:id', async (req, res, next) => {
     db('project_files').where({ project_id: project.id }).whereNull('task_id').orderBy('id', 'desc'),
     db('invoices').where({ project_id: project.id }).whereNot('status', 'draft').orderBy('id', 'desc'),
   ]);
-  res.render('team/project', { title: project.name, project, tasks, updates, files, invoices, TASK_LABEL });
+  const team = await db('users').whereIn('role', ['owner', 'admin', 'staff']).where({ is_active: true }).orderBy('name').select('id', 'name');
+  res.render('team/project', { title: project.name, styles: ['board'], scripts: ['projects'], project, tasks, updates, files, invoices, team, TASK_LABEL, TASK_STATUS });
 });
 
 router.post('/projects/:id/tasks', async (req, res, next) => {
@@ -334,12 +405,12 @@ router.post('/projects/:id/tasks', async (req, res, next) => {
     return res.redirect(`/team/projects/${project.id}`);
   }
   await db('project_tasks').insert({
-    project_id: project.id, title, status: 'todo', priority: ['low', 'normal', 'high'].includes(req.body.priority) ? req.body.priority : 'normal',
-    due_date: /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null, assignee: cleanName(req.body.assignee), created_at: nowSql(), updated_at: nowSql(),
+    project_id: project.id, title, status: TASK_STATUS.includes(req.body.status) ? req.body.status : 'todo', priority: ['low', 'normal', 'high'].includes(req.body.priority) ? req.body.priority : 'normal',
+    due_date: /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null, ...(await assigneeFrom(req.body)), created_at: nowSql(), updated_at: nowSql(),
   });
   await syncProgress(project.id);
-  req.flash('success', 'Task added.');
-  res.redirect(`/team/projects/${project.id}`);
+  req.flash('success', `Task added to ${TASK_LABEL[TASK_STATUS.includes(req.body.status) ? req.body.status : 'todo']}.`);
+  res.redirect(`/team/projects/${project.id}#board-title`);
 });
 
 router.post('/projects/:id/status', async (req, res, next) => {
@@ -387,9 +458,41 @@ router.post('/tasks/:id/status', loadTask, async (req, res) => {
   res.redirect(req.body.back === 'project' ? `/team/projects/${t.project_id}` : `/team/tasks/${t.id}`);
 });
 
+// Drag and drop on the project board: { column } in, the project's new progress out.
+router.post('/tasks/:id/move', loadTask, async (req, res) => {
+  const t = req.task;
+  if (!TASK_STATUS.includes(req.body.column)) return res.status(422).json({ ok: false, error: 'Unknown column.' });
+  if (req.body.column !== t.status) {
+    await db('project_tasks').where({ id: t.id }).update({ status: req.body.column, updated_at: nowSql() });
+    await syncProgress(t.project_id);
+  }
+  const project = await db('projects').where({ id: t.project_id }).first();
+  res.json({ ok: true, status: req.body.column, progress: project.progress, projectStatus: project.status });
+});
+
+/** "Assign to": a team member by id (from the board), or a typed name (task page). Empty clears it. */
+async function assigneeFrom(body) {
+  if (body.user_id !== undefined && body.user_id !== '') {
+    const u = await db('users').where({ id: int(body.user_id, 0), is_active: true }).whereIn('role', ['owner', 'admin', 'staff']).first();
+    if (u) return { assigned_to: u.id, assignee: u.name.slice(0, 80) };
+  }
+  if (body.user_id === '') return { assigned_to: null, assignee: null };
+  const name = cleanName(body.assignee);
+  const match = name ? await db('users').whereIn('role', ['owner', 'admin', 'staff']).where({ is_active: true }).whereRaw('LOWER(name) = ?', [name.toLowerCase()]).first() : null;
+  return { assigned_to: match ? match.id : null, assignee: name };
+}
+
 router.post('/tasks/:id/assign', loadTask, async (req, res) => {
-  await db('project_tasks').where({ id: req.task.id }).update({ assignee: cleanName(req.body.assignee), updated_at: nowSql() });
-  res.redirect(req.body.back === 'project' ? `/team/projects/${req.task.project_id}` : `/team/tasks/${req.task.id}`);
+  const t = req.task;
+  const who = await assigneeFrom(req.body);
+  await db('project_tasks').where({ id: t.id }).update({ ...who, updated_at: nowSql() });
+  if (who.assigned_to && who.assigned_to !== req.user.id && who.assigned_to !== t.assigned_to) {
+    require('../lib/realtime').publish({ users: [who.assigned_to] }, 'task.assigned', {
+      id: t.id, title: t.title, project: t.project_name, by: req.user.name, url: `/team/tasks/${t.id}`,
+    });
+  }
+  if (req.is('application/json')) return res.json({ ok: true, name: who.assignee, userId: who.assigned_to });
+  res.redirect(req.body.back === 'project' ? `/team/projects/${t.project_id}` : `/team/tasks/${t.id}`);
 });
 
 router.post('/tasks/:id/comment', loadTask, async (req, res) => {
