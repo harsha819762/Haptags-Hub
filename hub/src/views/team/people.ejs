@@ -55,10 +55,17 @@
         </details>
         <form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="role">
           <select name="role" data-autosubmit class="sel-sm" aria-label="Role"><% if (p.role === 'owner') { %><option value="owner" selected disabled>Owner</option><% } %><option value="staff" <%= p.role === 'staff' ? 'selected' : '' %>>Staff</option><option value="admin" <%= p.role === 'admin' ? 'selected' : '' %>>Admin</option></select></form>
+        <% if (isOwner && p.role === 'owner') { %><form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="Remove <%= p.name %> as an owner? They become an admin, with full access to every section but no say over owners."><%- include('../partials/csrf') %><input type="hidden" name="action" value="role"><input type="hidden" name="role" value="admin"><button class="btn btn-ghost btn-sm" type="submit">Remove owner role</button></form><% } %>
         <% if (isOwner && p.role !== 'owner' && p.is_active) { %><form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="Make <%= p.name %> an owner? Owners have full access to everything, including making or removing other owners."><%- include('../partials/csrf') %><input type="hidden" name="action" value="role"><input type="hidden" name="role" value="owner"><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('lock', 13) %> Make owner</button></form><% } %>
         <% if (p.is_active && !p.password_hash) { %><form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="resend"><button class="btn btn-ghost btn-sm" type="submit">Resend invite</button></form><% } %>
-        <form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="<%= p.is_active ? 'Remove ' + p.name + '’s access?' : 'Restore access?' %>"><%- include('../partials/csrf') %><input type="hidden" name="action" value="toggle"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Remove' : 'Restore' %></button></form>
-        <% } else { %><span class="badge tone-<%= r[1] %>"><%= r[0] %></span><% } %>
+        <form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="<%= p.is_active ? 'Remove ' + p.name + '’s access?' : 'Restore access?' %>"><%- include('../partials/csrf') %><input type="hidden" name="action" value="toggle"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Remove access' : 'Restore access' %></button></form>
+        <% } else { %>
+        <span class="row" style="gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="badge tone-<%= r[1] %>"><%= r[0] %></span>
+          <% if (manage && p.id === user.id) { %><span class="small muted locked-why">You can’t change your own role or access. <%= user.role === 'owner' ? 'Another owner can.' : 'An owner can.' %></span>
+          <% } else if (manage && p.role === 'owner') { %><span class="small muted locked-why">Only an owner can change or remove an owner.</span><% } %>
+        </span>
+        <% } %>
       </li>
       <% }) %>
     </ul>

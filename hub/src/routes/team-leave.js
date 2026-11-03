@@ -5,6 +5,8 @@ const express = require('express');
 const { db } = require('../db');
 const L = require('../lib/leave');
 const { sendMail } = require('../lib/mailer');
+const { notifyLeaders } = require('../lib/team-notify');
+const rt = require('../lib/realtime');
 const { nowSql, str, int, isDate, todayIST, addDays } = require('../lib/util');
 
 const router = express.Router();
@@ -58,12 +60,16 @@ router.post('/', async (req, res) => {
     user_id: req.user.id, type: values.type, start_date: values.start_date, end_date: values.end_date, days, half_day: values.half_day, reason: values.reason || null,
     status: owner ? 'approved' : 'pending', decided_by: owner ? req.user.id : null, decided_at: owner ? nowSql() : null, created_at: nowSql(),
   });
-  if (!owner) {
-    const approvers = await db('users').whereIn('role', req.user.role === 'staff' ? ['owner', 'admin'] : ['owner']).where({ is_active: true }).select('email');
-    for (const a of approvers) {
-      await sendMail({ to: a.email, subject: `Leave request from ${req.user.name}`, heading: 'Leave request', lines: [`${req.user.name} asked for ${days} day${days === 1 ? '' : 's'} of ${L.TYPES[values.type].label.toLowerCase()} (${values.start_date} to ${values.end_date}).`, ...(values.reason ? [values.reason] : [])], button: { label: 'Review request', url: `${require('../config').baseUrl}/team/leave` } }).catch(() => false);
-    }
-  }
+  // Every owner hears about every request (and admins about staff requests, which they can approve too).
+  // An owner's own leave needs no approval, but the other owners and the admins are told.
+  const what = `${days} day${days === 1 ? '' : 's'} of ${L.TYPES[values.type].label.toLowerCase()} (${values.start_date} to ${values.end_date})`;
+  await notifyLeaders({
+    roles: owner || req.user.role === 'staff' ? ['owner', 'admin'] : ['owner'],
+    except: req.user.id,
+    title: owner ? `${req.user.name} is taking leave` : `Leave request from ${req.user.name}`,
+    body: owner ? `${req.user.name} will be away: ${what}.${values.reason ? ` ${values.reason}` : ''}` : `${req.user.name} asked for ${what}.${values.reason ? ` Reason: ${values.reason}` : ''} Approve or reject it on the Leave page.`,
+    url: '/team/leave', tag: `leave-${Array.isArray(id) ? id[0] : id}`, related: ['leave', Array.isArray(id) ? id[0] : id],
+  });
   req.flash('success', owner ? 'Leave added to your record.' : `Request sent for ${days} day${days === 1 ? '' : 's'}. You’ll see the decision here.`);
   res.redirect('/team/leave');
 });
@@ -92,6 +98,9 @@ router.post('/:id/decide', async (req, res, next) => {
     to: r.user_email, subject: `Your leave was ${approve ? 'approved' : 'not approved'}`, heading: approve ? 'Leave approved' : 'Leave not approved',
     lines: [`${req.user.name} ${approve ? 'approved' : 'did not approve'} your ${L.TYPES[r.type].label.toLowerCase()} from ${r.start_date} to ${r.end_date}.`, ...(note ? [`Note: ${note}`] : [])],
   }).catch(() => false);
+  rt.publish({ users: [r.user_id] }, 'team.notice', {
+    title: approve ? 'Your leave was approved' : 'Your leave was not approved', body: `${r.start_date} to ${r.end_date}, decided by ${req.user.name}`, url: '/team/leave', tag: `leave-decided-${r.id}`,
+  });
   req.flash('success', `${approve ? 'Approved' : 'Rejected'} ${r.user_name}’s request.`);
   res.redirect('/team/leave');
 });

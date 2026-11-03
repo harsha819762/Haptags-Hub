@@ -169,3 +169,31 @@ test('an owner makes Abhay an owner; admins can’t make or change owners', asyn
   r = await owner.post('/team/people', { name: 'Gst Clerk', email: 'clerk@test.local', role: 'staff', password: 'clerk-password-1', perms: ['gst'] });
   assert.deepEqual(JSON.parse((await db('users').where({ email: 'clerk@test.local' }).first()).permissions), ['gst'], 'access can be set when adding someone');
 });
+
+test('an owner removes another owner: their owner role, or their access entirely', async () => {
+  const owner = await new Browser().login('owner@test.local', 'owner-password-1');
+  const [co] = await db('users').insert({ name: 'Co Owner', email: 'co@test.local', role: 'owner', password_hash: await hashPassword('co-password-123'), is_active: true, token_version: 1, created_at: NOW, updated_at: NOW });
+  const page = (await owner.get('/team/people')).text;
+  const row = page.slice(page.indexOf('Co Owner'), page.indexOf('</li>', page.indexOf('Co Owner')));
+  assert.match(row, />Remove owner role</);
+  assert.match(row, />Remove access</);
+  assert.match(page, /You can’t change your own role or access\. Another owner can\./, 'your own row says why it is locked');
+
+  await owner.post(`/team/people/${co}`, { action: 'role', role: 'admin' });
+  assert.equal(await role(co), 'admin', 'owner role removed');
+  await owner.post(`/team/people/${co}`, { action: 'role', role: 'owner' });
+  assert.equal(await role(co), 'owner');
+
+  const coSession = await new Browser().login('co@test.local', 'co-password-123');
+  await owner.post(`/team/people/${co}`, { action: 'toggle' });
+  const after = await db('users').where({ id: co }).first();
+  assert.equal(after.is_active ? 1 : 0, 0, 'access removed');
+  assert.equal((await coSession.get('/team')).status, 302, 'and they are signed out');
+  assert.match((await owner.get('/team/people')).text, />Restore access</);
+
+  const adele = await new Browser().login('adele@test.local', 'member-password-1');
+  const adminView = (await adele.get('/team/people')).text;
+  assert.match(adminView, /Only an owner can change or remove an owner\./, 'admins are told why owner rows are locked');
+  await adele.post(`/team/people/${co}`, { action: 'toggle' });
+  assert.equal((await db('users').where({ id: co }).first()).is_active ? 1 : 0, 0, 'an admin can’t restore or change an owner');
+});

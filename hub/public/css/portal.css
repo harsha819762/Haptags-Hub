@@ -398,3 +398,4 @@ select.sel-sm.tone-grey { background-color: var(--grey-bg); color: var(--grey); 
 .access-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .access-chips .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font: 600 11.5px var(--font-body); background: var(--blue-50); color: var(--blue-600); }
 [data-theme=dark] .access-chips .chip { background: rgba(0, 122, 245, .16); color: #8cc4ff; }
+.locked-why { max-width: 220px; text-align: right; }

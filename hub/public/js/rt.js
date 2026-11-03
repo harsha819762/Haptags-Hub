@@ -212,6 +212,10 @@
       chime(2);
       notify(d.name + ' is waiting in the lobby', d.title, d.url, 'knock-' + d.id);
     },
+    'team.notice': function (d) {
+      toast({ title: d.title, body: d.body, href: d.url });
+      notify(d.title, d.body, d.url, d.tag || 'notice');
+    },
     'task.assigned': function (d) {
       var what = d.kind === 'project' ? 'a project' : 'a task';
       toast({ title: d.by + ' assigned you ' + what, body: d.title + (d.project ? ' · ' + d.project : ''), href: d.url });

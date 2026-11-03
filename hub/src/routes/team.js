@@ -7,6 +7,12 @@ const { db } = require('../db');
 const chatRouter = require('./portal-chat');
 const { requireAdmin } = require('../lib/auth');
 const { can, requireAccess } = require('../lib/permissions');
+const { reviewNotice } = require('../lib/team-notify');
+/** Tells owners and admins when a project reaches Under review. */
+const projectReview = async (who, projectId) => {
+  const p = await db('projects as p').join('clients as c', 'c.id', 'p.client_id').where('p.id', projectId).select('p.id', 'p.name', 'c.name as client_name').first();
+  if (p) reviewNotice({ who, kind: 'project', name: p.name, project: p.client_name, url: `/team/projects/${p.id}` });
+};
 const L = require('../lib/leave');
 const M = require('../lib/meetings');
 const money = require('../lib/money');
@@ -339,6 +345,7 @@ router.post('/projects/:id/move', async (req, res) => {
   const keep = status === 'in_progress' && project.status === 'on_hold'; // dropping an on-hold project back in its own column changes nothing
   if (!keep && status !== project.status) {
     await db('projects').where({ id: project.id }).update({ status, ...(status === 'completed' ? { progress: 100 } : {}), updated_at: nowSql() });
+    if (status === 'review') projectReview(req.user, project.id);
   }
   const after = await db('projects').where({ id: project.id }).first();
   res.json({ ok: true, status: after.status, progress: after.progress });
@@ -414,11 +421,15 @@ router.post('/projects/:id/tasks', async (req, res, next) => {
     req.flash('error', 'Give the task a title.');
     return res.redirect(`/team/projects/${project.id}`);
   }
-  await db('project_tasks').insert({
+  const [newTaskId] = await db('project_tasks').insert({
     project_id: project.id, title, status: TASK_STATUS.includes(req.body.status) ? req.body.status : 'todo', priority: ['low', 'normal', 'high'].includes(req.body.priority) ? req.body.priority : 'normal',
     due_date: /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null, ...(await assigneeFrom(req.body)), created_at: nowSql(), updated_at: nowSql(),
   });
   await syncProgress(project.id);
+  if (req.body.status === 'review') {
+    const tid = Array.isArray(newTaskId) ? newTaskId[0] : newTaskId;
+    reviewNotice({ who: req.user, kind: 'task', name: title, project: project.name, url: `/team/tasks/${tid}` });
+  }
   req.flash('success', `Task added to ${TASK_LABEL[TASK_STATUS.includes(req.body.status) ? req.body.status : 'todo']}.`);
   res.redirect(`/team/projects/${project.id}#board-title`);
 });
@@ -455,6 +466,7 @@ router.post('/projects/:id/edit', requireAccess('projects'), async (req, res, ne
       if (outsiders.length) await trx('project_members').where({ project_id: project.id }).whereIn('user_id', outsiders).del();
     }
   });
+  if (status === 'review' && project.status !== 'review') projectReview(req.user, project.id);
   req.flash('success', `Project details saved${moved ? `. It now belongs to ${client.name}` : ''}.`);
   res.redirect(`/team/projects/${project.id}`);
 });
@@ -494,6 +506,7 @@ router.post('/projects/:id/status', async (req, res, next) => {
   if (!project) return next();
   const status = ['planning', 'in_progress', 'review', 'on_hold', 'completed', 'cancelled'].includes(req.body.status) ? req.body.status : project.status;
   await db('projects').where({ id: project.id }).update({ status, ...(status === 'completed' ? { progress: 100 } : {}), updated_at: nowSql() });
+  if (status === 'review' && project.status !== 'review') projectReview(req.user, project.id);
   req.flash('success', 'Project status updated.');
   res.redirect(`/team/projects/${project.id}`);
 });
@@ -530,6 +543,7 @@ router.post('/tasks/:id/status', loadTask, async (req, res) => {
   if (TASK_STATUS.includes(req.body.status) && req.body.status !== t.status) {
     await db('project_tasks').where({ id: t.id }).update({ status: req.body.status, updated_at: nowSql() });
     await syncProgress(t.project_id);
+    if (req.body.status === 'review') reviewNotice({ who: req.user, kind: 'task', name: t.title, project: t.project_name, url: `/team/tasks/${t.id}` });
   }
   res.redirect(req.body.back === 'project' ? `/team/projects/${t.project_id}` : `/team/tasks/${t.id}`);
 });
@@ -572,6 +586,7 @@ router.post('/tasks/:id/move', loadTask, async (req, res) => {
   if (req.body.column !== t.status) {
     await db('project_tasks').where({ id: t.id }).update({ status: req.body.column, updated_at: nowSql() });
     await syncProgress(t.project_id);
+    if (req.body.column === 'review') reviewNotice({ who: req.user, kind: 'task', name: t.title, project: t.project_name, url: `/team/tasks/${t.id}` });
   }
   const project = await db('projects').where({ id: t.project_id }).first();
   res.json({ ok: true, status: req.body.column, progress: project.progress, projectStatus: project.status });
