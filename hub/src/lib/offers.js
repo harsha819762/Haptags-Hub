@@ -320,7 +320,7 @@ async function respond(letter, { accept, name, note, ip }) {
     heading: accept ? 'Internship offer accepted' : 'Internship offer declined',
     lines: [`${name} ${accept ? 'accepted' : 'declined'} offer letter ${letter.number} (${letter.role_title}).`, note ? `Note: “${note}”` : ''].filter(Boolean),
     rows: [['Starts', formatDate(letter.start_date)], ['Ends', formatDate(letter.end_date)]],
-    button: { label: 'Open the letter', url: `${config.baseUrl}/admin/education/offers/${letter.id}` },
+    button: { label: 'Open the letter', url: `${config.baseUrl}/team/education/offers/${letter.id}` },
   });
   return db('offer_letters').where({ id: letter.id }).first();
 }

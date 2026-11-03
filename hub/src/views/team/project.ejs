@@ -1,0 +1,72 @@
+<%
+  const today = new Date().toISOString().slice(0, 10);
+  const tone = { todo: 'grey', doing: 'blue', review: 'amber', done: 'green' };
+  const PSTATUS = ['planning', 'in_progress', 'review', 'on_hold', 'completed', 'cancelled'];
+%>
+<div class="crumbs"><a href="/team/projects">Projects</a> / <%= project.name %></div>
+<div class="page-head">
+  <div><h1><%= project.name %> <%- h.badge(project.status) %></h1><div class="sub"><a href="/team/clients/<%= project.client_id %>"><%= project.client_name %></a> · <%= h.service(project.service) || 'Project' %><%= project.due_date ? ' · target ' + h.date(project.due_date) : '' %></div></div>
+  <div class="actions">
+    <form method="post" action="/team/projects/<%= project.id %>/status" class="row" style="flex-wrap:nowrap"><%- include('../partials/csrf') %>
+      <select name="status" aria-label="Project status" data-autosubmit><% PSTATUS.forEach(function (s) { %><option value="<%= s %>" <%= project.status === s ? 'selected' : '' %>><%= h.humanize(s) %></option><% }) %></select>
+    </form>
+  </div>
+</div>
+
+<section class="card card-pad mb-16">
+  <div class="row-between mb-8"><b>Overall progress</b><b><%= project.progress %>%</b></div>
+  <div class="progress <%= project.status === 'completed' ? 'done' : '' %>" style="height:12px"><span style="width:<%= project.progress %>%"></span></div>
+</section>
+
+<div class="split">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Tasks</h3><span class="muted small"><%= tasks.filter(function (t) { return t.status === 'done'; }).length %>/<%= tasks.length %> completed</span></div>
+      <form method="post" action="/team/projects/<%= project.id %>/tasks" class="card-body row" style="border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <%- include('../partials/csrf') %>
+        <input type="text" name="title" placeholder="Add a task…" maxlength="255" aria-label="New task" style="flex:2;min-width:180px" required>
+        <input type="text" name="assignee" placeholder="Assigned to" maxlength="80" aria-label="Assigned to" style="flex:1;min-width:120px">
+        <input type="date" name="due_date" aria-label="Due date" style="max-width:150px">
+        <select name="priority" aria-label="Priority" style="max-width:110px"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select>
+        <button class="btn btn-sm" type="submit"><%- h.icon('plus', 14) %> Add</button>
+      </form>
+      <% if (!tasks.length) { %><div class="empty" style="padding:26px">No tasks yet. Add the first one above — the client only sees the ones you send for approval.</div><% } else { %>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Task</th><th>Status</th><th>Due</th><th>Assigned</th></tr></thead>
+        <tbody>
+          <% tasks.forEach(function (t) { const late = t.due_date && String(t.due_date).slice(0, 10) < today && t.status !== 'done'; %>
+          <tr>
+            <td><a class="strong" href="/team/tasks/<%= t.id %>"><%= t.title %></a><span class="sub"><%= t.priority === 'high' ? 'High priority · ' : '' %><%= Number(t.comments) ? t.comments + ' comment' + (Number(t.comments) === 1 ? '' : 's') : 'No comments' %></span></td>
+            <td><form method="post" action="/team/tasks/<%= t.id %>/status"><%- include('../partials/csrf') %><input type="hidden" name="back" value="project"><select name="status" class="sel-sm tone-<%= tone[t.status] %>" data-autosubmit aria-label="Task status"><% Object.keys(TASK_LABEL).forEach(function (k) { %><option value="<%= k %>" <%= t.status === k ? 'selected' : '' %>><%= TASK_LABEL[k] %></option><% }) %></select></form></td>
+            <td class="nowrap <%= late ? 'late' : '' %>"><%= t.due_date ? h.date(t.due_date) : '—' %></td>
+            <td><form method="post" action="/team/tasks/<%= t.id %>/assign" class="row" style="flex-wrap:nowrap"><%- include('../partials/csrf') %><input type="hidden" name="back" value="project"><input class="sel-sm" type="text" name="assignee" value="<%= t.assignee || '' %>" placeholder="Assign…" maxlength="80" aria-label="Assigned to"></form></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table></div><% } %>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h3>Updates for the client</h3></div>
+      <form method="post" action="/team/projects/<%= project.id %>/updates" class="card-body" style="border-bottom:1px solid var(--border)">
+        <%- include('../partials/csrf') %>
+        <div class="field"><textarea name="body" rows="3" placeholder="e.g. Homepage is live on staging — please review." aria-label="Update"></textarea></div>
+        <label class="check mb-8"><input type="checkbox" name="internal" value="1"> Internal note <span class="muted">(hide from the client)</span></label>
+        <button class="btn btn-sm" type="submit"><%- h.icon('send', 15) %> Post update</button>
+      </form>
+      <% if (!updates.length) { %><div class="empty" style="padding:22px">No updates yet.</div><% } else { %>
+      <div class="card-body"><ul class="timeline"><% updates.forEach(function (u) { %><li class="k-email"><div class="meta"><%= u.user_name || 'Haptags' %> · <%= h.ago(u.created_at) %><% if (!u.client_visible) { %> <span class="chip chip-amber">Internal</span><% } %></div><div class="body"><%= u.body %></div></li><% }) %></ul></div><% } %>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Files &amp; links</h3></div>
+      <% if (!files.length) { %><div class="empty" style="padding:22px">Nothing uploaded.</div><% } %>
+      <ul class="list"><% files.forEach(function (f) { %><li><span class="ic blue ficon"><%- h.icon(f.url ? 'link' : 'paperclip', 15) %></span><div class="grow"><a class="title" href="<%= f.url || '/team/files/' + f.id %>" <%- f.url ? 'target="_blank" rel="noopener noreferrer"' : '' %>><%= f.label %></a><span class="meta"><%= f.url ? 'Link' : 'File' %> · <%= h.ago(f.created_at) %></span></div></li><% }) %></ul>
+    </section>
+    <% if (showMoney && invoices.length) { %>
+    <section class="card"><div class="card-head"><h3>Invoices</h3></div><ul class="list"><% invoices.forEach(function (i) { %><li><div class="grow"><a class="title mono" href="/i/<%= i.public_token %>"><%= i.number %></a><span class="meta"><%= h.date(i.issue_date) %></span></div><b><%= h.inrShort(i.total) %></b><%- h.badge(i.status) %></li><% }) %></ul></section>
+    <% } %>
+  </div>
+</div>

@@ -1,6 +1,6 @@
 <div class="page-head"><div><h1>Invoices</h1><div class="sub">View, download and pay your invoices.</div></div></div>
 <div class="card">
-  <% if (!invoices.length) { %><div class="empty">No invoices yet.</div><% } else { %>
+  <% if (!invoices.length) { %><div class="empty"><div class="art"><%- h.icon('invoices', 28) %></div><b>No invoices yet</b><p>Your GST invoices will appear here, ready to pay in a tap.</p></div><% } else { %>
   <div class="table-wrap"><table class="table">
     <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Status</th><th class="num">Total</th><th class="num">Balance</th><th></th></tr></thead>
     <tbody>

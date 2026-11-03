@@ -1,0 +1,19 @@
+<%
+  const v = values || { title: sale.title, customer: sale.customer, amount: h.rupees(sale.amount), sale_date: sale.sale_date, status: sale.status, notes: sale.notes || '', client_id: sale.client_id || '' };
+  const err = function (k) { return errors[k] ? '<div class="error">' + h.esc(errors[k]) + '</div>' : ''; };
+%>
+<div class="crumbs"><a href="/team/sales">Sales</a> / Edit</div>
+<div class="page-head"><div><h1>Edit sale</h1><div class="sub">Credited to <%= sale.user_name %></div></div></div>
+<form method="post" action="/team/sales/<%= sale.id %>" class="card card-pad" style="max-width:640px" novalidate>
+  <%- include('../partials/csrf') %>
+  <div class="field"><label for="e-title">What did you sell?</label><input id="e-title" name="title" type="text" maxlength="190" value="<%= v.title %>" <%- errors.title ? 'aria-invalid="true"' : '' %>><%- err('title') %></div>
+  <div class="field"><label for="e-customer">Who to?</label><input id="e-customer" name="customer" type="text" maxlength="190" value="<%= v.customer %>" list="e-clients" <%- errors.customer ? 'aria-invalid="true"' : '' %>><%- err('customer') %>
+    <datalist id="e-clients"><% clients.forEach(function (c) { %><option value="<%= c.name %>"><% }) %></datalist></div>
+  <div class="form-grid">
+    <div class="field"><label for="e-amount">Amount (₹)</label><input id="e-amount" name="amount" type="text" inputmode="decimal" value="<%= v.amount %>" <%- errors.amount ? 'aria-invalid="true"' : '' %>><%- err('amount') %></div>
+    <div class="field"><label for="e-date">Date</label><input id="e-date" name="sale_date" type="date" value="<%= v.sale_date %>" <%- errors.sale_date ? 'aria-invalid="true"' : '' %>><%- err('sale_date') %></div>
+    <div class="field"><label for="e-status">Status</label><select id="e-status" name="status"><% Object.keys(STATUS).forEach(function (k) { %><option value="<%= k %>" <%= h.selected(v.status, k) %>><%= STATUS[k] %></option><% }) %></select></div>
+  </div>
+  <div class="field"><label for="e-notes">Notes <span class="muted">(optional)</span></label><textarea id="e-notes" name="notes" rows="3" maxlength="2000"><%= v.notes %></textarea></div>
+  <div class="form-actions"><button class="btn" type="submit">Save changes</button><a class="btn btn-ghost" href="/team/sales">Cancel</a></div>
+</form>

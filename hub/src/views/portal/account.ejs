@@ -1,12 +1,83 @@
-<div class="page-head"><div><h1>My account</h1><div class="sub"><%= user.name %> · <%= user.email %> · <%= client.name %></div></div></div>
-<form method="post" action="/portal/account" class="card card-pad" style="max-width:480px">
-  <%- include('../partials/csrf') %>
-  <h3>Change password</h3>
-  <% if (error) { %><div class="flash flash-error"><%- h.icon('alert') %><span><%= error %></span></div><% } %>
-  <input type="email" name="email" value="<%= user.email %>" autocomplete="username" hidden>
-  <div class="field"><label for="current">Current password</label><input id="current" name="current" type="password" autocomplete="current-password" required></div>
-  <div class="field"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required></div>
-  <div class="field"><label for="confirm">Confirm new password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="8" required></div>
-  <button class="btn" type="submit">Change password</button>
-</form>
-<p class="small muted mt-16">Need another colleague on the portal, or to change billing details? <a href="/portal/tickets/new">Send us a request</a>.</p>
+<div class="page-head"><div><h1>My account</h1><div class="sub">Your profile, company and the people who can use this portal.</div></div></div>
+
+<div class="split">
+  <div class="stack">
+    <section class="card card-pad">
+      <div class="profile-head">
+        <% if (user.avatar_file_id) { %><img class="avatar-lg" src="/portal/avatar/<%= user.id %>?v=<%= user.avatar_file_id %>" alt=""><% } else { %><span class="avatar-lg"><%= h.initials(user.name) %></span><% } %>
+        <div class="grow">
+          <h2 class="mb-0"><%= user.name %></h2>
+          <div class="muted small"><%= user.email %> · <%= client.name %></div>
+          <div class="row mt-8">
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer"><%- h.icon('image', 14) %> <%= user.avatar_file_id ? 'Change photo' : 'Add photo' %><input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-avatar hidden></label>
+            <% if (user.avatar_file_id) { %><form method="post" action="/portal/account/avatar/remove" class="inline"><%- include('../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit">Remove</button></form><% } %>
+          </div>
+        </div>
+      </div>
+      <form method="post" action="/portal/account/profile" class="mt-16">
+        <%- include('../partials/csrf') %>
+        <div class="form-grid">
+          <div class="field"><label for="p-name">Full name</label><input id="p-name" name="name" type="text" maxlength="190" value="<%= user.name %>"></div>
+          <div class="field"><label for="p-title">Job title <span class="muted">(optional)</span></label><input id="p-title" name="job_title" type="text" maxlength="120" value="<%= user.job_title || '' %>"></div>
+          <div class="field"><label for="p-phone">Phone <span class="muted">(optional)</span></label><input id="p-phone" name="phone" type="tel" maxlength="40" value="<%= user.phone || '' %>"></div>
+          <div class="field"><label>Email</label><input type="email" value="<%= user.email %>" disabled><div class="hint">Contact us to change your sign-in email.</div></div>
+        </div>
+        <label class="check mb-16"><input type="checkbox" name="email_updates" value="1" <%= user.email_updates ? 'checked' : '' %>> Email me about replies, invoices and approvals</label>
+        <button class="btn" type="submit">Save profile</button>
+      </form>
+    </section>
+
+    <% if (allProjects) { %>
+    <section class="card card-pad">
+      <h3>Company details</h3>
+      <p class="muted small mt-0">Used on your invoices and quotations.</p>
+      <form method="post" action="/portal/account/company">
+        <%- include('../partials/csrf') %>
+        <div class="form-grid">
+          <div class="field full"><label for="c-name">Company name</label><input id="c-name" name="name" type="text" maxlength="190" value="<%= client.name %>"></div>
+          <div class="field"><label for="c-phone">Phone</label><input id="c-phone" name="phone" type="tel" value="<%= client.phone || '' %>"></div>
+          <div class="field"><label for="c-gst">GSTIN</label><input id="c-gst" name="gstin" type="text" maxlength="15" value="<%= client.gstin || '' %>" style="text-transform:uppercase"></div>
+          <div class="field full"><label for="c-addr">Address</label><textarea id="c-addr" name="address" rows="2"><%= client.address || '' %></textarea></div>
+          <div class="field"><label for="c-city">City</label><input id="c-city" name="city" type="text" value="<%= client.city || '' %>"></div>
+          <div class="field"><label for="c-state">State</label><input id="c-state" name="state" type="text" value="<%= client.state || '' %>"></div>
+          <div class="field"><label for="c-pin">Pincode</label><input id="c-pin" name="pincode" type="text" maxlength="12" value="<%= client.pincode || '' %>"></div>
+        </div>
+        <button class="btn" type="submit">Save company</button>
+      </form>
+    </section>
+    <% } %>
+  </div>
+
+  <div class="stack">
+    <% if (allProjects) { %>
+    <section class="card">
+      <div class="card-head"><h3>People at <%= client.name %></h3></div>
+      <% if (inviteLink) { %><div class="card-body" style="border-bottom:1px solid var(--border)"><div class="small muted mb-8">Invite link (share it if the email doesn’t arrive):</div><div class="row" style="flex-wrap:nowrap"><input id="invite-link" type="text" readonly value="<%= inviteLink %>"><button class="btn btn-ghost btn-sm" type="button" data-copy="#invite-link">Copy</button></div></div><% } %>
+      <ul class="list">
+        <% people.forEach(function (p) { %>
+        <li><span class="avatar avatar-sm"><%= h.initials(p.name) %></span><div class="grow"><span class="title"><%= p.name %><%= p.id === user.id ? ' (you)' : '' %></span><span class="meta"><%= p.email %><%= p.is_active ? '' : ' · access removed' %></span></div>
+          <% if (p.id !== user.id && p.is_active) { %><form method="post" action="/portal/account/people/<%= p.id %>/remove" data-confirm="Remove <%= p.name %>’s access?"><%- include('../partials/csrf') %><button class="x-btn" aria-label="Remove access"><%- h.icon('x', 14) %></button></form><% } %></li>
+        <% }) %>
+      </ul>
+      <form method="post" action="/portal/account/people" class="card-body" style="border-top:1px solid var(--border)">
+        <%- include('../partials/csrf') %>
+        <div class="field"><label for="n-name">Add a colleague</label><input id="n-name" name="name" type="text" placeholder="Full name" maxlength="190"></div>
+        <div class="field"><input name="email" type="email" placeholder="work@email.com" aria-label="Email"></div>
+        <button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('plus', 14) %> Send invite</button>
+      </form>
+    </section>
+    <% } %>
+
+    <form method="post" action="/portal/account" class="card card-pad">
+      <%- include('../partials/csrf') %>
+      <h3>Change password</h3>
+      <% if (error) { %><div class="flash flash-error"><%- h.icon('alert') %><span><%= error %></span></div><% } %>
+      <input type="email" name="email" value="<%= user.email %>" autocomplete="username" hidden>
+      <div class="field"><label for="current">Current password</label><input id="current" name="current" type="password" autocomplete="current-password" required></div>
+      <div class="field"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="confirm">Confirm new password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="8" required></div>
+      <button class="btn" type="submit">Change password</button>
+    </form>
+  </div>
+</div>
+<script src="/static/js/avatar.js?v=1" defer></script>

@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
   await logActivity('client', id, req.user.id, 'system', 'Client created from GST Invoices');
   await audit(who, { entity: 'client', id, action: 'created', summary: `Client ${hub.name} added (${form.client_type.toUpperCase()}${hub.gstin ? `, ${hub.gstin}` : ''})` });
   req.flash('success', `${hub.name} added to your clients.`);
-  res.redirect(req.body.then === 'invoice' ? `/invoices/docs/new?kind=invoice&client_id=${id}` : `/invoices/clients/${id}`);
+  res.redirect(req.body.then === 'invoice' ? `/team/gst/docs/new?kind=invoice&client_id=${id}` : `/team/gst/clients/${id}`);
 });
 
 async function load(req) {
@@ -137,7 +137,7 @@ router.post('/:id', async (req, res, next) => {
   await logActivity('client', current.id, req.user.id, 'system', 'Client details updated from GST Invoices');
   await audit(actor(req), { entity: 'client', id: current.id, action: 'edited', summary: `Client ${hub.name} updated`, changes: diff(current, hub, FIELDS) });
   req.flash('success', 'Client saved. Drafts pick up the change when next saved; finalised documents keep what they printed.');
-  res.redirect(`/invoices/clients/${current.id}`);
+  res.redirect(`/team/gst/clients/${current.id}`);
 });
 
 module.exports = router;

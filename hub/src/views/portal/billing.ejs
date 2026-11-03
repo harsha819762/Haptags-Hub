@@ -1,0 +1,43 @@
+<%
+  const tabs = [['all', 'All'], ['invoices', 'Invoices'], ['quotations', 'Quotations'], ['receipts', 'Receipts']];
+  const tone = { invoice: 'blue', quotation: 'violet', receipt: 'green' };
+  const label = { invoice: 'Invoice', quotation: 'Quotation', receipt: 'Receipt' };
+  const today = new Date().toISOString().slice(0, 10);
+%>
+<div class="page-head">
+  <div><h1>Billing</h1><div class="sub">Your invoices, quotations and receipts from Haptags.</div></div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="ic amber"><%- h.icon('invoices', 22) %></span><div><b><%= h.inrShort(outstanding) %></b><span>Outstanding</span></div></div>
+  <div class="kpi"><span class="ic green"><%- h.icon('check', 22) %></span><div><b><%= h.inrShort(paid) %></b><span>Paid</span></div></div>
+  <div class="kpi"><span class="ic violet"><%- h.icon('quotes', 22) %></span><div><b><%= awaiting %></b><span>Quote<%= awaiting === 1 ? '' : 's' %> to review</span></div></div>
+</div>
+
+<div class="tabs">
+  <% tabs.forEach(function (t) { %><a href="/portal/billing<%= t[0] === 'all' ? '' : '?tab=' + t[0] %>" class="<%= tab === t[0] ? 'active' : '' %>"><%= t[1] %><span class="n"><%= counts[t[0]] %></span></a><% }) %>
+</div>
+
+<div class="card">
+  <% if (!rows.length) { %><div class="empty"><div class="art"><%- h.icon('invoices', 28) %></div><b>Nothing here yet</b><p>Invoices, quotations and receipts from Haptags will appear here.</p></div><% } else { %>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Document</th><th>Date</th><th>Due</th><th>Status</th><th class="num">Total</th><th class="num">Balance</th><th></th></tr></thead>
+    <tbody>
+      <% rows.forEach(function (r) { const late = r.kind === 'invoice' && r.balance > 0 && r.due && String(r.due).slice(0, 10) < today; %>
+      <tr>
+        <td><a class="strong mono" href="<%= r.href %>"><%= r.number %></a><span class="sub"><span class="badge tone-<%= tone[r.kind] %>" style="padding:1px 8px"><%= label[r.kind] %></span> <%= r.title || '' %><%= r.origin === 'mine' ? '' : ' · from Haptags' %></span></td>
+        <td class="nowrap"><%= h.date(r.date) %></td>
+        <td class="nowrap <%= late ? 'late' : '' %>"><%= r.due && r.kind !== 'receipt' ? h.date(r.due) : '—' %></td>
+        <td><%- h.badge(r.status === 'sent' && late ? 'overdue' : r.status) %></td>
+        <td class="num"><%= h.inr(r.total) %></td>
+        <td class="num"><%= r.kind === 'invoice' ? h.inr(r.balance) : '—' %></td>
+        <td class="right">
+          <% if (r.payHref && r.balance > 0) { %><a class="btn btn-sm" href="<%= r.payHref %>">Pay</a>
+          <% } else if (r.reviewHref) { %><a class="btn btn-sm" href="<%= r.reviewHref %>">Review</a>
+          <% } else { %><a class="btn btn-ghost btn-sm" href="<%= r.href %>">Open</a><% } %>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div><% } %>
+</div>

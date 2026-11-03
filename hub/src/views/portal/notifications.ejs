@@ -1,0 +1,19 @@
+<%
+  const unread = items.filter(function (i) { return !i.read; }).length;
+%>
+<div class="page-head">
+  <div><h1>Notifications</h1><div class="sub"><%= unread ? unread + ' need your attention' : 'You’re all caught up' %></div></div>
+  <% if (unread) { %><div class="actions"><form method="post" action="/portal/notifications/read-all"><%- include('../partials/csrf') %><button class="btn btn-ghost" type="submit"><%- h.icon('check', 16) %> Mark all as read</button></form></div><% } %>
+</div>
+<div class="card">
+  <% if (!items.length) { %><div class="empty"><div class="art"><%- h.icon('bell', 28) %></div><b>Nothing to see</b><p>Reminders about invoices, approvals, meetings and messages show up here.</p></div><% } else { %>
+  <ul class="list notif-list">
+    <% items.forEach(function (n) { %>
+    <li class="<%= n.read ? 'is-read' : '' %>">
+      <span class="ic <%= { red: 'red', amber: 'amber', blue: 'blue', green: 'green', violet: 'violet' }[n.tone] %> nicon"><%- h.icon(n.icon, 17) %></span>
+      <div class="grow"><a class="title" href="/portal/notifications/open?key=<%= encodeURIComponent(n.key) %>&to=<%= encodeURIComponent(n.href) %>"><%= n.text %></a><span class="meta"><%= n.sub %></span></div>
+      <% if (!n.read) { %><span class="dot-unread" aria-label="Unread"></span><% } %>
+    </li>
+    <% }) %>
+  </ul><% } %>
+</div>

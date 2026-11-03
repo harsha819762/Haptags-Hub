@@ -24,7 +24,7 @@ function back(req, fallback) {
   if (ref) {
     try {
       const u = new URL(ref);
-      if (u.pathname.startsWith('/admin')) return u.pathname + u.search;
+      if (u.pathname.startsWith('/admin') || u.pathname.startsWith('/team/education')) return u.pathname + u.search;
     } catch { /* ignore */ }
   }
   return fallback;

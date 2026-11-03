@@ -4,14 +4,15 @@
     <div class="sub">College students and interns: enrolments, fee invoices (<%= settings.edu_invoice_prefix %>/…) and collections.</div>
   </div>
   <div class="actions">
-    <a class="btn btn-ghost" href="/admin/education/programs"><%- h.icon('education', 16) %> Programs</a>
-    <a class="btn" href="/admin/education/students/new"><%- h.icon('plus', 16) %> Enrol student</a>
+    <a class="btn btn-ghost" href="/team/education/programs"><%- h.icon('education', 16) %> Programs</a>
+    <a class="btn" href="/team/education/students/new"><%- h.icon('plus', 16) %> Enrol student</a>
   </div>
 </div>
 <nav class="tabs">
-  <a href="/admin/education" class="<%= tab === 'overview' ? 'active' : '' %>">Overview</a>
-  <a href="/admin/education/students" class="<%= tab === 'students' ? 'active' : '' %>">Students</a>
-  <a href="/admin/education/programs" class="<%= tab === 'programs' ? 'active' : '' %>">Programs &amp; fees</a>
-  <a href="/admin/education/offers" class="<%= tab === 'offers' ? 'active' : '' %>">Offer letters</a>
-  <a href="/admin/education/certificates" class="<%= tab === 'certificates' ? 'active' : '' %>">Certificates</a>
+  <a href="/team/education" class="<%= tab === 'overview' ? 'active' : '' %>">Overview</a>
+  <a href="/team/education/students" class="<%= tab === 'students' ? 'active' : '' %>">Students</a>
+  <a href="/team/education/programs" class="<%= tab === 'programs' ? 'active' : '' %>">Programs &amp; fees</a>
+  <a href="/team/education/offers" class="<%= tab === 'offers' ? 'active' : '' %>">Offer letters</a>
+  <a href="/team/education/certificates" class="<%= tab === 'certificates' ? 'active' : '' %>">Certificates</a>
+  <a href="/team/education/settings" class="<%= tab === 'settings' ? 'active' : '' %>">Settings</a>
 </nav>

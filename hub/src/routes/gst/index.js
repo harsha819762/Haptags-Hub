@@ -1,7 +1,7 @@
 'use strict';
 
-// GST Invoices (/invoices): tax invoices, proformas and credit/debit notes for Haptags LLP.
-// Owners and admins only (app.js mounts it behind requireAdmin), with its own clients, items,
+// GST Invoices (/team/gst): tax invoices, proformas and credit/debit notes for Haptags LLP.
+// Owners and admins only (routes/team.js mounts it behind requireAdmin), with its own clients, items,
 // payments and business profile, kept apart from the rest of the Hub.
 
 const express = require('express');
@@ -19,9 +19,9 @@ const { paginate } = require('../admin/_helpers');
 const router = express.Router();
 
 router.use(async (req, res, next) => {
-  // Views live in views/gst/ and use the admin layout (sidebar and top bar).
+  // Views live in views/gst/ and use the company view's layout (sidebar and top bar).
   const render = res.render.bind(res);
-  res.render = (view, locals = {}) => render(view, { layout: 'admin', ...locals });
+  res.render = (view, locals = {}) => render(view, { layout: 'portal', ...locals });
   res.locals.profile = await getProfile();
   res.locals.g = { ...format, C };
   res.locals.styles = ['gst'];
@@ -81,7 +81,7 @@ router.get('/audit', async (req, res) => {
 router.use((err, req, res, next) => {
   if (!err.gst) return next(err);
   req.flash('error', err.message);
-  res.redirect(back(req, '/invoices'));
+  res.redirect(back(req, '/team/gst'));
 });
 
 module.exports = router;

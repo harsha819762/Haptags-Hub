@@ -1,0 +1,69 @@
+<%
+  const tabs = [['all', 'All'], ['invoices', 'Invoices'], ['quotations', 'Quotations'], ['receipts', 'Receipts'], ['overdue', 'Unpaid past due']];
+  const tone = { invoice: 'blue', quotation: 'violet', receipt: 'green' };
+  const label = { invoice: 'Invoice', quotation: 'Quotation', receipt: 'Receipt' };
+%>
+<div class="page-head">
+  <div><h1>Billing</h1><div class="sub">Every invoice, quotation and receipt across all clients.</div></div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="/team/billing/new?type=quotation"><%- h.icon('quotes', 16) %> Quotation</a>
+    <a class="btn btn-ghost" href="/team/billing/new?type=receipt"><%- h.icon('check', 16) %> Receipt</a>
+    <a class="btn" href="/team/billing/new?type=invoice"><%- h.icon('plus', 16) %> New invoice</a>
+  </div>
+</div>
+<% if (pending.length) { %>
+<section class="card approve-card mb-16" id="payments">
+  <div class="card-head"><h3>Payments to confirm</h3><span class="muted small">Clients say they paid — check your bank or UPI, then confirm</span></div>
+  <ul class="list">
+    <% pending.forEach(function (p) { %>
+    <li>
+      <div class="grow"><span class="title"><%= p.client_name %> · <%= h.inr(p.amount) %></span><span class="meta mono"><%= p.invoice_number %> · <%= p.method === 'upi' ? 'UPI' : 'Bank transfer' %> · ref <%= p.reference || '—' %> · <%= h.date(p.paid_on) %></span></div>
+      <form method="post" action="/team/payments/<%= p.id %>/status" class="row" style="flex-wrap:nowrap"><%- include('../partials/csrf') %>
+        <button class="btn btn-success btn-sm" type="submit" name="status" value="confirmed"><%- h.icon('check', 14) %> Confirm</button>
+        <button class="btn btn-danger btn-sm" type="submit" name="status" value="rejected">Reject</button>
+      </form>
+    </li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+<div class="kpis">
+  <div class="kpi"><span class="ic amber"><%- h.icon('invoices', 22) %></span><div><b><%= h.inrShort(outstanding) %></b><span>Clients owe you</span></div></div>
+  <div class="kpi"><span class="ic red"><%- h.icon('alert', 22) %></span><div><b><%= h.inrShort(overdueTotal) %></b><span>Past due (owed to you)</span></div></div>
+  <div class="kpi"><span class="ic green"><%- h.icon('check', 22) %></span><div><b><%= h.inrShort(collected) %></b><span>Paid to you</span></div></div>
+</div>
+<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/billing<%= t[0] === 'all' ? '' : '?tab=' + t[0] %>" class="<%= tab === t[0] ? 'active' : '' %>"><%= t[1] %><span class="n"><%= counts[t[0]] %></span></a><% }) %></div>
+<div class="card">
+  <% if (!rows.length) { %><div class="empty"><div class="art"><%- h.icon('invoices', 28) %></div><b>Nothing here</b></div><% } else { %>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Document</th><th>Client</th><th>Date</th><th>Due</th><th>Status</th><th class="num">Total</th><th class="num">Owed to you</th><th></th></tr></thead>
+    <tbody>
+      <% rows.forEach(function (r) { const late = isLate(r); %>
+      <tr>
+        <td><a class="strong mono" href="<%= r.href %>"><%= r.number %></a><span class="sub"><span class="badge tone-<%= tone[r.kind] %>" style="padding:1px 8px"><%= label[r.kind] %></span></span></td>
+        <td><a class="strong" href="/team/clients/<%= r.clientId %>"><%= r.client %></a></td>
+        <td class="nowrap"><%= h.date(r.date) %></td>
+        <td class="nowrap <%= late ? 'late' : '' %>"><%= r.due && r.kind !== 'receipt' ? h.date(r.due) : '—' %></td>
+        <td><%- h.badge(late && r.status === 'sent' ? 'overdue' : r.status) %></td>
+        <td class="num"><%= h.inr(r.total) %></td>
+        <td class="num"><%= r.kind === 'invoice' ? h.inr(r.balance) : '—' %></td>
+        <td class="right">
+          <% if (r.invoiceId && r.balance > 0) { %>
+          <details class="access-edit"><summary class="btn btn-sm">Record payment</summary>
+            <form method="post" action="/team/billing/invoices/<%= r.invoiceId %>/payment" class="access-form"><%- include('../partials/csrf') %>
+              <div class="small muted"><%= r.number %> · <%= h.inr(r.balance) %> due</div>
+              <input type="number" name="amount" min="0" step="any" value="<%= (r.balance / 100).toFixed(2) %>" aria-label="Amount received (₹)" required>
+              <select name="method" aria-label="Paid by"><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="other">Other</option></select>
+              <input type="text" name="reference" placeholder="Reference / UTR (optional)" maxlength="190">
+              <input type="number" name="tds" min="0" step="any" placeholder="TDS deducted (₹, optional)">
+              <input type="date" name="paid_on" value="<%= new Date().toISOString().slice(0, 10) %>">
+              <button class="btn btn-success btn-sm" type="submit">Save payment</button>
+            </form>
+          </details>
+          <% } %>
+          <a class="btn btn-ghost btn-sm" href="<%= r.href %>">Open</a></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div><% } %>
+</div>

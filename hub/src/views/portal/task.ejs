@@ -1,0 +1,61 @@
+<%
+  const fmtSize = function (n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; };
+%>
+<div class="crumbs"><a href="/portal/projects">Projects</a> / <a href="/portal/projects/<%= project.id %>"><%= project.name %></a> / Review</div>
+<div class="page-head">
+  <div><h1><%= task.title %></h1><div class="sub">For your approval · <a href="/portal/projects/<%= project.id %>"><%= project.name %></a></div></div>
+</div>
+
+<section class="card card-pad approve-card mb-16">
+  <div class="row-between">
+    <div><b>This is ready for your review</b><div class="small muted">Look it over, then approve it or send it back with a note.</div></div>
+    <div class="row">
+      <form method="post" action="/portal/tasks/<%= task.id %>/approve"><%- include('../partials/csrf') %><button class="btn btn-success" type="submit"><%- h.icon('check', 16) %> Approve</button></form>
+      <button class="btn btn-ghost" type="button" data-dialog="#changes-dialog">Request changes</button>
+    </div>
+  </div>
+</section>
+
+<div class="split">
+  <div class="stack">
+    <% if (task.description) { %><section class="card card-pad"><h3>What to check</h3><div style="white-space:pre-wrap"><%= task.description %></div></section><% } %>
+    <section class="card" id="comments">
+      <div class="card-head"><h3>Conversation</h3></div>
+      <div class="card-body">
+        <% if (!comments.length) { %><p class="muted small">No messages yet. Ask a question below.</p><% } %>
+        <div class="thread">
+          <% comments.forEach(function (c) { const mine = c.user_id === user.id; %>
+          <div class="msg <%= mine ? 'mine' : '' %>"><div class="meta"><b><%= mine ? 'You' : (c.user_name || 'Haptags') %></b> · <%= h.dateTime(c.created_at) %></div><div class="body"><%= c.body %></div></div>
+          <% }) %>
+        </div>
+        <form method="post" action="/portal/tasks/<%= task.id %>/comment" class="mt-16">
+          <%- include('../partials/csrf') %>
+          <div class="field"><textarea name="body" rows="3" placeholder="Write a message to the team…" aria-label="Message" required></textarea></div>
+          <button class="btn btn-sm" type="submit"><%- h.icon('send', 15) %> Send</button>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div class="stack">
+    <% if (files.length) { %>
+    <section class="card">
+      <div class="card-head"><h3>To look at</h3></div>
+      <ul class="list">
+        <% files.forEach(function (f) { %>
+        <li><span class="ic blue ficon"><%- h.icon(f.url ? 'link' : 'paperclip', 15) %></span>
+          <div class="grow"><a class="title" href="<%= f.url || '/portal/files/' + f.id %>" <%- f.url ? 'target="_blank" rel="noopener noreferrer"' : '' %>><%= f.label %></a><span class="meta"><%= f.url ? 'Link' : fmtSize(f.size || 0) %></span></div></li>
+        <% }) %>
+      </ul>
+    </section>
+    <% } %>
+  </div>
+</div>
+
+<dialog class="modal" id="changes-dialog" aria-labelledby="changes-title">
+  <form method="post" action="/portal/tasks/<%= task.id %>/request-changes">
+    <%- include('../partials/csrf') %>
+    <div class="modal-head"><h2 id="changes-title">Request changes</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body"><div class="field mb-0"><label for="rc-body">What should change?</label><textarea id="rc-body" name="body" rows="4" placeholder="Tell the team what to fix…"></textarea></div></div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Send back</button></div>
+  </form>
+</dialog>

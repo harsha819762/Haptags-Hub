@@ -1,0 +1,108 @@
+<div class="crumbs"><a href="/team/clients">Clients</a> / <%= client.name %></div>
+<div class="page-head">
+  <div><h1><%= client.name %></h1><div class="sub"><%= [client.contact_name, client.email, client.phone].filter(Boolean).join(' · ') || 'No contact details' %><%= client.gstin ? ' · GSTIN ' + client.gstin : '' %></div></div>
+  <div class="actions">
+    <% if (showMoney) { %><a class="btn btn-ghost" href="/team/billing/new?type=invoice&client=<%= client.id %>"><%- h.icon('invoices', 16) %> New invoice</a><% } %>
+    <% if (manage) { %>
+      <% if (client.status === 'archived') { %>
+        <form method="post" action="/team/clients/<%= client.id %>/restore" class="inline"><%- include('../partials/csrf') %><button class="btn btn-ghost" type="submit">Restore client</button></form>
+        <form method="post" action="/team/clients/<%= client.id %>/delete" class="inline" data-confirm="Delete <%= client.name %> for good? This can’t be undone."><%- include('../partials/csrf') %><button class="btn btn-danger" type="submit"><%- h.icon('trash', 16) %> Delete</button></form>
+      <% } else { %>
+        <form method="post" action="/team/clients/<%= client.id %>/archive" class="inline" data-confirm="Archive <%= client.name %>? Their people will be signed out and can’t sign in until you restore it."><%- include('../partials/csrf') %><button class="btn btn-ghost" type="submit">Archive</button></form>
+      <% } %>
+    <% } %>
+    <% if (canOpenChat) { %><a class="btn" href="/team/chat/<%= groupId %>"><%- h.icon('chat', 16) %> Group chat</a><% } %>
+  </div>
+</div>
+<div class="split">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Projects</h3><span class="muted small"><%= projects.length %></span></div>
+      <% if (!projects.length) { %><div class="empty" style="padding:26px">No projects yet.</div><% } else { %>
+      <ul class="list"><% projects.forEach(function (p) { %><li><div class="ring <%= p.progress >= 100 ? 'done' : '' %>" style="--p:<%= p.progress %>"><span><%= p.progress %>%</span></div><div class="grow"><a class="title" href="/team/projects/<%= p.id %>"><%= p.name %></a><span class="meta"><%= h.service(p.service) || 'Project' %><%= p.due_date ? ' · target ' + h.date(p.due_date) : '' %></span></div><%- h.badge(p.status) %></li><% }) %></ul><% } %>
+    
+      <% if (manage) { %>
+      <form method="post" action="/team/clients/<%= client.id %>/projects" class="card-body row" style="border-top:1px solid var(--border);flex-wrap:nowrap">
+        <%- include('../partials/csrf') %>
+        <input type="text" name="name" placeholder="New project name" maxlength="190" aria-label="New project name" required>
+        <input type="date" name="due_date" aria-label="Target date" style="max-width:150px">
+        <button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('plus', 14) %> Add project</button>
+      </form>
+      <% } %>
+    </section>
+    <% if (showMoney) { %>
+    <section class="card">
+      <div class="card-head"><h3>Billing</h3></div>
+      <% if (!invoices.length && !docs.length) { %><div class="empty" style="padding:26px">No invoices yet.</div><% } else { %>
+      <ul class="list">
+        <% invoices.forEach(function (i) { %><li><div class="grow"><a class="title mono" href="/i/<%= i.public_token %>"><%= i.number %></a><span class="meta"><%= i.title || 'Invoice' %> · <%= h.date(i.issue_date) %></span></div><b><%= h.inr(i.total) %></b><%- h.badge(i.status) %></li><% }) %>
+        <% docs.forEach(function (d) { %><li><div class="grow"><a class="title mono" href="/team/billing/<%= d.id %>"><%= d.number %></a><span class="meta"><%= DOC_LABEL[d.type] %> · <%= h.date(d.issue_date) %></span></div><b><%= h.inr(d.total) %></b><%- h.badge(d.type === 'receipt' ? 'paid' : d.status === 'open' ? 'sent' : d.status) %></li><% }) %>
+      </ul><% } %>
+    </section>
+    <% } %>
+  </div>
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>People</h3><span class="muted small"><%= people.length %></span></div>
+      <% if (inviteLink) { %><div class="card-body" style="border-bottom:1px solid var(--border);background:var(--blue-50)">
+        <div class="small mb-8"><b><%= inviteLink.name %></b>’s invite<%= inviteLink.sent ? ' was emailed.' : ' is ready.' %> Share this link if the email doesn’t arrive:</div>
+        <div class="row" style="flex-wrap:nowrap"><input id="invite-link" type="text" readonly value="<%= inviteLink.link %>"><button class="btn btn-ghost btn-sm" type="button" data-copy="#invite-link">Copy</button></div>
+      </div><% } %>
+      <% if (!people.length) { %><div class="empty" style="padding:26px">No one has been invited yet.</div><% } else { %>
+      <ul class="list people-list">
+        <% people.forEach(function (p) { const pending = !p.password_hash; %>
+        <li class="<%= p.is_active ? '' : 'is-read' %>">
+          <span class="avatar avatar-sm"><%= h.initials(p.name) %></span>
+          <div class="grow"><span class="title"><%= p.name %></span>
+            <span class="meta"><%= p.email %></span>
+            <span class="meta">Can see: <b><%= p.all_projects ? 'All projects' : (access[p.id] || []).map(function (x) { return x.name; }).join(', ') || 'No projects yet' %></b></span>
+            <span class="meta"><% if (!p.is_active) { %>Access removed<% } else if (pending) { %><span class="badge tone-amber">Invite pending</span><% } else { %><%= p.last_login_at ? 'Last seen ' + h.ago(p.last_login_at) : 'Active' %><% } %></span></div>
+          <% if (manage) { %>
+          <details class="access-edit">
+            <summary class="btn btn-ghost btn-sm">Projects</summary>
+            <form method="post" action="/team/clients/<%= client.id %>/people/<%= p.id %>" class="access-form"><%- include('../partials/csrf') %><input type="hidden" name="action" value="access">
+              <label class="check"><input type="checkbox" name="all_projects" value="1" <%= p.all_projects ? 'checked' : '' %>> All projects (including future ones)</label>
+              <% projects.forEach(function (pr) { const has = (access[p.id] || []).some(function (x) { return x.id === pr.id; }); %><label class="check"><input type="checkbox" name="project_ids" value="<%= pr.id %>" <%= has ? 'checked' : '' %>> <%= pr.name %></label><% }) %>
+              <button class="btn btn-sm" type="submit">Save access</button>
+            </form>
+          </details>
+          <% if (p.is_active && pending) { %><form method="post" action="/team/clients/<%= client.id %>/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="resend"><button class="btn btn-ghost btn-sm" type="submit">Resend invite</button></form><% } %>
+          <form method="post" action="/team/clients/<%= client.id %>/people/<%= p.id %>" class="inline" data-confirm="<%= p.is_active ? 'Remove ' + p.name + '’s access?' : 'Restore access?' %>"><%- include('../partials/csrf') %><input type="hidden" name="action" value="toggle"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Remove' : 'Restore' %></button></form>
+          <% } %>
+        </li>
+        <% }) %>
+      </ul><% } %>
+      <% if (manage) { %>
+      <form method="post" action="/team/clients/<%= client.id %>/people" class="card-body" style="border-top:1px solid var(--border)">
+        <%- include('../partials/csrf') %>
+        <div class="field"><label for="ip-name">Invite someone from <%= client.name %></label><input id="ip-name" name="name" type="text" placeholder="Full name" maxlength="190"></div>
+        <div class="field"><input name="email" type="email" placeholder="work@email.com" aria-label="Email"></div>
+        <div class="field"><label>Which project is it for?</label>
+          <% if (!projects.length) { %><div class="small muted">Add a project first, then invite them to it.</div><% } %>
+          <% projects.forEach(function (pr) { %><label class="check"><input type="checkbox" name="project_ids" value="<%= pr.id %>"> <%= pr.name %></label><% }) %>
+          <label class="check"><input type="checkbox" name="all_projects" value="1"> All of <%= client.name %>’s projects <span class="muted">(including future ones)</span></label>
+          <div class="hint">They’ll only see what you tick here.</div>
+        </div>
+        <button class="btn btn-sm" type="submit"><%- h.icon('send', 14) %> Send invite</button>
+      </form>
+      <% } %>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Haptags contacts</h3><span class="muted small">what this client can see &amp; message</span></div>
+      <% if (!contacts.length) { %><div class="empty" style="padding:22px">No one assigned, so the client can’t start a chat.</div><% } %>
+      <ul class="list people-list">
+        <% contacts.forEach(function (c) { %>
+        <li><span class="avatar avatar-sm"><%= h.initials(c.name) %></span><div class="grow"><span class="title"><%= c.name %></span><span class="meta"><%= h.humanize(c.role) %></span></div>
+          <% if (manage) { %><form method="post" action="/team/clients/<%= client.id %>/contacts/<%= c.id %>/remove" data-confirm="Remove <%= c.name %> from this client’s contacts?"><%- include('../partials/csrf') %><button class="x-btn" aria-label="Remove contact"><%- h.icon('x', 14) %></button></form><% } %></li>
+        <% }) %>
+      </ul>
+      <% if (manage) { const free = staffOptions.filter(function (u) { return !contacts.some(function (c) { return c.id === u.id; }); }); if (free.length) { %>
+      <form method="post" action="/team/clients/<%= client.id %>/contacts" class="card-body row" style="border-top:1px solid var(--border);flex-wrap:nowrap">
+        <%- include('../partials/csrf') %>
+        <select name="user_id" aria-label="Add a Haptags contact"><% free.forEach(function (u) { %><option value="<%= u.id %>"><%= u.name %> · <%= h.humanize(u.role) %></option><% }) %></select>
+        <button class="btn btn-ghost btn-sm" type="submit">Add</button>
+      </form><% } } %>
+    </section>
+    <% if (client.address || client.city) { %><section class="card card-pad small"><div class="label">Address</div><%= [client.address, client.city, client.state, client.pincode].filter(Boolean).join(', ') %></section><% } %>
+  </div>
+</div>

@@ -18,6 +18,7 @@ Object.assign(process.env, {
   LMS_API_URL: '',
   HOLIDAYS_ICS_URL: '',
   NODE_ENV: 'test',
+  ENABLE_ADMIN: '1',
 });
 
 const { db, migrate } = require('../src/db');
@@ -118,9 +119,9 @@ test('offer letter: draft from a student, issue, PDF, accept online', async () =
   await b.login('owner@test.local', 'owner-password-1');
 
   // The student page offers to create one; the form is filled from the student and programme.
-  assert.match((await b.get(`/admin/education/students/${studentId}`)).text, /Create offer letter/);
-  assert.match((await b.get('/admin/education/offers')).text, /Offer letters/);
-  const form = await b.get(`/admin/education/offers/new?student=${studentId}`);
+  assert.match((await b.get(`/team/education/students/${studentId}`)).text, /Create offer letter/);
+  assert.match((await b.get('/team/education/offers')).text, /Offer letters/);
+  const form = await b.get(`/team/education/offers/new?student=${studentId}`);
   assert.equal(form.status, 200);
   assert.match(form.text, /value="Java Full Stack Development Intern"/);
   assert.match(form.text, new RegExp(`HTOL/${fy}/0001`));
@@ -131,10 +132,10 @@ test('offer letter: draft from a student, issue, PDF, accept online', async () =
   assert.equal(offers.durationText(d.start_date, d.end_date), '3 months');
 
   // Invalid: end before start.
-  let r = await b.post('/admin/education/offers', { client_id: studentId, action: 'draft', ...formFrom(d, { end_date: addDays(d.start_date, -1) }) });
+  let r = await b.post('/team/education/offers', { client_id: studentId, action: 'draft', ...formFrom(d, { end_date: addDays(d.start_date, -1) }) });
   assert.equal(r.status, 422);
 
-  r = await b.post('/admin/education/offers', { client_id: studentId, action: 'draft', ...formFrom(d, { stipend: '5000' }) });
+  r = await b.post('/team/education/offers', { client_id: studentId, action: 'draft', ...formFrom(d, { stipend: '5000' }) });
   const id = idFrom(r.location);
   let o = await row(id);
   assert.deepEqual([o.status, o.number, o.stipend], ['draft', null, 500000]);
@@ -143,27 +144,27 @@ test('offer letter: draft from a student, issue, PDF, accept online', async () =
   assert.equal((await anon.get(`/o/${o.public_token}`)).status, 404);
 
   // Issue: numbered, wording frozen.
-  await b.post(`/admin/education/offers/${id}/issue`);
+  await b.post(`/team/education/offers/${id}/issue`);
   o = await row(id);
   assert.equal(o.number, `HTOL/${fy}/0001`);
   assert.equal(o.status, 'issued');
   assert.equal(o.signatory_name, 'Asha Rao');
   assert.match(o.terms, /Confidentiality:/);
   await setSettings({ offer_signatory_name: 'Someone Else' });
-  const show = await b.get(`/admin/education/offers/${id}`);
+  const show = await b.get(`/team/education/offers/${id}`);
   assert.match(show.text, /Asha Rao/);
   assert.match(show.text, /INTERNSHIP OFFER LETTER|Internship Offer Letter/);
   assert.match(show.text, /₹5,000.00 per month/);
-  assert.doesNotMatch((await b.get(`/admin/education/offers/${id}/edit`)).text, /name="role_title"/);
+  assert.doesNotMatch((await b.get(`/team/education/offers/${id}/edit`)).text, /name="role_title"/);
 
   // PDFs: admin and the student's link.
-  const pdf = await b.get(`/admin/education/offers/${id}/pdf`, { binary: true });
+  const pdf = await b.get(`/team/education/offers/${id}/pdf`, { binary: true });
   assert.equal(pdf.type, 'application/pdf');
   assert.equal(pdf.body.subarray(0, 5).toString(), '%PDF-');
   assert.equal((await anon.get(`/o/${o.public_token}/pdf`, { binary: true })).body.subarray(0, 5).toString(), '%PDF-');
 
   // Email (logged without SMTP).
-  await b.post(`/admin/education/offers/${id}/email`, { to: 'divya@college.test' });
+  await b.post(`/team/education/offers/${id}/email`, { to: 'divya@college.test' });
   assert.ok(await db('email_log').where({ related_type: 'offer', related_id: id }).first());
 
   // The student reads it, must tick the box, then accepts.
@@ -185,15 +186,15 @@ test('offer letter: draft from a student, issue, PDF, accept online', async () =
   assert.ok(history.some((h) => /Accepted online by Divya Nagaraj/.test(h)));
 
   // A revised copy is a new draft; withdrawing the old one closes its link.
-  r = await b.post(`/admin/education/offers/${id}/revise`);
+  r = await b.post(`/team/education/offers/${id}/revise`);
   const copyId = idFrom(r.location.replace(/\/edit$/, ''));
   assert.equal((await row(copyId)).status, 'draft');
-  await b.post(`/admin/education/offers/${id}/withdraw`, { reason: 'Dates changed' });
+  await b.post(`/team/education/offers/${id}/withdraw`, { reason: 'Dates changed' });
   assert.equal((await row(id)).status, 'withdrawn');
   assert.match((await anon.get(`/o/${o.public_token}`)).text, /has been withdrawn/);
 
   // Declining, and an expired offer.
-  await b.post(`/admin/education/offers/${copyId}/issue`);
+  await b.post(`/team/education/offers/${copyId}/issue`);
   const copy = await row(copyId);
   assert.equal(copy.number, `HTOL/${fy}/0002`);
   await anon.get(`/o/${copy.public_token}`);
@@ -201,16 +202,16 @@ test('offer letter: draft from a student, issue, PDF, accept online', async () =
   assert.equal((await row(copyId)).status, 'declined');
 
   // Drafts can be deleted; issued letters can't.
-  r = await b.post('/admin/education/offers', { client_id: studentId, action: 'draft', ...formFrom(d) });
+  r = await b.post('/team/education/offers', { client_id: studentId, action: 'draft', ...formFrom(d) });
   const draftId = idFrom(r.location);
-  await b.post(`/admin/education/offers/${draftId}/delete`);
+  await b.post(`/team/education/offers/${draftId}/delete`);
   assert.equal(await row(draftId), undefined);
-  await b.post(`/admin/education/offers/${copyId}/delete`);
+  await b.post(`/team/education/offers/${copyId}/delete`);
   assert.ok(await row(copyId));
   assert.equal(offers.displayStatus({ status: 'issued', respond_by: addDays(today, -1) }), 'expired');
 
   // Settings tab.
-  const settings = await b.get('/admin/settings?tab=offers');
+  const settings = await b.get('/team/education/settings');
   assert.match(settings.text, /Offer letter settings|Save offer letter settings/);
   assert.match(settings.text, /Governing law/);
 });

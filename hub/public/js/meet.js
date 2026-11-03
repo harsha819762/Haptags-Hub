@@ -1,5 +1,5 @@
 /*
- * Haptags Hub: video meetings. Every participant connects directly to every other one (WebRTC
+ * Haptags Portal: video meetings. Every participant connects directly to every other one (WebRTC
  * mesh), which suits calls of up to about 6–8 people. The server only relays the connection
  * handshake through /meet/:token/signal; audio and video never pass through it.
  *
@@ -25,7 +25,7 @@
   var S = {
     stage: 'prejoin',
     micTrack: null, micOn: prefs.micOn !== false,
-    camRaw: null, fx: null, camOn: prefs.camOn !== false, camBusy: null,
+    camRaw: null, fx: null, camOn: !cfg.voice && prefs.camOn !== false, camBusy: null,
     effect: prefs.effect && prefs.effect.type !== 'custom' ? prefs.effect : { type: 'none' }, customImage: null,
     screenTrack: null, sharing: false, hand: false,
     speakerId: prefs.speaker || '',

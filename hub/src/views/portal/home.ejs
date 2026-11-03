@@ -1,15 +1,36 @@
-<div class="page-head">
-  <div><h1>Hello, <%= user.name.split(' ')[0] %></h1><div class="sub">Everything about your work with Haptags, in one place.</div></div>
-</div>
-
+<%
+  const hr = new Date().getHours();
+  const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  const overdue = unpaid.some(function (i) { return i.status === 'overdue'; });
+  const first = user.name.split(' ')[0];
+  const active = cards.filter(function (c) { return c.project.status !== 'completed'; });
+  const sz = function (n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1024)) + ' KB'; };
+%>
 <% if (balance > 0) { %>
-<section class="card card-pad mb-16" style="border-color:<%= unpaid.some(function (i) { return i.status === 'overdue'; }) ? '#f6c7d0' : 'var(--border)' %>">
-  <div class="row-between">
-    <div><div class="muted small">Amount due</div><div style="font:700 28px var(--font-body)"><%= h.inr(balance) %></div><div class="small muted"><%= unpaid.length %> open invoice<%= unpaid.length === 1 ? '' : 's' %></div></div>
-    <% if (unpaid.length === 1) { %><a class="btn btn-lg" href="/i/<%= unpaid[0].public_token %>#pay">Pay now</a><% } else { %><a class="btn btn-lg" href="/portal/invoices">View & pay</a><% } %>
+<section class="hero-card <%= overdue ? 'alert' : '' %>">
+  <div class="eyebrow"><%= greet %>, <%= first %> 👋</div>
+  <div class="due">
+    <div>
+      <h1 class="amount" style="margin:8px 0 2px"><%= h.inr(balance) %></h1>
+      <p><%= overdue ? 'Overdue — please settle at your earliest convenience.' : 'due across ' + unpaid.length + ' open invoice' + (unpaid.length === 1 ? '' : 's') + '.' %></p>
+    </div>
+    <% if (unpaid.length === 1) { %><a class="btn btn-lg" href="/i/<%= unpaid[0].public_token %>#pay"><%- h.icon('payments', 18) %> Pay now</a><% } else { %><a class="btn btn-lg" href="/portal/billing">View &amp; pay <%- h.icon('arrow', 16) %></a><% } %>
   </div>
 </section>
+<% } else { %>
+<section class="hero-card calm">
+  <div class="eyebrow"><%= greet %>, <%= first %> 👋</div>
+  <h1>You’re all paid up</h1>
+  <p>Nothing due right now. Here’s everything happening with your work.</p>
+</section>
 <% } %>
+
+<div class="kpis">
+  <div class="kpi"><span class="ic blue"><%- h.icon('projects', 22) %></span><div><b><%= active.length %></b><span>Active project<%= active.length === 1 ? '' : 's' %></span></div></div>
+  <a class="kpi" href="/portal/billing"><span class="ic amber"><%- h.icon('invoices', 22) %></span><div><b><%= unpaid.length %></b><span>Open invoice<%= unpaid.length === 1 ? '' : 's' %></span></div></a>
+  <% if (allProjects) { %><a class="kpi" href="/portal/billing?tab=quotations"><span class="ic violet"><%- h.icon('quotes', 22) %></span><div><b><%= quotes.length %></b><span>Quote<%= quotes.length === 1 ? '' : 's' %> to review</span></div></a><% } %>
+  <a class="kpi" href="/portal/tickets"><span class="ic green"><%- h.icon('tickets', 22) %></span><div><b><%= tickets.length %></b><span>Open request<%= tickets.length === 1 ? '' : 's' %></span></div></a>
+</div>
 
 <% if (quotes.length) { %>
 <section class="card mb-16">
@@ -20,27 +41,66 @@
 
 <div class="split">
   <div class="stack">
-    <section class="card">
-      <div class="card-head"><h3>Active projects</h3><a class="small" href="/portal/projects">All →</a></div>
-      <% if (!projects.length) { %><div class="empty">No active projects right now.</div><% } else { %>
-      <ul class="list">
-        <% projects.forEach(function (p) { %>
-        <li><div class="grow"><a class="title" href="/portal/projects/<%= p.id %>"><%= p.name %></a><span class="meta"><%= h.humanize(p.status) %><%= p.due_date ? ' · target ' + h.date(p.due_date) : '' %></span></div>
-          <div class="progress" style="width:110px"><span style="width:<%= p.progress %>%"></span></div><span class="small"><%= p.progress %>%</span></li>
-        <% }) %>
-      </ul><% } %>
-    </section>
-    <section class="card">
-      <div class="card-head"><h3>Latest updates</h3></div>
-      <div class="card-body">
-        <% if (!updates.length) { %><p class="muted small mb-0">Updates from the team will appear here.</p><% } else { %>
-        <ul class="timeline"><% updates.forEach(function (u) { %><li class="k-email"><div class="meta"><a href="/portal/projects/<%= u.project_id %>"><%= u.project_name %></a> · <%= h.ago(u.created_at) %></div><div class="body"><%= u.body %></div></li><% }) %></ul><% } %>
+    <% if (!cards.length) { %>
+    <section class="card"><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b>No projects yet</b><p>When your project starts, its progress, updates and invoices will appear right here.</p></div></section>
+    <% } %>
+
+    <% cards.forEach(function (c) { const p = c.project; const done = p.status === 'completed'; %>
+    <section class="card proj-card" id="project-<%= p.id %>">
+      <header class="proj-head">
+        <div class="ring <%= done ? 'done' : '' %>" style="--p:<%= p.progress %>"><span><%= p.progress %>%</span></div>
+        <div class="grow">
+          <h2><%= p.name %></h2>
+          <div class="muted small"><%= h.service(p.service) || 'Project' %><%= p.due_date ? ' · target ' + h.date(p.due_date) : '' %><%= p.assignee ? ' · your contact: ' + p.assignee : '' %></div>
+        </div>
+        <%- h.badge(p.status) %>
+      </header>
+      <div class="proj-body">
+        <div class="progress <%= done ? 'done' : '' %>"><span style="width:<%= p.progress %>%"></span></div>
+        <% if (c.steps.total) { %><div class="small muted mt-8"><%= c.steps.done %> of <%= c.steps.total %> steps completed</div><% } %>
+
+        <div class="proj-sec">
+          <h3>Latest updates</h3>
+          <% if (!c.updates.length) { %><p class="muted small mb-0">Updates from the team will appear here.</p><% } else { %>
+          <ul class="timeline"><% c.updates.forEach(function (u) { %><li class="k-email"><div class="meta"><%= u.user_name || 'Haptags' %> · <%= h.ago(u.created_at) %></div><div class="body"><%= u.body %></div></li><% }) %></ul><% } %>
+        </div>
+
+        <% if (c.files.length || c.links.length) { %>
+        <div class="proj-sec">
+          <h3>Files &amp; links</h3>
+          <div class="chips">
+            <% c.files.forEach(function (f) { %><a class="file-chip" href="<%= f.url || '/portal/files/' + f.id %>" <%- f.url ? 'target="_blank" rel="noopener noreferrer"' : '' %>><%- h.icon(f.url ? 'link' : 'paperclip', 14) %> <%= f.label %><% if (!f.url) { %><small><%= sz(f.size) %></small><% } %></a><% }) %>
+            <% c.links.forEach(function (l) { %><a class="file-chip" href="<%= l.url %>" target="_blank" rel="noopener noreferrer"><%- h.icon('link', 14) %> <%= l.label %></a><% }) %>
+          </div>
+        </div>
+        <% } %>
+
+        <% if (c.invoices.length) { %>
+        <div class="proj-sec">
+          <h3>Invoices</h3>
+          <ul class="list inv-mini">
+            <% c.invoices.forEach(function (i) { const bal = Number(i.total) - Number(i.amount_paid); %>
+            <li><div class="grow"><a class="title mono" href="/i/<%= i.public_token %>"><%= i.number %></a><span class="meta"><%= i.title || 'Invoice' %> · due <%= h.date(i.due_date) %></span></div><b><%= h.inrShort(i.total) %></b><%- h.badge(i.status) %><% if (bal > 0 && i.status !== 'void') { %><a class="btn btn-sm" href="/i/<%= i.public_token %>#pay">Pay</a><% } %></li>
+            <% }) %>
+          </ul>
+        </div>
+        <% } %>
       </div>
+      <footer class="proj-foot"><a class="btn btn-ghost btn-sm" href="/portal/tickets/new?project_id=<%= p.id %>">Request a change</a></footer>
+    </section>
+    <% }) %>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Your requests</h3><a class="small" href="/portal/tickets/new">+ New</a></div>
+      <% if (!tickets.length) { %><div class="empty"><div class="art"><%- h.icon('chat', 26) %></div><b>All quiet</b><p>Need a change or have a question?</p><a class="btn btn-sm" href="/portal/tickets/new">Raise a request</a></div><% } else { %>
+      <ul class="list"><% tickets.forEach(function (t) { %><li><div class="grow"><a class="title" href="/portal/tickets/<%= t.id %>"><%= t.subject %></a><span class="meta"><%= h.ago(t.last_reply_at) %></span></div><%- h.badge(t.status, t.status === 'awaiting_client' ? 'Your reply needed' : t.status === 'open' ? 'With our team' : null) %></li><% }) %></ul><% } %>
+    </section>
+    <section class="card card-pad small">
+      <b>Need to talk?</b>
+      <p class="muted mb-8 mt-8">Message your Haptags team or start a call from Chat &amp; Calls.</p>
+      <a class="btn btn-sm" href="/portal/chat"><%- h.icon('chat', 15) %> Open chat</a>
     </section>
   </div>
-  <section class="card">
-    <div class="card-head"><h3>Your requests</h3><a class="small" href="/portal/tickets/new">+ New</a></div>
-    <% if (!tickets.length) { %><div class="empty">Need a change or have a question? <a href="/portal/tickets/new">Raise a request</a>.</div><% } else { %>
-    <ul class="list"><% tickets.forEach(function (t) { %><li><div class="grow"><a class="title" href="/portal/tickets/<%= t.id %>"><%= t.subject %></a><span class="meta"><%= h.ago(t.last_reply_at) %></span></div><%- h.badge(t.status, t.status === 'awaiting_client' ? 'Your reply needed' : t.status === 'open' ? 'With our team' : null) %></li><% }) %></ul><% } %>
-  </section>
 </div>

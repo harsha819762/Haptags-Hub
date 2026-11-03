@@ -1,19 +1,19 @@
 <%
   const tabs = [
-    ['dashboard', '/invoices', 'Dashboard'],
-    ['invoice', '/invoices/docs?type=invoice', 'Tax invoices'],
-    ['proforma', '/invoices/docs?type=proforma', 'Proforma'],
-    ['notes', '/invoices/docs?type=notes', 'Credit & debit notes'],
-    ['payments', '/invoices/payments', 'Payments'],
-    ['clients', '/invoices/clients', 'Clients'],
-    ['items', '/invoices/items', 'Services'],
-    ['reports', '/invoices/reports', 'Reports'],
-    ['profile', '/invoices/profile', 'Business profile'],
-    ['audit', '/invoices/audit', 'Audit log'],
+    ['dashboard', '/team/gst', 'Dashboard'],
+    ['invoice', '/team/gst/docs?type=invoice', 'Tax invoices'],
+    ['proforma', '/team/gst/docs?type=proforma', 'Proforma'],
+    ['notes', '/team/gst/docs?type=notes', 'Credit & debit notes'],
+    ['payments', '/team/gst/payments', 'Payments'],
+    ['clients', '/team/gst/clients', 'Clients'],
+    ['items', '/team/gst/items', 'Services'],
+    ['reports', '/team/gst/reports', 'Reports'],
+    ['profile', '/team/gst/profile', 'Business profile'],
+    ['audit', '/team/gst/audit', 'Audit log'],
   ];
 %>
 <div class="gst-bar">
-  <a class="gst-brand" href="/invoices"><%- h.icon('gst', 20) %><span><b>GST Invoices</b><small><%= profile.legal_name %><%= profile.gstin ? ' · GSTIN ' + profile.gstin : '' %></small></span></a>
+  <a class="gst-brand" href="/team/gst"><%- h.icon('gst', 20) %><span><b>GST Invoices</b><small><%= profile.legal_name %><%= profile.gstin ? ' · GSTIN ' + profile.gstin : '' %></small></span></a>
   <nav class="gst-tabs" aria-label="GST Invoices">
     <% tabs.forEach(function (t) { %><a href="<%= t[1] %>" class="<%= active === t[0] ? 'active' : '' %>"<%- active === t[0] ? ' aria-current="page"' : '' %>><%= t[2] %></a><% }) %>
   </nav>

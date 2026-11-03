@@ -1,0 +1,18 @@
+<%
+  const tabs = [['open', 'Needs a reply'], ['waiting', 'Waiting for client'], ['closed', 'Closed'], ['all', 'All']];
+  const prio = { urgent: 'red', high: 'amber', normal: 'grey', low: 'grey' };
+%>
+<div class="page-head"><div><h1>Support</h1><div class="sub">Requests and questions from your clients.</div></div></div>
+<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/support?tab=<%= t[0] %>" class="<%= tab === t[0] ? 'active' : '' %>"><%= t[1] %><span class="n"><%= counts[t[0]] %></span></a><% }) %></div>
+<div class="card">
+  <% if (!tickets.length) { %><div class="empty"><div class="art"><%- h.icon('tickets', 28) %></div><b><%= tab === 'open' ? 'Nothing needs a reply' : 'Nothing here' %></b><p>New client requests show up here.</p></div><% } else { %>
+  <ul class="list">
+    <% tickets.forEach(function (t) { %>
+    <li>
+      <div class="grow"><a class="title" href="/team/support/<%= t.id %>">#<%= t.id %> · <%= t.subject %></a><span class="meta"><%= t.client_name %><%= t.project_name ? ' · ' + t.project_name : '' %> · <%= t.opened_by || 'client' %> · <%= h.ago(t.last_reply_at) %></span></div>
+      <% if (t.priority === 'urgent' || t.priority === 'high') { %><span class="badge tone-<%= prio[t.priority] %>"><%= h.humanize(t.priority) %></span><% } %>
+      <%- h.badge(t.status, t.status === 'open' ? 'Needs a reply' : t.status === 'awaiting_client' ? 'Waiting for client' : null) %>
+    </li>
+    <% }) %>
+  </ul><% } %>
+</div>

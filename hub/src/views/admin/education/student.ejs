@@ -2,7 +2,7 @@
   const first = st.name.split(' ')[0];
   const wa = next ? h.waLink(st.phone, 'Hi ' + first + ', here is your fee invoice ' + next.number + ' for ' + (next.title || 'your program') + ': ' + h.inr(Number(next.total) - Number(next.amount_paid)) + ' due by ' + h.date(next.due_date) + '. Pay by UPI or card here: ' + next.link) : h.waLink(st.phone, 'Hi ' + first + ', ');
 %>
-<div class="crumbs"><a href="/admin/education">Education</a> / <a href="/admin/education/students">Students</a> / <%= st.name %></div>
+<div class="crumbs"><a href="/team/education">Education</a> / <a href="/team/education/students">Students</a> / <%= st.name %></div>
 <div class="page-head">
   <div>
     <h1><%= st.name %></h1>
@@ -10,7 +10,7 @@
   </div>
   <div class="actions">
     <% if (wa) { %><a class="btn btn-wa" href="<%= wa %>" target="_blank" rel="noopener"><%- h.icon('whatsapp', 16) %> <%= next ? 'Send invoice on WhatsApp' : 'WhatsApp' %></a><% } %>
-    <a class="btn btn-ghost" href="/admin/education/students/<%= st.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+    <a class="btn btn-ghost" href="/team/education/students/<%= st.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
   </div>
 </div>
 
@@ -30,7 +30,7 @@
         <tbody>
           <% invoices.forEach(function (i) { %>
           <tr>
-            <td><a class="strong" href="/admin/invoices/<%= i.id %>"><%= i.number || 'Draft' %></a></td>
+            <td><a class="strong" href="<%= i.link %>" target="_blank" rel="noopener"><%= i.number || 'Draft' %></a></td>
             <td><%= i.title || '—' %></td>
             <td class="nowrap"><%= h.date(i.due_date) %></td>
             <td class="num"><%= h.inr(i.total) %></td>
@@ -39,8 +39,8 @@
             <td class="nowrap">
               <% if (i.status !== 'draft' && i.status !== 'void') { %><button class="btn btn-ghost btn-sm" type="button" data-copy-text="<%= i.link %>" title="Copy payment link"><%- h.icon('link', 15) %></button><% } %>
               <% if (isAdmin || i.status === 'draft') { %>
-              <form method="post" action="/admin/invoices/<%= i.id %>/delete" class="inline" data-confirm="Permanently delete <%= i.number || 'this draft' %><%= Number(i.amount_paid) > 0 ? ' and its payments' : '' %>? This can’t be undone.">
-                <%- include('../../partials/csrf') %><input type="hidden" name="back" value="/admin/education/students/<%= st.id %>">
+              <form method="post" action="/team/education/invoices/<%= i.id %>/delete" class="inline" data-confirm="Permanently delete <%= i.number || 'this draft' %><%= Number(i.amount_paid) > 0 ? ' and its payments' : '' %>? This can’t be undone.">
+                <%- include('../../partials/csrf') %><input type="hidden" name="back" value="/team/education/students/<%= st.id %>">
                 <button class="btn btn-ghost btn-sm" type="submit" title="Delete invoice" aria-label="Delete <%= i.number || 'draft' %>"><%- h.icon('trash', 15) %></button>
               </form>
               <% } %>
@@ -63,13 +63,13 @@
     </section>
 
     <section class="card" id="offers">
-      <div class="card-head"><h3>Offer letters</h3><a class="btn btn-sm" href="/admin/education/offers/new?student=<%= st.id %>"><%- h.icon('plus', 14) %> Create offer letter</a></div>
+      <div class="card-head"><h3>Offer letters</h3><a class="btn btn-sm" href="/team/education/offers/new?student=<%= st.id %>"><%- h.icon('plus', 14) %> Create offer letter</a></div>
       <% if (!offerLetters.length) { %><div class="empty small">No offer letter yet. Create one to send <%= first %> a formal internship offer to accept online.</div><% } else { %>
       <ul class="list">
         <% offerLetters.forEach(function (o) { %>
         <li>
           <div class="grow">
-            <a class="title" href="/admin/education/offers/<%= o.id %>"><span class="mono"><%= o.number || 'Draft' %></span> · <%= o.role_title %></a>
+            <a class="title" href="/team/education/offers/<%= o.id %>"><span class="mono"><%= o.number || 'Draft' %></span> · <%= o.role_title %></a>
             <span class="meta"><%= h.date(o.start_date) %> – <%= h.date(o.end_date) %><%= o.responded_at ? ' · ' + (o.status === 'accepted' ? 'accepted ' : 'answered ') + h.dateTime(o.responded_at) : o.respond_by && o.status === 'issued' ? ' · accept by ' + h.date(o.respond_by) : '' %></span>
           </div>
           <%- h.badge({ issued: 'sent', accepted: 'accepted', declined: 'declined', withdrawn: 'void', expired: 'expired', draft: 'draft' }[o.display], h.humanize(o.display)) %>
@@ -89,16 +89,16 @@
             <span class="title"><span class="mono"><%= c.certificate_no %></span> · <%= c.programme || 'Certificate' %></span>
             <span class="meta"><%= c.issued_on ? 'Issued ' + h.date(c.issued_on) : '' %><%= c.grade ? ' · Grade ' + c.grade : '' %><%= c.duration ? ' · ' + c.duration : '' %> · <%= c.source === 'lms' ? 'from LMS' : 'uploaded' %></span>
           </div>
-          <% if (c.file_id) { %><a class="btn btn-ghost btn-sm" href="/admin/education/certificates/<%= c.id %>/pdf" target="_blank" rel="noopener"><%- h.icon('download', 15) %> PDF</a><% } %>
+          <% if (c.file_id) { %><a class="btn btn-ghost btn-sm" href="/team/education/certificates/<%= c.id %>/pdf" target="_blank" rel="noopener"><%- h.icon('download', 15) %> PDF</a><% } %>
           <% if (c.verify_url) { %><a class="btn btn-ghost btn-sm" href="<%= c.verify_url %>" target="_blank" rel="noopener" title="Public verification page"><%- h.icon('external', 15) %></a><% } %>
-          <% if (isAdmin) { %><form method="post" action="/admin/education/certificates/<%= c.id %>/delete" class="inline" data-confirm="Remove <%= c.certificate_no %> from the Hub? It stays on the LMS."><%- include('../../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit" aria-label="Remove certificate"><%- h.icon('trash', 15) %></button></form><% } %>
+          <% if (isAdmin) { %><form method="post" action="/team/education/certificates/<%= c.id %>/delete" class="inline" data-confirm="Remove <%= c.certificate_no %> from the Hub? It stays on the LMS."><%- include('../../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit" aria-label="Remove certificate"><%- h.icon('trash', 15) %></button></form><% } %>
         </li>
         <% }) %>
       </ul>
       <% } %>
       <div class="card-body"<%- certificates.length ? ' style="border-top:1px solid var(--border)"' : '' %>>
         <% if (lmsEnabled) { %>
-        <form method="post" action="/admin/education/students/<%= st.id %>/certificates" class="row mb-16">
+        <form method="post" action="/team/education/students/<%= st.id %>/certificates" class="row mb-16">
           <%- include('../../partials/csrf') %>
           <input type="text" name="certificate_no" placeholder="LMS certificate ID, e.g. HAP-INT-001" class="mono" aria-label="LMS certificate ID" style="max-width:280px">
           <button class="btn btn-ghost btn-sm" type="submit">Fetch from LMS</button>
@@ -106,7 +106,7 @@
         <% } %>
         <details>
           <summary class="small muted" style="cursor:pointer">Upload a certificate PDF instead…</summary>
-          <form class="form-grid mt-8" data-cert-upload="/admin/education/students/<%= st.id %>/certificates">
+          <form class="form-grid mt-8" data-cert-upload="/team/education/students/<%= st.id %>/certificates">
             <div class="field"><label for="cu-no">Certificate number</label><input id="cu-no" name="certificate_no" type="text" class="mono" required></div>
             <div class="field"><label for="cu-prog">Programme</label><input id="cu-prog" name="programme" type="text" value="<%= st.program_name || '' %>"></div>
             <div class="field"><label for="cu-issued">Issued on</label><input id="cu-issued" name="issued_on" type="date"></div>
@@ -118,7 +118,7 @@
       </div>
     </section>
 
-    <form method="post" action="/admin/education/students/<%= st.id %>/invoice" class="card card-pad">
+    <form method="post" action="/team/education/students/<%= st.id %>/invoice" class="card card-pad">
       <%- include('../../partials/csrf') %>
       <h3>Add another fee</h3>
       <p class="muted small mt-0">For an extension, a second module or a certificate fee. Amount is what the student pays<%= settings.gstin ? ', including GST' : '' %>.</p>
@@ -159,7 +159,7 @@
     </section>
     <% } %>
     <% if (isAdmin) { %>
-    <form method="post" action="/admin/education/students/<%= st.id %>/delete" class="card card-pad" data-confirm="Delete <%= st.name %><%= invoices.length ? ' and their ' + invoices.length + ' invoice' + (invoices.length === 1 ? '' : 's') + (payments.length ? ' and ' + payments.length + ' payment' + (payments.length === 1 ? '' : 's') : '') : '' %>? This can’t be undone.">
+    <form method="post" action="/team/education/students/<%= st.id %>/delete" class="card card-pad" data-confirm="Delete <%= st.name %><%= invoices.length ? ' and their ' + invoices.length + ' invoice' + (invoices.length === 1 ? '' : 's') + (payments.length ? ' and ' + payments.length + ' payment' + (payments.length === 1 ? '' : 's') : '') : '' %>? This can’t be undone.">
       <%- include('../../partials/csrf') %>
       <p class="small muted mt-0">Created by mistake or a duplicate? Deleting removes this student<%= invoices.length ? ' and their invoices and payments' : '' %> permanently.</p>
       <button class="btn btn-danger btn-sm" type="submit"><%- h.icon('trash', 14) %> Delete student</button>

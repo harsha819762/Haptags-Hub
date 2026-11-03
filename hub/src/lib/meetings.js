@@ -123,7 +123,7 @@ async function emailInvites(meetingId, { kind = 'invite', only = null, skipUserI
       heading,
       lines: kind === 'cancel'
         ? [`${organizerName} cancelled this meeting.`]
-        : [`${organizerName} invited you to a video meeting on Haptags Hub. It runs in your browser; there's nothing to install.`, ...(meeting.agenda ? meeting.agenda.split(/\n+/) : [])],
+        : [`${organizerName} invited you to a video meeting on the Haptags Portal. It runs in your browser; there's nothing to install.`, ...(meeting.agenda ? meeting.agenda.split(/\n+/) : [])],
       rows: [['When', when], ['Duration', `${meeting.duration_min} minutes`]],
       button: kind === 'cancel' ? undefined : { label: 'Join meeting', url: joinUrl(meeting) },
       footnote: kind === 'cancel' ? undefined : `Or open ${joinUrl(meeting)} in Chrome, Edge, Safari or Firefox. Allow camera and microphone when asked.`,

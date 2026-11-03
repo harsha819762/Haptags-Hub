@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res, next) => {
   const client = await db('clients').where({ id: idParam(req) }).first();
   if (!client) return next();
-  if (client.segment === 'student') return res.redirect(`/admin/education/students/${client.id}`);
+  if (client.segment === 'student') return res.redirect(`/team/education/students/${client.id}`);
   const [projects, quotes, invoices, retainers, tickets, users, activities, bal, lead] = await Promise.all([
     db('projects').where({ client_id: client.id }).orderBy('id', 'desc'),
     db('quotes').where({ client_id: client.id }).orderBy('id', 'desc').limit(20),

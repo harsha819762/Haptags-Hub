@@ -4,7 +4,7 @@ const express = require('express');
 const { db } = require('../../db');
 const C = require('../../lib/constants');
 const E = require('../../lib/education');
-const { getSettings } = require('../../lib/settings');
+const { getSettings, setSettings, DEFAULTS } = require('../../lib/settings');
 const { columnChart } = require('../../lib/charts');
 const { toPaise } = require('../../lib/money');
 const {
@@ -22,6 +22,13 @@ const { nowSql, todayIST, addDays, addMonths, str, int, isEmail, isDate } = requ
 const { paginate, idParam, back } = require('./_helpers');
 
 const router = express.Router();
+
+// These pages live in the company view (routes/team.js mounts them at /team/education).
+router.use((req, res, next) => {
+  const render = res.render.bind(res);
+  res.render = (view, locals = {}) => render(view, { layout: 'portal', ...locals });
+  next();
+});
 
 const programs = (all = false) => db('programs').modify((q) => { if (!all) q.where({ is_active: true }); }).orderBy('name');
 // Grouped by LMS category on the Programs page and the enrol form; programmes without one come last.
@@ -206,7 +213,7 @@ router.post('/students', async (req, res) => {
     sendEmail: Boolean(req.body.send_email),
   }, req.user.id);
   req.flash('success', `${student.name} enrolled.${paidNow ? ' Payment recorded.' : ''}`);
-  res.redirect(`/admin/education/students/${clientId}`);
+  res.redirect(`/team/education/students/${clientId}`);
 });
 
 async function loadStudent(req, res, next) {
@@ -258,7 +265,7 @@ router.post('/students/:id', loadStudent, async (req, res) => {
     ...student, program_id: int(req.body.program_id, 0) || null, status: req.body.status === 'inactive' ? 'inactive' : 'active', updated_at: nowSql(),
   });
   req.flash('success', 'Student updated.');
-  res.redirect(`/admin/education/students/${req.student.id}`);
+  res.redirect(`/team/education/students/${req.student.id}`);
 });
 
 // Another fee for an existing student (next module, certificate, extension…).
@@ -273,7 +280,7 @@ router.post('/students/:id/delete', requireAdmin, loadStudent, async (req, res) 
   });
   console.log(`[education] ${req.user.email} deleted student #${st.id} ${st.name} (${r.invoices} invoices, ${r.payments} payments)`);
   req.flash('success', `${st.name} deleted${r.invoices ? `, with ${r.invoices} invoice${r.invoices === 1 ? '' : 's'}` : ''}.`);
-  res.redirect('/admin/education/students');
+  res.redirect('/team/education/students');
 });
 
 router.post('/students/:id/invoice', loadStudent, async (req, res) => {
@@ -283,12 +290,12 @@ router.post('/students/:id/invoice', loadStudent, async (req, res) => {
   const description = str(req.body.description, 200);
   if (amount <= 0 || !description) {
     req.flash('error', 'Add a description and an amount.');
-    return res.redirect(`/admin/education/students/${st.id}`);
+    return res.redirect(`/team/education/students/${st.id}`);
   }
   const num = await readNumber(req.body.number);
   if (num.error) {
     req.flash('error', num.error);
-    return res.redirect(`/admin/education/students/${st.id}`);
+    return res.redirect(`/team/education/students/${st.id}`);
   }
   const taxMode = defaultTaxMode(st, s);
   const id = await db.transaction(async (trx) => {
@@ -303,7 +310,7 @@ router.post('/students/:id/invoice', loadStudent, async (req, res) => {
   });
   if (req.body.send_email && st.email) await sendInvoiceEmail(id, req.user.id);
   req.flash('success', 'Invoice created.');
-  res.redirect(`/admin/education/students/${st.id}`);
+  res.redirect(`/team/education/students/${st.id}`);
 });
 
 // ---------------- Certificates ----------------
@@ -325,7 +332,7 @@ router.post('/certificates/sync', async (req, res) => {
   } catch (err) {
     req.flash('error', `Couldn’t reach the LMS: ${err.message}`);
   }
-  res.redirect('/admin/education/certificates');
+  res.redirect('/team/education/certificates');
 });
 
 router.get('/certificates/:id/pdf', async (req, res, next) => {
@@ -347,7 +354,7 @@ router.post('/certificates/:id/delete', requireAdmin, async (req, res) => {
     if (cert.file_id) await db('files').where({ id: cert.file_id }).del();
     req.flash('success', `Certificate ${cert.certificate_no} removed from the Hub (it stays on the LMS).`);
   }
-  res.redirect(back(req, '/admin/education/certificates'));
+  res.redirect(back(req, '/team/education/certificates'));
 });
 
 // Attach a certificate to a student: by LMS number, or by uploading the PDF.
@@ -359,7 +366,7 @@ router.post('/students/:id/certificates', loadStudent, express.raw({ type: ['app
   const done = (type, msg) => {
     req.flash(type, msg);
     if (req.accepts(['html', 'json']) === 'json') return res.status(type === 'error' ? 422 : 200).json({ ok: type !== 'error', message: msg });
-    return res.redirect(`/admin/education/students/${st.id}`);
+    return res.redirect(`/team/education/students/${st.id}`);
   };
   if (!number) return done('error', 'Enter the certificate number.');
   if (!fromUpload) {
@@ -401,7 +408,7 @@ router.post('/import', requireAdmin, express.raw({ type: ['text/*', 'application
   } catch (err) {
     if (req.accepts(['html', 'json']) === 'json') return res.status(422).json({ error: err.message });
     req.flash('error', err.message);
-    return res.redirect('/admin/education/import');
+    return res.redirect('/team/education/import');
   }
 });
 
@@ -428,7 +435,7 @@ router.post('/programs/sync', async (req, res) => {
   } catch (err) {
     req.flash('error', `Couldn’t sync with the LMS: ${err.message}`);
   }
-  res.redirect('/admin/education/programs');
+  res.redirect('/team/education/programs');
 });
 
 function readProgram(body) {
@@ -448,11 +455,11 @@ router.post('/programs', async (req, res) => {
   const p = readProgram(req.body);
   if (!p.name) {
     req.flash('error', 'Give the program a name.');
-    return res.redirect('/admin/education/programs');
+    return res.redirect('/team/education/programs');
   }
   await db('programs').insert({ ...p, is_active: true, created_at: nowSql(), updated_at: nowSql() });
   req.flash('success', `${p.name} added.`);
-  res.redirect('/admin/education/programs');
+  res.redirect('/team/education/programs');
 });
 
 router.post('/programs/:id', async (req, res, next) => {
@@ -464,7 +471,47 @@ router.post('/programs/:id', async (req, res, next) => {
     if (p.name) await db('programs').where({ id: prog.id }).update({ ...p, updated_at: nowSql() });
   }
   req.flash('success', 'Program saved.');
-  res.redirect('/admin/education/programs');
+  res.redirect('/team/education/programs');
+});
+
+// ---------------- Settings: student fee invoices and offer-letter defaults ----------------
+const SETTINGS = {
+  fees: ['edu_invoice_prefix', 'edu_sac', 'edu_gst_rate', 'edu_due_days', 'edu_terms'],
+  offers: ['offer_prefix', 'offer_signatory_name', 'offer_signatory_designation', 'offer_reporting_to', 'offer_reporting_designation',
+    'offer_mode', 'offer_location', 'offer_schedule', 'offer_respond_days', 'offer_terms'],
+};
+
+router.get('/settings', async (req, res) => {
+  res.render('admin/education/settings', { title: 'Education settings', s: await getSettings() });
+});
+
+router.post('/settings', async (req, res) => {
+  const group = SETTINGS[req.body.group] ? req.body.group : null;
+  if (!group) return res.redirect('/team/education/settings');
+  const values = {};
+  for (const key of SETTINGS[group]) if (key in req.body) values[key] = str(req.body[key], 5000) || '';
+  const current = await getSettings();
+  if (values.edu_invoice_prefix) {
+    values.edu_invoice_prefix = values.edu_invoice_prefix.replace(/[^A-Za-z0-9-]/g, '').slice(0, 6) || DEFAULTS.edu_invoice_prefix;
+    if (values.edu_invoice_prefix === current.invoice_prefix) values.edu_invoice_prefix = `${values.edu_invoice_prefix}E`.slice(0, 6);
+  }
+  if ('offer_prefix' in values) values.offer_prefix = values.offer_prefix.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 6) || DEFAULTS.offer_prefix;
+  if ('offer_mode' in values && !['onsite', 'remote', 'hybrid'].includes(values.offer_mode)) values.offer_mode = DEFAULTS.offer_mode;
+  if ('offer_respond_days' in values) values.offer_respond_days = String(Math.min(60, Math.max(1, int(values.offer_respond_days, 7))));
+  if ('offer_terms' in values && !values.offer_terms.trim()) values.offer_terms = DEFAULTS.offer_terms;
+  await setSettings(values);
+  req.flash('success', 'Settings saved.');
+  res.redirect('/team/education/settings');
+});
+
+// Delete one of a student's fee invoices (a draft, or any invoice with its payments).
+router.post('/invoices/:id/delete', async (req, res, next) => {
+  const inv = await db('invoices').where({ id: idParam(req), segment: 'student' }).first();
+  if (!inv) return next();
+  const r = await db.transaction((trx) => deleteInvoices(trx, [inv.id]));
+  console.log(`[education] ${req.user.email} deleted ${inv.number || `draft #${inv.id}`}`);
+  req.flash('success', `${inv.number || 'Draft'} deleted${r.payments ? `, with ${r.payments} payment${r.payments === 1 ? '' : 's'}` : ''}.`);
+  res.redirect(back(req, '/team/education/students'));
 });
 
 router.use('/offers', require('./offers'));

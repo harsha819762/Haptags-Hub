@@ -72,6 +72,13 @@ const config = {
     webhookSecret: env.RAZORPAY_WEBHOOK_SECRET || '',
   },
 
+  // Optional "Sign in with Google": an OAuth client (Web application) from Google Cloud Console, with
+  // <BASE_URL>/auth/google/callback as an authorised redirect URI. The button shows only when both are set.
+  google: {
+    clientId: env.GOOGLE_CLIENT_ID || '',
+    clientSecret: env.GOOGLE_CLIENT_SECRET || '',
+  },
+
   // Optional: lets a hosting cron job call /api/v1/cron?key=... to run automations.
   cronKey: env.CRON_KEY || '',
 
@@ -93,6 +100,7 @@ const config = {
 };
 
 config.razorpay.enabled = Boolean(config.razorpay.keyId && config.razorpay.keySecret);
+
 // The LMS's course catalogue (PocketBase) sits beside its API: /hcgi/api → /hcgi/platform.
 config.lms.platformUrl = (env.LMS_PLATFORM_URL || config.lms.apiUrl.replace(/\/api$/, '/platform')).replace(/\/+$/, '');
 

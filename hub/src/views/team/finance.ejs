@@ -1,0 +1,144 @@
+<%
+  const net = a.net;
+  const margin = a.ratios.netMargin;
+  const profit = net >= 0;
+  const fmtDay = function (d) { return h.date(String(d).slice(0, 10)); };
+  const incomeCats = CATEGORIES.filter(function (c) { return c.type === 'income' || c.type === 'capital'; });
+  const outCats = CATEGORIES.filter(function (c) { return c.type === 'expense' || c.type === 'tax' || c.type === 'transfer'; });
+%>
+<div class="page-head">
+  <div><h1>Income &amp; expenses</h1><div class="sub"><%= period.label %></div></div>
+</div>
+
+<div class="tabs">
+  <% presets.forEach(function (p) { %><a href="/team/finance?period=<%= p[0] %>" class="<%= period.key === p[0] ? 'active' : '' %>"><%= p[1] %></a><% }) %>
+</div>
+
+<div class="kpis fin-kpis">
+  <div class="kpi"><span class="ic green"><%- h.icon('download', 22) %></span><div><b><%= h.inrShort(a.revenue) %></b><span>Money in (income)</span></div></div>
+  <div class="kpi"><span class="ic red"><%- h.icon('upload', 22) %></span><div><b><%= h.inrShort(a.spend) %></b><span>Money out (expenses)</span></div></div>
+  <div class="kpi profit <%= profit ? 'up' : 'down' %>"><span class="ic <%= profit ? 'green' : 'red' %>"><%- h.icon('finance', 22) %></span><div><b><%= profit ? '' : '−' %><%= h.inrShort(Math.abs(net)) %></b><span><%= profit ? 'Profit' : 'Loss' %><%= margin !== null ? ' · ' + margin + '% margin' : '' %></span></div></div>
+</div>
+
+<% if (!a.count) { %>
+<section class="card card-pad fin-empty">
+  <div class="art"><%- h.icon('finance', 30) %></div>
+  <h2>Connect your bank to see your profit</h2>
+  <p class="muted">Upload a bank statement (CSV) and we’ll sort your income and expenses automatically. You can add cash entries by hand too.</p>
+  <label class="btn btn-lg" style="cursor:pointer"><%- h.icon('upload', 18) %> Upload bank statement<input type="file" accept=".csv,text/csv,text/plain" data-statement hidden></label>
+</section>
+<% } %>
+
+<div class="split">
+  <div class="stack">
+    <% if (a.count) { %>
+    <section class="card">
+      <div class="card-head"><h3>Money in vs money out, by month</h3><span class="fin-legend"><i class="in"></i> In <i class="out"></i> Out</span></div>
+      <div class="fin-chart" role="img" aria-label="Monthly income and expenses">
+        <% months.forEach(function (m) { const p = m.income - m.expense; %>
+        <div class="fin-col" title="<%= m.label %>: in <%= h.inrShort(m.income) %>, out <%= h.inrShort(m.expense) %>, <%= p >= 0 ? 'profit' : 'loss' %> <%= h.inrShort(Math.abs(p)) %>">
+          <div class="bars"><span class="b in" style="height:<%= Math.round(m.income / peak * 100) %>%"></span><span class="b out" style="height:<%= Math.round(m.expense / peak * 100) %>%"></span></div>
+          <span class="lbl"><%= m.label %></span>
+          <span class="pl <%= p >= 0 ? 'up' : 'down' %>"><%= p >= 0 ? '+' : '−' %><%= h.inrShort(Math.abs(p)).replace('₹', '') %></span>
+        </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <div class="grid grid-2">
+      <section class="card">
+        <div class="card-head"><h3>Where the money goes</h3></div>
+        <% if (!a.costs.length) { %><div class="empty" style="padding:22px">No expenses in this period.</div><% } %>
+        <ul class="list fin-list">
+          <% a.costs.slice(0, 8).forEach(function (c) { %>
+          <li><div class="grow"><span class="title"><%= c.label %></span><div class="progress"><span style="width:<%= c.ofSpend || 0 %>%"></span></div></div><div class="right"><b><%= h.inrShort(c.amount) %></b><span class="small muted"><%= c.ofSpend !== null ? c.ofSpend + '%' : '' %></span></div></li>
+          <% }) %>
+        </ul>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Where the money comes from</h3></div>
+        <% if (!a.income.length) { %><div class="empty" style="padding:22px">No income in this period.</div><% } %>
+        <ul class="list fin-list">
+          <% a.income.slice(0, 8).forEach(function (c) { %>
+          <li><div class="grow"><span class="title"><%= c.label %></span><div class="progress done"><span style="width:<%= c.share || 0 %>%"></span></div></div><div class="right"><b><%= h.inrShort(c.amount) %></b><span class="small muted"><%= c.share !== null ? c.share + '%' : '' %></span></div></li>
+          <% }) %>
+        </ul>
+      </section>
+    </div>
+
+    <% if (a.uncategorized.count) { %><div class="flash flash-info"><%- h.icon('info') %><span><%= a.uncategorized.count %> transaction<%= a.uncategorized.count === 1 ? '' : 's' %> aren’t sorted yet. Pick a category below and they’ll count properly.</span></div><% } %>
+
+    <section class="card">
+      <div class="card-head"><h3>Transactions</h3><span class="muted small"><%= a.count %> in this period</span></div>
+      <% if (!txns.length) { %><div class="empty" style="padding:26px">Nothing in this period.</div><% } else { %>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Date</th><th>What</th><th>Category</th><th class="num">Money in</th><th class="num">Money out</th></tr></thead>
+        <tbody>
+          <% txns.forEach(function (t) { const isIn = Number(t.credit) > 0; %>
+          <tr>
+            <td class="nowrap"><%= fmtDay(t.txn_date) %></td>
+            <td><span class="strong"><%= (t.counterparty || t.description || '').slice(0, 60) %></span><span class="sub"><%= t.account %></span></td>
+            <td><form method="post" action="/team/finance/txn/<%= t.id %>"><%- include('../partials/csrf') %><input type="hidden" name="back" value="/team/finance?period=<%= period.key %><%= showAll ? '&all=1' : '' %>">
+              <select name="category" class="sel-sm" data-autosubmit aria-label="Category">
+                <% (isIn ? incomeCats : outCats).concat([CAT.uncategorized]).forEach(function (c) { %><option value="<%= c.id %>" <%= t.category === c.id ? 'selected' : '' %>><%= c.label %></option><% }) %>
+              </select></form></td>
+            <td class="num <%= isIn ? 'up' : '' %>"><%= isIn ? h.inr(t.credit) : '' %></td>
+            <td class="num"><%= Number(t.debit) > 0 ? h.inr(t.debit) : '' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table></div>
+      <% if (a.count > txns.length && !showAll) { %><div class="card-body"><a class="btn btn-ghost btn-sm" href="/team/finance?period=<%= period.key %>&all=1">Show all <%= a.count %></a></div><% } %>
+      <% } %>
+    </section>
+    <% } %>
+  </div>
+
+  <div class="stack">
+    <section class="card" id="connect">
+      <div class="card-head"><h3>Connect your bank</h3></div>
+      <div class="card-body">
+        <div class="connect-row">
+          <span class="ic green ficon"><%- h.icon('upload', 17) %></span>
+          <div class="grow"><b>Upload a statement</b><div class="small muted">Works with HDFC, ICICI, SBI, Axis, Kotak and most banks. Download the statement as <b>CSV</b> from net banking.</div></div>
+        </div>
+        <label class="dropzone" data-statement-drop style="margin:14px 0 0;cursor:pointer">
+          <%- h.icon('upload', 22) %><b>Drop your CSV here or click to choose</b><span>Re-uploading overlapping months is safe — duplicates are skipped.</span>
+          <input type="file" accept=".csv,text/csv,text/plain" data-statement hidden>
+        </label>
+        <div class="field mt-16 mb-0"><label for="acct">Account name</label><input id="acct" type="text" data-account value="<%= accounts[0] || 'Main account' %>" maxlength="80" placeholder="e.g. HDFC Current"></div>
+        <div class="connect-row mt-16">
+          <span class="ic amber ficon"><%- h.icon('zap', 17) %></span>
+          <div class="grow"><b>Live bank sync <span class="badge tone-grey" style="margin-left:6px">Not connected</span></b><div class="small muted">Automatic daily updates need a bank-data service (such as an Account Aggregator or your bank’s business API). Until one is connected, upload a statement whenever you like.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <form method="post" action="/team/finance/entry" class="card card-pad">
+      <%- include('../partials/csrf') %>
+      <h3>Add a cash entry</h3>
+      <div class="seg mb-16" role="radiogroup" style="display:flex">
+        <label style="flex:1"><input type="radio" name="kind" value="out" checked hidden><a role="button" class="seg-opt">Expense</a></label>
+        <label style="flex:1"><input type="radio" name="kind" value="in" hidden><a role="button" class="seg-opt">Income</a></label>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label for="e-date">Date</label><input id="e-date" name="date" type="date" value="<%= new Date().toISOString().slice(0, 10) %>"></div>
+        <div class="field"><label for="e-amt">Amount (₹)</label><input id="e-amt" name="amount" type="number" min="0" step="any" required></div>
+      </div>
+      <div class="field"><label for="e-cat">Category</label>
+        <select id="e-cat" name="category"><optgroup label="Expenses"><% CATEGORIES.filter(function (c) { return c.type === 'expense'; }).forEach(function (c) { %><option value="<%= c.id %>"><%= c.label %></option><% }) %></optgroup>
+        <optgroup label="Income"><% CATEGORIES.filter(function (c) { return c.type === 'income'; }).forEach(function (c) { %><option value="<%= c.id %>"><%= c.label %></option><% }) %></optgroup></select></div>
+      <div class="field"><label for="e-desc">Note <span class="muted">(optional)</span></label><input id="e-desc" name="description" type="text" maxlength="200" placeholder="e.g. Office tea & snacks"></div>
+      <button class="btn" type="submit"><%- h.icon('plus', 16) %> Add entry</button>
+    </form>
+
+    <% if (imports.length) { %>
+    <section class="card">
+      <div class="card-head"><h3>Recent statements</h3></div>
+      <ul class="list"><% imports.forEach(function (i) { %><li><div class="grow"><span class="title"><%= i.account %></span><span class="meta"><%= i.from_date ? fmtDay(i.from_date) + ' – ' + fmtDay(i.to_date) : '' %> · <%= i.rows_added %> added</span></div>
+        <form method="post" action="/team/finance/imports/<%= i.id %>/delete" data-confirm="Remove this statement and its transactions?"><%- include('../partials/csrf') %><button class="x-btn" aria-label="Remove statement"><%- h.icon('x', 14) %></button></form></li><% }) %></ul>
+    </section>
+    <% } %>
+  </div>
+</div>
+<script src="/static/js/statement.js?v=1" defer></script>

@@ -5,11 +5,11 @@
 %>
 <div class="row-between">
   <nav class="tabs">
-    <% tabs.forEach(function (t) { %><a href="<%= h.qs('/admin/education/offers', { status: t[0], q: q }) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %><% if (t[0] && counts[t[0]]) { %><span class="n"><%= counts[t[0]] %></span><% } %></a><% }) %>
+    <% tabs.forEach(function (t) { %><a href="<%= h.qs('/team/education/offers', { status: t[0], q: q }) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %><% if (t[0] && counts[t[0]]) { %><span class="n"><%= counts[t[0]] %></span><% } %></a><% }) %>
   </nav>
   <div class="row mb-16">
     <form method="get"><input type="hidden" name="status" value="<%= status %>"><input type="search" name="q" value="<%= q || '' %>" placeholder="Name, number, position, college…" aria-label="Search offer letters" style="width:240px"></form>
-    <a class="btn" href="/admin/education/offers/new"><%- h.icon('plus', 16) %> New offer letter</a>
+    <a class="btn" href="/team/education/offers/new"><%- h.icon('plus', 16) %> New offer letter</a>
   </div>
 </div>
 <div class="card">
@@ -21,8 +21,8 @@
     <tbody>
       <% rows.forEach(function (o) { const st = displayStatus(o, today); %>
       <tr>
-        <td><a class="strong mono" href="/admin/education/offers/<%= o.id %>"><%= o.number || 'Draft' %></a><span class="sub"><%= o.issued_on ? 'Issued ' + h.date(o.issued_on) : 'Not issued' %></span></td>
-        <td><a href="/admin/education/students/<%= o.client_id %>"><%= o.candidate_name %></a><span class="sub"><%= o.college || '' %></span></td>
+        <td><a class="strong mono" href="/team/education/offers/<%= o.id %>"><%= o.number || 'Draft' %></a><span class="sub"><%= o.issued_on ? 'Issued ' + h.date(o.issued_on) : 'Not issued' %></span></td>
+        <td><a href="/team/education/students/<%= o.client_id %>"><%= o.candidate_name %></a><span class="sub"><%= o.college || '' %></span></td>
         <td><%= o.role_title %><span class="sub"><%= h.date(o.start_date) %> – <%= h.date(o.end_date) %></span></td>
         <td class="hide-sm small"><%= o.responded_at ? h.dateTime(o.responded_at) : st === 'issued' && o.respond_by ? 'By ' + h.date(o.respond_by) : '—' %></td>
         <td><%- h.badge(tone[st], h.humanize(st === 'issued' ? 'awaiting_reply' : st)) %></td>
@@ -30,6 +30,6 @@
       <% }) %>
     </tbody>
   </table></div>
-  <%- include('../../partials/pager', { pagerBase: '/admin/education/offers', pagerQuery: { status: status, q: q } }) %>
+  <%- include('../../partials/pager', { pagerBase: '/team/education/offers', pagerQuery: { status: status, q: q } }) %>
   <% } %>
 </div>

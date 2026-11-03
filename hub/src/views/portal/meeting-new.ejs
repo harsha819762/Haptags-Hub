@@ -1,0 +1,20 @@
+<div class="crumbs"><a href="<%= base %>/meetings">Meetings</a> / New</div>
+<div class="page-head"><div><h1>Schedule a meeting</h1><div class="sub">Pick a time and who should join. Everyone gets an invite with a join link.</div></div></div>
+<form method="post" action="<%= base %>/meetings" class="card card-pad" style="max-width:720px" novalidate>
+  <%- include('../partials/csrf') %>
+  <div class="field"><label for="title">Title</label><input id="title" name="title" type="text" value="<%= values.title %>" placeholder="e.g. Website review call" <%- errors.title ? 'aria-invalid="true"' : '' %> autofocus><% if (errors.title) { %><div class="error"><%= errors.title %></div><% } %></div>
+  <div class="form-grid">
+    <div class="field"><label for="date">Date</label><input id="date" name="date" type="date" value="<%= values.date %>"><% if (errors.date) { %><div class="error"><%= errors.date %></div><% } %></div>
+    <div class="field"><label for="time">Time <span class="muted">(India time)</span></label><input id="time" name="time" type="time" value="<%= values.time %>"></div>
+    <div class="field"><label for="duration_min">Length</label><select id="duration_min" name="duration_min"><% durations.forEach(function (d) { %><option value="<%= d %>" <%= Number(values.duration_min) === d ? 'selected' : '' %>><%= d %> minutes</option><% }) %></select></div>
+  </div>
+  <div class="field"><label><%= base === '/team/chat' ? 'Who should join?' : 'Who from the team?' %></label>
+    <% if (errors.people) { %><div class="error"><%= errors.people %></div><% } %>
+    <div class="pick-list">
+      <% people.forEach(function (u) { %><label class="check pick"><input type="checkbox" name="user_ids" value="<%= u.id %>" <%= values.user_ids.indexOf(u.id) !== -1 ? 'checked' : '' %>><span class="avatar avatar-sm"><%= h.initials(u.name) %></span><span><%= u.name %><span class="muted small"> · <%= u.company || h.humanize(u.role) %></span></span></label><% }) %>
+    </div>
+  </div>
+  <div class="field"><label for="emails">Invite someone else by email <span class="muted">(optional)</span></label><input id="emails" name="emails" type="text" value="<%= values.emails %>" placeholder="name@company.com, other@company.com"><% if (errors.emails) { %><div class="error"><%= errors.emails %></div><% } %></div>
+  <div class="field"><label for="agenda">Agenda <span class="muted">(optional)</span></label><textarea id="agenda" name="agenda" rows="3" placeholder="What would you like to cover?"><%= values.agenda %></textarea></div>
+  <div class="form-actions"><button class="btn" type="submit"><%- h.icon('calendar', 16) %> Schedule meeting</button><a class="btn btn-ghost" href="<%= base %>/meetings">Cancel</a></div>
+</form>

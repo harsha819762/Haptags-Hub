@@ -3,9 +3,9 @@
   const inv = function (k) { return errors[k] ? 'aria-invalid="true"' : ''; };
 %>
 <%- include('../_nav', { active: 'items' }) %>
-<div class="crumbs"><a href="/invoices/items">Services</a> / <%= item.id ? item.name : 'New' %></div>
+<div class="crumbs"><a href="/team/gst/items">Services</a> / <%= item.id ? item.name : 'New' %></div>
 <div class="page-head"><div><h1><%= item.id ? 'Edit service' : 'New service' %></h1></div></div>
-<form method="post" action="<%= item.id ? '/invoices/items/' + item.id : '/invoices/items' %>" class="card card-pad gst-narrow" novalidate>
+<form method="post" action="<%= item.id ? '/team/gst/items/' + item.id : '/team/gst/items' %>" class="card card-pad gst-narrow" novalidate>
   <%- include('../../partials/csrf') %>
   <div class="form-grid">
     <div class="field full"><label for="i-name">Name *</label><input id="i-name" name="name" type="text" maxlength="190" value="<%= item.name || '' %>" <%- inv('name') %> required><%- err('name') %></div>
@@ -15,5 +15,5 @@
     <div class="field"><label for="i-rate">Default rate (₹, before GST)</label><input id="i-rate" name="rate" type="text" inputmode="decimal" value="<%= g.inputValue(item.rate) %>" placeholder="0.00" <%- inv('rate') %>><%- err('rate') %></div>
     <div class="field"><label for="i-gst">GST rate</label><select id="i-gst" name="gst_rate"><% g.C.GST_RATES.forEach(function (r) { %><option value="<%= r %>" <%= Number(item.gst_rate) === r ? 'selected' : '' %>><%= r %>%</option><% }) %></select></div>
   </div>
-  <div class="form-actions"><button class="btn" type="submit"><%- h.icon('check', 16) %> Save service</button><a class="btn-link" href="/invoices/items">Cancel</a></div>
+  <div class="form-actions"><button class="btn" type="submit"><%- h.icon('check', 16) %> Save service</button><a class="btn-link" href="/team/gst/items">Cancel</a></div>
 </form>

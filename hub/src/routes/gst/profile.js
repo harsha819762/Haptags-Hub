@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
   await setProfile(values);
   if (Object.keys(changes).length) await audit(actor(req), { entity: 'profile', action: 'edited', summary: `Business profile updated (${Object.keys(changes).join(', ')})`, changes });
   req.flash('success', 'Business profile saved. New documents use it; finalised ones keep what they printed.');
-  res.redirect('/invoices/profile');
+  res.redirect('/team/gst/profile');
 });
 
 // Logo and signature: PNG or JPEG sent as the raw request body (see public/js/gst.js).
@@ -112,7 +112,7 @@ router.post('/image/:kind/remove', async (req, res, next) => {
   await setProfile({ [`${req.params.kind}_file_id`]: '' });
   await audit(actor(req), { entity: 'profile', action: `${req.params.kind}_removed`, summary: `${req.params.kind === 'logo' ? 'Logo reset to the Haptags mark' : 'Signature image removed'}` });
   req.flash('success', req.params.kind === 'logo' ? 'Logo reset to the Haptags mark.' : 'Signature image removed. Documents show a blank signature line instead.');
-  res.redirect('/invoices/profile#images');
+  res.redirect('/team/gst/profile#images');
 });
 
 router.get('/image/:kind', async (req, res, next) => {
@@ -138,7 +138,7 @@ router.post('/numbering', async (req, res) => {
   }
   if (moved.length) await audit(actor(req), { entity: 'profile', action: 'numbering', summary: `Number series moved forward; next: ${moved.join(', ')}` });
   req.flash(moved.length ? 'success' : 'info', moved.length ? `Next numbers: ${moved.join(', ')}.` : 'Nothing changed. A series can only move forward, never back to a number already passed.');
-  res.redirect('/invoices/profile#numbering');
+  res.redirect('/team/gst/profile#numbering');
 });
 
 router.get('/backup', async (req, res) => {
@@ -150,7 +150,7 @@ router.post('/backup', async (req, res) => {
   const name = await writeBackup({ force: true });
   await audit(actor(req), { entity: 'backup', action: 'written', summary: `Backup ${name} written to the server` });
   req.flash('success', `Backup ${name} saved on the server.`);
-  res.redirect('/invoices/profile#backups');
+  res.redirect('/team/gst/profile#backups');
 });
 
 router.get('/backups/:name', async (req, res, next) => {

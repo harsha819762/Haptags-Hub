@@ -1,0 +1,97 @@
+<%
+  const hr = new Date().getHours();
+  const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  const attention = showMoney ? review.length + overdue.length + late.length : review.length + late.length;
+  const heroTone = showMoney && overdue.length ? 'alert' : attention ? '' : 'calm';
+  const num = function (n) { return Number(n) % 1 ? Number(n).toFixed(1) : String(Number(n)); };
+%>
+<section class="hero-card <%= heroTone %>">
+  <div class="eyebrow"><%= greet %>, <%= user.name.split(' ')[0] %> 👋</div>
+  <div class="due">
+    <div>
+      <h1 style="margin:6px 0 4px"><%= attention ? attention + ' thing' + (attention === 1 ? '' : 's') + ' need your attention' : 'Everything is on track' %></h1>
+      <% if (showMoney) { %>
+      <p><%= review.length %> under review · <%= overdue.length %> client invoice<%= overdue.length === 1 ? '' : 's' %> unpaid past due (<%= h.inrShort(overdueTotal) %> owed to you) · <%= late.length %> late task<%= late.length === 1 ? '' : 's' %></p>
+      <% } else { %>
+      <p><%= review.length %> task<%= review.length === 1 ? '' : 's' %> under review · <%= late.length %> late task<%= late.length === 1 ? '' : 's' %> · <%= meetings.length %> meeting<%= meetings.length === 1 ? '' : 's' %> this week</p>
+      <% } %>
+    </div>
+    <% if (showMoney) { %><a class="btn btn-lg" href="/team/billing?tab=overdue">See who owes you →</a><% } else { %><a class="btn btn-lg" href="/team/projects?status=active">Go to projects →</a><% } %>
+  </div>
+</section>
+
+<div class="kpis">
+  <a class="kpi" href="/team/clients"><span class="ic blue"><%- h.icon('clients', 22) %></span><div><b><%= clients %></b><span>Active clients</span></div></a>
+  <a class="kpi" href="/team/projects?status=active"><span class="ic violet"><%- h.icon('projects', 22) %></span><div><b><%= projects.length %></b><span>Open projects</span></div></a>
+  <a class="kpi" href="/team/projects"><span class="ic amber"><%- h.icon('check', 22) %></span><div><b><%= review.length %></b><span>Under review</span></div></a>
+  <% if (showMoney) { %>
+  <a class="kpi" href="/team/billing"><span class="ic green"><%- h.icon('payments', 22) %></span><div><b><%= h.inrShort(outstanding) %></b><span>Clients owe you</span></div></a>
+  <% } else { %>
+  <a class="kpi" href="/team/leave"><span class="ic green"><%- h.icon('calendar', 22) %></span><div><b><%= num(leave.casualLeft) %></b><span>Casual leave left</span></div></a>
+  <% } %>
+</div>
+
+<div class="split">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Under review</h3><span class="muted small"><%= review.length %></span></div>
+      <% if (!review.length) { %><div class="empty" style="padding:26px"><b>Nothing waiting</b>All caught up.</div><% } else { %>
+      <ul class="list"><% review.slice(0, 6).forEach(function (t) { %><li><div class="grow"><a class="title" href="/team/tasks/<%= t.id %>"><%= t.title %></a><span class="meta"><%= t.client_name %> · <%= t.project_name %></span></div><span class="badge tone-amber">Under review</span></li><% }) %></ul><% } %>
+    </section>
+
+    <% if (showMoney) { %>
+    <section class="card">
+      <div class="card-head"><h3>Clients who haven’t paid on time</h3><a class="small" href="/team/billing?tab=overdue">See all →</a></div>
+      <% if (!overdue.length) { %><div class="empty" style="padding:26px"><b>Everyone has paid on time</b>Nothing owed past its due date.</div><% } else { %>
+      <ul class="list"><% overdue.slice(0, 6).forEach(function (i) { %><li><div class="grow"><a class="title" href="/i/<%= i.public_token %>"><%= i.client_name %></a><span class="meta mono"><%= i.number %> · was due <%= h.date(i.due_date) %></span></div><b><%= h.inr(balance(i)) %></b></li><% }) %></ul><% } %>
+    </section>
+    <% } else { %>
+    <section class="card">
+      <div class="card-head"><h3>Late tasks</h3><span class="muted small"><%= late.length %></span></div>
+      <% if (!late.length) { %><div class="empty" style="padding:26px"><b>Nothing is late</b>Great work.</div><% } else { %>
+      <ul class="list"><% late.slice(0, 6).forEach(function (t) { %><li><div class="grow"><a class="title" href="/team/tasks/<%= t.id %>"><%= t.title %></a><span class="meta"><%= t.client_name %> · <%= t.project_name %> · due <%= h.date(t.due_date) %></span></div><span class="chip chip-red">Late</span></li><% }) %></ul><% } %>
+    </section>
+    <% } %>
+
+    <section class="card">
+      <div class="card-head"><h3>Projects</h3><a class="small" href="/team/projects">All projects →</a></div>
+      <ul class="list">
+        <% projects.slice(0, 6).forEach(function (p) { %>
+        <li><div class="ring <%= p.progress >= 100 ? 'done' : '' %>" style="--p:<%= p.progress %>"><span><%= p.progress %>%</span></div><div class="grow"><a class="title" href="/team/projects/<%= p.id %>"><%= p.name %></a><span class="meta"><%= p.client_name %><%= p.due_date ? ' · target ' + h.date(p.due_date) : '' %></span></div><%- h.badge(p.status) %></li>
+        <% }) %>
+      </ul>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Needs a reply</h3><a class="small" href="/team/support">Support →</a></div>
+      <% if (!tickets.length) { %><div class="empty" style="padding:22px"><b>All answered</b>No open client requests.</div><% } else { %>
+      <ul class="list"><% tickets.forEach(function (t) { %><li><div class="grow"><a class="title" href="/team/support/<%= t.id %>"><%= t.subject %></a><span class="meta"><%= t.client_name %></span></div><% if (t.priority === 'urgent' || t.priority === 'high') { %><span class="chip chip-red"><%= h.humanize(t.priority) %></span><% } %></li><% }) %></ul><% } %>
+      <% if (pendingPayments) { %><div class="card-body" style="border-top:1px solid var(--border)"><div class="row-between small"><span><b><%= pendingPayments %></b> payment<%= pendingPayments === 1 ? '' : 's' %> to confirm</span><a class="btn btn-sm" href="/team/billing#payments">Review</a></div></div><% } %>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Leave</h3><a class="small" href="/team/leave">Open →</a></div>
+      <div class="card-body small">
+        <% if (isApprover) { %>
+          <% if (leave.waiting) { %><div class="row-between"><span><b><%= leave.waiting %></b> request<%= leave.waiting === 1 ? '' : 's' %> waiting for you</span><a class="btn btn-sm" href="/team/leave">Review</a></div>
+          <% } else { %><span class="muted">No leave requests waiting.</span><% } %>
+        <% } else { %>
+          <% if (leave.pending) { %><div class="mb-8"><span class="badge tone-amber">Pending</span> <b><%= leave.pending %></b> request<%= leave.pending === 1 ? '' : 's' %> awaiting a decision</div><% } %>
+          <% if (leave.next) { %><div><span class="badge tone-green">Approved</span> <%= h.date(leave.next.start_date) %><%= leave.next.start_date === leave.next.end_date ? '' : ' – ' + h.date(leave.next.end_date) %></div>
+          <% } else if (!leave.pending) { %><span class="muted">No upcoming leave. <a href="/team/leave">Request time off</a></span><% } %>
+        <% } %>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Meetings this week</h3><a class="small" href="/team/chat/meetings">All →</a></div>
+      <% if (!meetings.length) { %><div class="empty" style="padding:26px"><b>No meetings</b><a href="/team/chat/meetings/new">Schedule one</a></div><% } else { %>
+      <ul class="list"><% meetings.forEach(function (m) { %><li><div class="grow"><a class="title" href="/team/chat/meetings/<%= m.id %>"><%= m.title %></a><span class="meta"><%= h.dateTime(m.starts_at) %></span></div><a class="btn btn-sm btn-ghost" href="/meet/<%= m.room_token %>" target="_blank">Join</a></li><% }) %></ul><% } %>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Latest comments</h3></div>
+      <% if (!comments.length) { %><div class="empty" style="padding:26px"><b>No comments yet</b></div><% } else { %>
+      <ul class="list"><% comments.forEach(function (c) { %><li><div class="grow"><a class="title" href="/team/tasks/<%= c.task_id %>"><%= c.body.length > 60 ? c.body.slice(0, 60) + '…' : c.body %></a><span class="meta"><%= c.user_name || 'Someone' %> · <%= c.client_name %> · <%= h.ago(c.created_at) %></span></div></li><% }) %></ul><% } %>
+    </section>
+  </div>
+</div>

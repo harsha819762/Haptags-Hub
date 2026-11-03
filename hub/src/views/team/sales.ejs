@@ -1,0 +1,83 @@
+<%
+  const qs = function (o) { const p = Object.assign({ month: month, who: who || '' }, o); return '/team/sales?' + Object.keys(p).filter(function (k) { return p[k]; }).map(function (k) { return k + '=' + encodeURIComponent(p[k]); }).join('&'); };
+%>
+<div class="page-head">
+  <div><h1>Sales</h1><div class="sub"><%= approver ? 'What the team has sold, and who brought it in.' : 'Log the sales you bring in. Only you and the owners can see them.' %></div></div>
+  <div class="actions">
+    <% if (prev) { %><a class="btn btn-ghost btn-sm" href="<%= qs({ month: prev }) %>" aria-label="Previous month">‹</a><% } %>
+    <span class="strong" style="min-width:130px;text-align:center"><%= monthName %></span>
+    <% if (next) { %><a class="btn btn-ghost btn-sm" href="<%= qs({ month: next }) %>" aria-label="Next month">›</a><% } %>
+    <a class="btn btn-ghost btn-sm" href="<%= qs({ month: month === 'all' ? '' : 'all' }) %>"><%= month === 'all' ? 'By month' : 'All time' %></a>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="ic green"><%- h.icon('check', 22) %></span><div><b><%= h.inr(totals.won) %></b><span>Closed · <%= totals.wonCount %> sale<%= totals.wonCount === 1 ? '' : 's' %></span></div></div>
+  <div class="kpi"><span class="ic amber"><%- h.icon('clock', 22) %></span><div><b><%= h.inr(totals.pipeline) %></b><span>In talks · <%= totals.pipelineCount %></span></div></div>
+  <div class="kpi"><span class="ic blue"><%- h.icon('finance', 22) %></span><div><b><%= h.inr(totals.average) %></b><span>Average closed sale</span></div></div>
+  <% if (approver) { %><div class="kpi"><span class="ic violet"><%- h.icon('team', 22) %></span><div><b><%= best ? best.name : '—' %></b><span>Top seller<%= best ? ' · ' + h.inr(best.total) : '' %></span></div></div><% } %>
+</div>
+
+<div class="split">
+  <div class="stack">
+    <% if (approver) { %>
+    <section class="card">
+      <div class="card-head"><h3>By teammate</h3><span class="muted small">closed sales, <%= monthName.toLowerCase() %></span></div>
+      <% if (!board.length) { %><div class="empty" style="padding:26px"><b>No closed sales yet</b>When the team logs sales they show up here.</div><% } else { %>
+      <ul class="list">
+        <% board.forEach(function (b, i) { const share = totals.won ? Math.round((b.total / totals.won) * 100) : 0; %>
+        <li>
+          <span class="avatar avatar-sm"><%= h.initials(b.name) %></span>
+          <div class="grow"><a class="title" href="<%= qs({ who: b.id }) %>"><%= i === 0 ? '★ ' : '' %><%= b.name %></a>
+            <span class="meta"><%= b.count %> sale<%= b.count === 1 ? '' : 's' %> · <%= share %>% of the total</span></div>
+          <b><%= h.inr(b.total) %></b>
+        </li>
+        <% }) %>
+      </ul><% } %>
+    </section>
+    <% } %>
+
+    <section class="card">
+      <div class="card-head"><h3><%= approver ? 'All entries' : 'My sales' %></h3>
+        <% if (approver) { %><form method="get" action="/team/sales" class="inline"><input type="hidden" name="month" value="<%= month %>">
+          <select name="who" data-autosubmit class="sel-sm" aria-label="Show one teammate"><option value="">Everyone</option><% staff.forEach(function (s) { %><option value="<%= s.id %>" <%= h.selected(who, s.id) %>><%= s.name %></option><% }) %></select></form><% } %></div>
+      <% if (!rows.length) { %><div class="empty" style="padding:30px"><div class="art"><%- h.icon('finance', 26) %></div><b>No sales here yet</b><p class="mb-0">Use the form to add one.</p></div><% } else { %>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Date</th><% if (approver) { %><th>Teammate</th><% } %><th>Sale</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <% rows.forEach(function (r) { %>
+          <tr>
+            <td class="nowrap"><%= h.date(r.sale_date) %></td>
+            <% if (approver) { %><td><%= r.user_name %></td><% } %>
+            <td><span class="strong"><%= r.title %></span><span class="sub"><%= r.client_name || r.customer %><%= r.notes ? ' · ' + r.notes : '' %></span></td>
+            <td class="num"><b><%= h.inr(r.amount) %></b></td>
+            <td><span class="badge tone-<%= r.status === 'won' ? 'green' : 'amber' %>"><%= STATUS[r.status] %></span></td>
+            <td class="right nowrap">
+              <a class="x-btn" href="/team/sales/<%= r.id %>" aria-label="Edit sale" title="Edit"><%- h.icon('edit', 14) %></a>
+              <form method="post" action="/team/sales/<%= r.id %>/delete" class="inline" data-confirm="Delete this sale?"><%- include('../partials/csrf') %><button class="x-btn" aria-label="Delete sale"><%- h.icon('trash', 14) %></button></form>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table></div><% } %>
+    </section>
+  </div>
+
+  <div class="stack">
+    <form method="post" action="/team/sales" class="card card-pad" novalidate>
+      <%- include('../partials/csrf') %>
+      <h3>Add a sale</h3>
+      <div class="field"><label for="s-title">What did you sell?</label><input id="s-title" name="title" type="text" maxlength="190" placeholder="e.g. Website redesign" required></div>
+      <div class="field"><label for="s-customer">Who to?</label><input id="s-customer" name="customer" type="text" maxlength="190" placeholder="Customer or company name" list="s-clients" required>
+        <datalist id="s-clients"><% clients.forEach(function (c) { %><option value="<%= c.name %>"><% }) %></datalist></div>
+      <div class="form-grid">
+        <div class="field"><label for="s-amount">Amount (₹)</label><input id="s-amount" name="amount" type="text" inputmode="decimal" placeholder="50000" required><div class="hint">Before GST.</div></div>
+        <div class="field"><label for="s-date">Date</label><input id="s-date" name="sale_date" type="date" value="<%= values.sale_date %>" required></div>
+        <div class="field"><label for="s-status">Status</label><select id="s-status" name="status"><% Object.keys(STATUS).forEach(function (k) { %><option value="<%= k %>"><%= STATUS[k] %></option><% }) %></select><div class="hint">“In talks” counts separately until it closes.</div></div>
+        <% if (canCredit) { %><div class="field"><label for="s-user">Credit to</label><select id="s-user" name="user_id"><% staff.forEach(function (s) { %><option value="<%= s.id %>" <%= h.selected(me, s.id) %>><%= s.name %><%= s.id === me ? ' (you)' : '' %></option><% }) %></select></div><% } %>
+      </div>
+      <div class="field"><label for="s-notes">Notes <span class="muted">(optional)</span></label><textarea id="s-notes" name="notes" rows="2" maxlength="2000" placeholder="How it came in, what you did, next steps"></textarea></div>
+      <button class="btn" type="submit"><%- h.icon('plus', 16) %> Save sale</button>
+    </form>
+  </div>
+</div>

@@ -17,6 +17,13 @@ const actionLimiter = rateLimit({ windowMs: 60 * 1000, limit: 600, standardHeade
 
 const isStaff = (user) => Boolean(user && STAFF_ROLES.includes(user.role));
 
+/** Team members host. So does the organiser, and anyone signed in who was invited by name (so a client can run a call with the team). */
+async function isHost(user, meeting) {
+  if (!user) return false;
+  if (isStaff(user) || meeting.created_by === user.id) return true;
+  return Boolean(await db('meeting_invitees').where({ meeting_id: meeting.id, user_id: user.id }).first());
+}
+
 async function loadMeeting(req, res, next) {
   const token = String(req.params.token || '');
   const meeting = /^[a-f0-9]{32}$/.test(token) ? await db('meetings').where({ room_token: token }).first() : null;
@@ -41,7 +48,7 @@ function peer(req, res, next) {
 
 router.get('/meet/:token', loadMeeting, async (req, res) => {
   const m = req.meeting;
-  const host = isStaff(req.user);
+  const host = await isHost(req.user, m);
   if (m.status === 'cancelled') {
     return res.status(410).render('public/message', { title: 'Meeting cancelled', heading: 'This meeting was cancelled', body: `“${m.title}” is no longer taking place.` });
   }
@@ -60,7 +67,7 @@ router.get('/meet/:token', loadMeeting, async (req, res) => {
     host,
     endsAt: addMinutesSql(m.starts_at, m.duration_min),
     defaultName: req.user ? req.user.name : req.session.meetName || '',
-    room: { token: m.room_token, host, iceServers: config.iceServers, back: host ? `/admin/meetings/${m.id}` : null },
+    room: { token: m.room_token, host, voice: req.query.voice === '1', iceServers: config.iceServers, back: !host ? null : isStaff(req.user) ? '/team/chat/meetings' : '/portal/chat/meetings' },
   });
 });
 
@@ -72,7 +79,7 @@ router.get('/meet/:token/status', loadMeeting, (req, res) => {
 
 router.post('/meet/:token/join', joinLimiter, loadMeeting, async (req, res) => {
   const m = req.meeting;
-  const host = isStaff(req.user);
+  const host = await isHost(req.user, m);
   if (m.status !== 'scheduled') return res.status(410).json({ error: 'This meeting was cancelled.' });
   if (!host && !m.allow_guests) return res.status(403).json({ error: 'Sign in with your team account to join.' });
   const name = host ? req.user.name : str(req.body.name, 60);

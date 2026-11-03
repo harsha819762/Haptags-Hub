@@ -1,6 +1,6 @@
-<div class="crumbs"><a href="/admin/education">Education</a> / <a href="/admin/education/students">Students</a> / New</div>
+<div class="crumbs"><a href="/team/education">Education</a> / <a href="/team/education/students">Students</a> / New</div>
 <div class="page-head"><div><h1>Enrol a student</h1><div class="sub">Creates the student, their fee invoice<%= settings.gstin ? ' (GST included in the fee)' : '' %>, and records any payment taken now.</div></div></div>
-<form method="post" action="/admin/education/students" class="card card-pad" style="max-width:900px" novalidate data-enrol>
+<form method="post" action="/team/education/students" class="card card-pad" style="max-width:900px" novalidate data-enrol>
   <%- include('../../partials/csrf') %>
   <h3>Student</h3>
   <div class="form-grid">
@@ -22,7 +22,7 @@
         <option value="<%= p.id %>" data-fee="<%= Number(p.fee) / 100 %>"<% if (Number(p.certificate_fee)) { %> data-cert-fee="<%= Number(p.certificate_fee) / 100 %>"<% } %> <%= h.selected(form.program_id, p.id) %>><%= p.name %> · <%= h.inr(p.fee) %></option>
         <% if (i === programs.length - 1) { %></optgroup><% } }) %>
       </select>
-      <% if (!programs.length) { %><div class="hint"><a href="/admin/education/programs">Add your programs</a> to fill fees in one click.</div><% } %>
+      <% if (!programs.length) { %><div class="hint"><a href="/team/education/programs">Add your programs</a> to fill fees in one click.</div><% } %>
     </div>
     <div class="field" data-plan-field hidden><label for="plan">Plan</label>
       <select id="plan" name="plan">
@@ -54,5 +54,5 @@
     <div class="field full"><label class="check"><input type="checkbox" name="send_email" value="1" <%= h.checked(form.send_email) %>> Email the invoice to the student</label></div>
   </div>
   <p class="muted small" data-enrol-summary></p>
-  <div class="form-actions"><button class="btn" type="submit">Enrol &amp; create invoice</button><a class="btn btn-ghost" href="/admin/education/students">Cancel</a></div>
+  <div class="form-actions"><button class="btn" type="submit">Enrol &amp; create invoice</button><a class="btn btn-ghost" href="/team/education/students">Cancel</a></div>
 </form>

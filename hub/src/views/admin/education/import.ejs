@@ -1,19 +1,19 @@
-<div class="crumbs"><a href="/admin/education">Education</a> / <a href="/admin/education/students">Students</a> / Import</div>
+<div class="crumbs"><a href="/team/education">Education</a> / <a href="/team/education/students">Students</a> / Import</div>
 <div class="page-head">
   <div><h1>Import past students</h1><div class="sub">Add a whole batch at once: each row creates the student, their invoice and payment, and attaches their LMS certificate.</div></div>
-  <div class="actions"><a class="btn btn-ghost" href="/admin/education/import-template.csv"><%- h.icon('download', 16) %> Download the template</a></div>
+  <div class="actions"><a class="btn btn-ghost" href="/team/education/import-template.csv"><%- h.icon('download', 16) %> Download the template</a></div>
 </div>
 
 <% if (report) { const ok = report.filter(function (r) { return r.status !== 'error'; }).length; %>
 <section class="card mb-16">
-  <div class="card-head"><h3>Imported <%= ok %> of <%= report.length %> rows</h3><a class="small" href="/admin/education/students">Go to students →</a></div>
+  <div class="card-head"><h3>Imported <%= ok %> of <%= report.length %> rows</h3><a class="small" href="/team/education/students">Go to students →</a></div>
   <div class="table-wrap"><table class="table">
     <thead><tr><th>Row</th><th>Student</th><th>Result</th><th>Details</th></tr></thead>
     <tbody>
       <% report.forEach(function (r) { %>
       <tr>
         <td class="muted"><%= r.line %></td>
-        <td><% if (r.studentId) { %><a class="strong" href="/admin/education/students/<%= r.studentId %>"><%= r.name %></a><% } else { %><%= r.name %><% } %></td>
+        <td><% if (r.studentId) { %><a class="strong" href="/team/education/students/<%= r.studentId %>"><%= r.name %></a><% } else { %><%= r.name %><% } %></td>
         <td><%- r.status === 'error' ? h.badge('overdue', 'Error') : r.status === 'created' ? h.badge('paid', 'Added') : h.badge('sent', 'Updated') %></td>
         <td class="small"><%= r.notes.join(' · ') %></td>
       </tr>
@@ -26,7 +26,7 @@
 <div class="split">
   <section class="card card-pad">
     <% if (isAdmin) { %>
-    <form method="post" action="/admin/education/import" data-csv-upload data-target="/admin/education/import">
+    <form method="post" action="/team/education/import" data-csv-upload data-target="/team/education/import">
       <%- include('../../partials/csrf') %>
       <div class="field">
         <label for="imp-file">Students CSV</label>

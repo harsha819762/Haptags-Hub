@@ -1,0 +1,34 @@
+<div class="crumbs"><a href="<%= base %>/meetings">Meetings</a> / <%= meeting.title %></div>
+<div class="page-head">
+  <div><h1><%= meeting.title %> <% if (meeting.status === 'cancelled') { %><%- h.badge('void', 'Cancelled') %><% } %></h1>
+    <div class="sub"><%= h.date(meeting.when.date) %> at <%= meeting.when.time %> IST · <%= meeting.duration_min %> minutes · organised by <%= meeting.organizer_name %></div></div>
+  <div class="actions">
+    <% if (meeting.status === 'scheduled') { %>
+    <a class="btn btn-lg" href="/meet/<%= meeting.room_token %>" target="_blank"><%- h.icon('video', 18) %> Join meeting</a>
+    <a class="btn btn-ghost btn-lg" href="/meet/<%= meeting.room_token %>?voice=1" target="_blank"><%- h.icon('phone', 18) %> Join with audio only</a>
+    <% } %>
+  </div>
+</div>
+<div class="split">
+  <div class="stack">
+    <section class="card card-pad">
+      <h3>Join link</h3>
+      <div class="row" style="flex-wrap:nowrap"><input id="join-url" type="text" readonly value="<%= joinUrl %>"><button class="btn btn-ghost" type="button" data-copy="#join-url"><%- h.icon('copy', 15) %> Copy</button></div>
+      <p class="small muted mb-0 mt-8">Runs in the browser — nothing to install. Allow camera and microphone when asked. Use <b>Share screen</b> inside the call to present.</p>
+    </section>
+    <% if (meeting.agenda) { %><section class="card card-pad"><h3>Agenda</h3><div style="white-space:pre-wrap"><%= meeting.agenda %></div></section><% } %>
+  </div>
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>People</h3></div>
+      <ul class="list">
+        <li><span class="avatar avatar-sm"><%= h.initials(meeting.organizer_name || 'H') %></span><div class="grow"><span class="title"><%= meeting.organizer_name %></span><span class="meta">Organiser</span></div></li>
+        <% people.forEach(function (p) { %><li><span class="avatar avatar-sm"><%= h.initials(p.user_name || p.email || '?') %></span><div class="grow"><span class="title"><%= p.user_name || p.email %></span><span class="meta"><%= p.user_id ? 'Haptags team' : 'Guest' %></span></div><span class="small muted"><%= h.humanize(p.response || 'pending') %></span></li><% }) %>
+      </ul>
+    </section>
+    <div class="row">
+      <a class="btn btn-ghost btn-sm" href="<%= base %>/meetings/<%= meeting.id %>/invite.ics"><%- h.icon('calendar', 15) %> Add to calendar</a>
+      <% if (mine && meeting.status === 'scheduled') { %><form method="post" action="<%= base %>/meetings/<%= meeting.id %>/cancel" class="inline" data-confirm="Cancel this meeting?"><%- include('../partials/csrf') %><button class="btn btn-danger btn-sm" type="submit">Cancel meeting</button></form><% } %>
+    </div>
+  </div>
+</div>

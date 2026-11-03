@@ -5,12 +5,12 @@
   const rupees = function (p) { return Number(p) ? (Number(p) / 100).toFixed(2).replace(/\.00$/, '') : ''; };
 %>
 <%- include('_nav') %>
-<div class="crumbs"><a href="/admin/education/offers">Offer letters</a> / <a href="/admin/education/students/<%= student.id %>"><%= student.name %></a> / <%= letter.id ? 'Edit draft' : 'New' %></div>
+<div class="crumbs"><a href="/team/education/offers">Offer letters</a> / <a href="/team/education/students/<%= student.id %>"><%= student.name %></a> / <%= letter.id ? 'Edit draft' : 'New' %></div>
 <h2><%= letter.id ? 'Edit draft offer letter' : 'New offer letter' %></h2>
-<p class="muted">Filled in from <%= student.name %>’s record and programme. When you issue it, it gets the number <b class="mono"><%= nextNumber %></b> and the standard terms from <a href="/admin/settings?tab=offers">Settings → Offer letters</a>, and its wording is fixed.</p>
+<p class="muted">Filled in from <%= student.name %>’s record and programme. When you issue it, it gets the number <b class="mono"><%= nextNumber %></b> and the standard terms from <a href="/team/education/settings">Settings → Offer letters</a>, and its wording is fixed.</p>
 <% if (Object.keys(errors).length) { %><div class="flash flash-error" role="alert"><%- h.icon('alert') %><span>Please fix the highlighted fields.</span></div><% } %>
 
-<form method="post" action="<%= letter.id ? '/admin/education/offers/' + letter.id : '/admin/education/offers' %>" novalidate>
+<form method="post" action="<%= letter.id ? '/team/education/offers/' + letter.id : '/team/education/offers' %>" novalidate>
   <%- include('../../partials/csrf') %>
   <input type="hidden" name="client_id" value="<%= student.id %>">
 
@@ -61,6 +61,6 @@
   <div class="form-actions mt-16">
     <button class="btn btn-ghost" type="submit" name="action" value="draft"><%- h.icon('edit', 16) %> Save draft</button>
     <button class="btn" type="submit" name="action" value="issue" data-confirm-click="Issue this offer letter as <%= nextNumber %>? Its wording is then fixed; you can still withdraw it."><%- h.icon('send', 16) %> Issue offer letter</button>
-    <a class="btn-link" href="<%= letter.id ? '/admin/education/offers/' + letter.id : '/admin/education/students/' + student.id %>">Cancel</a>
+    <a class="btn-link" href="<%= letter.id ? '/team/education/offers/' + letter.id : '/team/education/students/' + student.id %>">Cancel</a>
   </div>
 </form>

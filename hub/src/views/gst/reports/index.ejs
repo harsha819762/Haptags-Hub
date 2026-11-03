@@ -20,11 +20,11 @@
     <div class="card-head"><h3>Sales register</h3></div>
     <div class="card-body">
       <p class="small muted mt-0">Every tax invoice, credit note and debit note in the range, with taxable value, CGST, SGST, IGST and totals. Credit notes are negative; cancelled documents are listed at zero.</p>
-      <%- rangeForm('/invoices/reports/sales-register', ['xlsx', 'csv']) %>
-      <form method="get" action="/invoices/reports/sales-register.xlsx" class="gst-custom-range mt-16">
+      <%- rangeForm('/team/gst/reports/sales-register', ['xlsx', 'csv']) %>
+      <form method="get" action="/team/gst/reports/sales-register.xlsx" class="gst-custom-range mt-16">
         <input type="date" name="from" value="<%= month %>" aria-label="From" required><span class="muted">to</span><input type="date" name="to" value="<%= today %>" aria-label="To" required>
         <button class="btn btn-sm" type="submit" data-no-disable>Excel</button>
-        <button class="btn btn-ghost btn-sm" type="submit" formaction="/invoices/reports/sales-register.csv" data-no-disable>CSV</button>
+        <button class="btn btn-ghost btn-sm" type="submit" formaction="/team/gst/reports/sales-register.csv" data-no-disable>CSV</button>
       </form>
     </div>
   </section>
@@ -33,8 +33,8 @@
     <div class="card-head"><h3>GSTR-1 workbook</h3></div>
     <div class="card-body">
       <p class="small muted mt-0">Sheets <b>b2b</b>, <b>b2cl</b>, <b>b2cs</b>, <b>exp</b> (WOPAY), <b>cdnr</b>, <b>cdnur</b>, <b>hsn(b2b)</b>, <b>hsn(b2c)</b> and <b>docs</b>, with the GST offline tool’s headings. Usually one month (or one quarter under QRMP).</p>
-      <%- rangeForm('/invoices/reports/gstr1', ['xlsx']) %>
-      <form method="get" action="/invoices/reports/gstr1.xlsx" class="gst-custom-range mt-16">
+      <%- rangeForm('/team/gst/reports/gstr1', ['xlsx']) %>
+      <form method="get" action="/team/gst/reports/gstr1.xlsx" class="gst-custom-range mt-16">
         <input type="date" name="from" value="<%= month %>" aria-label="From" required><span class="muted">to</span><input type="date" name="to" value="<%= today %>" aria-label="To" required>
         <button class="btn btn-sm" type="submit" data-no-disable>Download</button>
       </form>
@@ -45,7 +45,7 @@
     <div class="card-head"><h3>Outstanding receivables</h3></div>
     <div class="card-body">
       <p class="small muted mt-0">Open invoices with what is left to collect, aged by days past the due date (not due, 1–30, 31–60, 61–90, over 90).</p>
-      <div class="row"><a class="btn" href="/invoices/reports/outstanding">View report</a><a class="btn btn-ghost" href="/invoices/reports/outstanding.xlsx">Excel</a><a class="btn btn-ghost" href="/invoices/reports/outstanding.csv">CSV</a></div>
+      <div class="row"><a class="btn" href="/team/gst/reports/outstanding">View report</a><a class="btn btn-ghost" href="/team/gst/reports/outstanding.xlsx">Excel</a><a class="btn btn-ghost" href="/team/gst/reports/outstanding.csv">CSV</a></div>
     </div>
   </section>
 
@@ -53,7 +53,7 @@
     <div class="card-head"><h3>Backups</h3></div>
     <div class="card-body">
       <p class="small muted mt-0">A full copy of the GST data (documents, lines, payments, clients, audit log, logo and signature) is saved on the server every day. Download one any time.</p>
-      <div class="row"><a class="btn btn-ghost" href="/invoices/profile/backup"><%- h.icon('download', 16) %> Download backup now</a><a class="btn-link small" href="/invoices/profile#backups">Saved backups →</a></div>
+      <div class="row"><a class="btn btn-ghost" href="/team/gst/profile/backup"><%- h.icon('download', 16) %> Download backup now</a><a class="btn-link small" href="/team/gst/profile#backups">Saved backups →</a></div>
     </div>
   </section>
 </div>

@@ -2,15 +2,14 @@
 
 const express = require('express');
 const rt = require('../lib/realtime');
-const { STAFF_ROLES } = require('../lib/auth');
 const { int } = require('../lib/util');
 
 const router = express.Router();
 
-// A signed-in team member's tab subscribes to their notifications. (Meeting guests get their
+// A signed-in user's tab (team member or client) subscribes to their notifications. (Meeting guests get their
 // credentials from /meet/:token/join instead.)
 router.post('/connect', (req, res) => {
-  if (!req.user || !STAFF_ROLES.includes(req.user.role)) return res.status(401).json({ error: 'Sign in again.' });
+  if (!req.user) return res.status(401).json({ error: 'Sign in again.' });
   res.json(rt.connect({ userId: req.user.id, name: req.user.name }));
 });
 

@@ -1,26 +1,26 @@
 <%- include('../_nav', { active: 'clients' }) %>
-<div class="crumbs"><a href="/invoices/clients">Clients</a> / <%= client.name %></div>
+<div class="crumbs"><a href="/team/gst/clients">Clients</a> / <%= client.name %></div>
 <div class="page-head">
   <div>
     <h1><%= client.name %> <span class="badge tone-<%= client.client_type === 'b2b' ? 'blue' : client.client_type === 'export' ? 'violet' : 'grey' %>"><%= client.client_type.toUpperCase() %></span><% if (!client.is_active) { %> <span class="badge tone-grey">Inactive</span><% } %></h1>
     <div class="sub"><%= g.C.clientTypeLabel(client.client_type) %><%= client.gstin ? ' · GSTIN ' + client.gstin : '' %></div>
   </div>
   <div class="actions">
-    <a class="btn btn-ghost" href="/admin/clients/<%= client.id %>"><%- h.icon('external', 16) %> Open in Hub</a>
-    <a class="btn btn-ghost" href="/invoices/clients/<%= client.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+    <a class="btn btn-ghost" href="/team/clients/<%= client.id %>"><%- h.icon('external', 16) %> Open in Hub</a>
+    <a class="btn btn-ghost" href="/team/gst/clients/<%= client.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
     <% if (client.is_active) { %>
-    <a class="btn btn-ghost" href="/invoices/docs/new?kind=proforma&client_id=<%= client.id %>">Proforma</a>
-    <a class="btn" href="/invoices/docs/new?kind=invoice&client_id=<%= client.id %>"><%- h.icon('plus', 16) %> Tax invoice</a>
+    <a class="btn btn-ghost" href="/team/gst/docs/new?kind=proforma&client_id=<%= client.id %>">Proforma</a>
+    <a class="btn" href="/team/gst/docs/new?kind=invoice&client_id=<%= client.id %>"><%- h.icon('plus', 16) %> Tax invoice</a>
     <% } %>
   </div>
 </div>
 
 <% if (client.issues.length) { %>
-<div class="flash flash-error"><%- h.icon('alert') %><span>Before a tax invoice can be finalised for this client: <%= client.issues.join(', ') %>. <a href="/invoices/clients/<%= client.id %>/edit">Fix the client’s details</a></span></div>
+<div class="flash flash-error"><%- h.icon('alert') %><span>Before a tax invoice can be finalised for this client: <%= client.issues.join(', ') %>. <a href="/team/gst/clients/<%= client.id %>/edit">Fix the client’s details</a></span></div>
 <% } %>
 <div class="stats">
   <div class="stat"><div class="label">Invoiced (all time)</div><div class="value"><%= h.inrShort(stats.invoiced) %></div><div class="delta"><%= stats.count %> tax invoice<%= stats.count === 1 ? '' : 's' %>, incl. GST</div></div>
-  <div class="stat"><div class="label">Outstanding</div><div class="value <%= stats.outstanding ? 'down' : '' %>"><%= h.inrShort(stats.outstanding) %></div><div class="delta"><a href="/invoices/reports/outstanding?client=<%= client.id %>">Ageing report →</a></div></div>
+  <div class="stat"><div class="label">Outstanding</div><div class="value <%= stats.outstanding ? 'down' : '' %>"><%= h.inrShort(stats.outstanding) %></div><div class="delta"><a href="/team/gst/reports/outstanding?client=<%= client.id %>">Ageing report →</a></div></div>
 </div>
 
 <div class="split">
@@ -30,7 +30,7 @@
     <div class="table-wrap"><table class="table">
       <thead><tr><th>Document</th><th>Date</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th></tr></thead>
       <tbody><% documents.forEach(function (d) { const st = g.displayStatus(d); %>
-        <tr class="<%= st === 'cancelled' ? 'is-cancelled' : '' %>"><td><a class="strong mono" href="/invoices/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="sub"><%= g.kindLabel(d.kind) %></span></td><td class="nowrap"><%= h.date(d.issue_date) %></td><td class="num"><%= g.money(d.total, d.currency) %></td><td class="num"><%= d.kind === 'invoice' && d.number && st !== 'cancelled' ? g.money(Math.max(0, d.balance), d.currency) : '—' %></td><td><%- g.badge(st) %></td></tr>
+        <tr class="<%= st === 'cancelled' ? 'is-cancelled' : '' %>"><td><a class="strong mono" href="/team/gst/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="sub"><%= g.kindLabel(d.kind) %></span></td><td class="nowrap"><%= h.date(d.issue_date) %></td><td class="num"><%= g.money(d.total, d.currency) %></td><td class="num"><%= d.kind === 'invoice' && d.number && st !== 'cancelled' ? g.money(Math.max(0, d.balance), d.currency) : '—' %></td><td><%- g.badge(st) %></td></tr>
       <% }) %></tbody>
     </table></div>
     <% } %>
@@ -61,6 +61,6 @@
         <% }) %></ul>
       </div>
     </section>
-    <p class="small muted">Projects, quotes, the client portal and active/inactive status are managed in the <a href="/admin/clients/<%= client.id %>">Hub’s client page</a>.</p>
+    <p class="small muted">Projects, quotes, the client portal and active/inactive status are managed in the <a href="/team/clients/<%= client.id %>">Hub’s client page</a>.</p>
   </div>
 </div>

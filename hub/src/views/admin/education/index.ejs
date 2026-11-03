@@ -1,5 +1,5 @@
 <%- include('_nav') %>
-<%- include('../../partials/period', { periodBase: '/admin/education' }) %>
+<%- include('../../partials/period', { periodBase: '/team/education' }) %>
 
 <div class="stats">
   <div class="stat hero-stat">
@@ -14,12 +14,12 @@
   </div>
   <div class="stat">
     <div class="label">Outstanding fees</div>
-    <a class="value" href="/admin/education/students?status=due"><%= h.inrShort(kpi.outstanding) %></a>
+    <a class="value" href="/team/education/students?status=due"><%= h.inrShort(kpi.outstanding) %></a>
     <div class="delta">All open student invoices</div>
   </div>
   <div class="stat">
     <div class="label">Students enrolled</div>
-    <a class="value" href="/admin/education/students"><%= kpi.enrolled %></a>
+    <a class="value" href="/team/education/students"><%= kpi.enrolled %></a>
     <div class="delta"><%= kpi.total %> in total<% if (kpi.perStudent) { %> · <%= h.inrShort(kpi.perStudent) %> avg fee<% } %></div>
   </div>
 </div>
@@ -31,14 +31,14 @@
       <div class="card-body"><div class="chart-scroll"><%- chart %></div></div>
     </section>
     <section class="card">
-      <div class="card-head"><h3>By program</h3><a class="small" href="/admin/education/programs">Programs →</a></div>
-      <% if (!byProgram.length) { %><div class="empty"><b>No fees billed in this period</b><a href="/admin/education/students/new">Enrol a student</a> to raise the first invoice.</div><% } else { %>
+      <div class="card-head"><h3>By program</h3><a class="small" href="/team/education/programs">Programs →</a></div>
+      <% if (!byProgram.length) { %><div class="empty"><b>No fees billed in this period</b><a href="/team/education/students/new">Enrol a student</a> to raise the first invoice.</div><% } else { %>
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Program</th><th class="num">Students</th><th class="num">Billed</th><th class="num">Collected</th><th class="num">Due</th><th>Collected</th></tr></thead>
         <tbody>
           <% byProgram.forEach(function (p) { const rate = p.billed ? Math.round(p.paid / p.billed * 100) : 0; %>
           <tr>
-            <td><a class="strong" href="/admin/education/students?program=<%= p.id || '' %>"><%= p.name || 'No program' %></a></td>
+            <td><a class="strong" href="/team/education/students?program=<%= p.id || '' %>"><%= p.name || 'No program' %></a></td>
             <td class="num"><%= p.students %></td>
             <td class="num"><%= h.inr(p.billed) %></td>
             <td class="num"><%= h.inr(p.paid) %></td>
@@ -53,12 +53,12 @@
   </div>
   <div class="stack">
     <section class="card">
-      <div class="card-head"><h3>Overdue fees</h3><a class="small" href="/admin/education/students?status=overdue">All →</a></div>
+      <div class="card-head"><h3>Overdue fees</h3><a class="small" href="/team/education/students?status=overdue">All →</a></div>
       <% if (!overdue.length) { %><div class="empty"><b>Nothing overdue</b>Reminders go out automatically before and after due dates.</div><% } else { %>
       <ul class="list">
         <% overdue.forEach(function (i) { const due = Number(i.total) - Number(i.amount_paid); const wa = h.waLink(i.phone, 'Hi ' + i.name.split(' ')[0] + ', a gentle reminder that your fee of ' + h.inr(due) + ' (' + i.number + ') was due on ' + h.date(i.due_date) + '. Pay here: ' + baseUrl + '/i/' + i.public_token); %>
         <li>
-          <div class="grow"><a class="title" href="/admin/education/students/<%= i.student_id %>"><%= i.name %></a><span class="meta"><%= h.inr(due) %> · due <%= h.date(i.due_date) %></span></div>
+          <div class="grow"><a class="title" href="/team/education/students/<%= i.student_id %>"><%= i.name %></a><span class="meta"><%= h.inr(due) %> · due <%= h.date(i.due_date) %></span></div>
           <% if (wa) { %><a class="btn btn-wa btn-sm" href="<%= wa %>" target="_blank" rel="noopener" title="Send a WhatsApp reminder"><%- h.icon('whatsapp', 16) %></a><% } %>
         </li>
         <% }) %>
@@ -69,7 +69,7 @@
       <% if (!recent.length) { %><div class="empty">No student payments yet.</div><% } else { %>
       <ul class="list">
         <% recent.forEach(function (p) { %>
-        <li><div class="grow"><a class="title" href="/admin/education/students/<%= p.student_id %>"><%= p.name %></a><span class="meta"><%= h.method(p.method) %> · <%= h.date(p.paid_on) %></span></div><b><%= h.inr(p.amount) %></b></li>
+        <li><div class="grow"><a class="title" href="/team/education/students/<%= p.student_id %>"><%= p.name %></a><span class="meta"><%= h.method(p.method) %> · <%= h.date(p.paid_on) %></span></div><b><%= h.inr(p.amount) %></b></li>
         <% }) %>
       </ul><% } %>
     </section>

@@ -1,0 +1,26 @@
+<div class="crumbs"><a href="/team/clients">Clients</a> / New</div>
+<div class="page-head"><div><h1>Add a client</h1><div class="sub">Create the company, and invite the person who’ll use the client portal.</div></div></div>
+<form method="post" action="/team/clients" class="card card-pad" style="max-width:760px" novalidate>
+  <%- include('../partials/csrf') %>
+
+  <div class="step"><span class="n">1</span><h3>The company</h3></div>
+  <div class="field"><label for="c-name">Company name</label><input id="c-name" name="name" type="text" maxlength="190" value="<%= values.name || '' %>" placeholder="e.g. LVS" <%- errors.name ? 'aria-invalid="true"' : '' %> autofocus><% if (errors.name) { %><div class="error"><%= errors.name %></div><% } %></div>
+  <div class="form-grid">
+    <div class="field"><label for="c-phone">Phone <span class="muted">(optional)</span></label><input id="c-phone" name="phone" type="tel" value="<%= values.phone || '' %>"></div>
+    <div class="field"><label for="c-gst">GSTIN <span class="muted">(optional)</span></label><input id="c-gst" name="gstin" type="text" maxlength="15" value="<%= values.gstin || '' %>" style="text-transform:uppercase"></div>
+    <div class="field full"><label for="c-addr">Address <span class="muted">(optional)</span></label><textarea id="c-addr" name="address" rows="2"><%= values.address || '' %></textarea></div>
+    <div class="field"><label for="c-city">City</label><input id="c-city" name="city" type="text" value="<%= values.city || '' %>"></div>
+    <div class="field"><label for="c-state">State</label><input id="c-state" name="state" type="text" value="<%= values.state || '' %>" placeholder="e.g. Karnataka"></div>
+  </div>
+
+  <div class="step"><span class="n">2</span><h3>Who should we invite?</h3></div>
+  <p class="muted small mt-0">They’ll get a link to set a password and join the client portal. You can add more people later.</p>
+  <div class="form-grid">
+    <div class="field"><label for="p-name">Their name</label><input id="p-name" name="contact_name" type="text" maxlength="190" value="<%= values.contact_name || '' %>" placeholder="e.g. Paramesh" <%- errors.contact_name ? 'aria-invalid="true"' : '' %>><% if (errors.contact_name) { %><div class="error"><%= errors.contact_name %></div><% } %></div>
+    <div class="field"><label for="p-email">Their email</label><input id="p-email" name="contact_email" type="email" value="<%= values.contact_email || '' %>" placeholder="name@company.com" <%- errors.contact_email ? 'aria-invalid="true"' : '' %>><% if (errors.contact_email) { %><div class="error"><%= errors.contact_email %></div><% } %></div>
+  </div>
+  <div class="field"><label for="p-proj">Which project is it for?</label><input id="p-proj" name="first_project" type="text" maxlength="190" value="<%= values.first_project || '' %>" placeholder="e.g. LVS website" <%- errors.first_project ? 'aria-invalid="true"' : '' %>><% if (errors.first_project) { %><div class="error"><%= errors.first_project %></div><% } %><div class="hint">We’ll create the project, and they’ll only see this one. You can add more projects later.</div></div>
+  <label class="check mb-16"><input type="checkbox" name="send_invite" value="1" <%= values.send_invite === false ? '' : 'checked' %>> Email the invite now <span class="muted">(you’ll also get a link to share by hand)</span></label>
+
+  <div class="form-actions"><button class="btn btn-lg" type="submit"><%- h.icon('send', 16) %> Add client &amp; send invite</button><a class="btn btn-ghost btn-lg" href="/team/clients">Cancel</a></div>
+</form>

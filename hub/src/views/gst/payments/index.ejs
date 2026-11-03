@@ -18,7 +18,7 @@
       <% rows.forEach(function (p) { %>
       <tr class="<%= p.status === 'reversed' ? 'is-cancelled' : '' %>">
         <td class="nowrap"><%= h.date(p.paid_on) %></td>
-        <td><a class="strong mono" href="/invoices/docs/<%= p.document_id %>#payments"><%= p.number %></a><% if (p.status === 'reversed') { %><span class="sub">Reversed: <%= p.reverse_reason %></span><% } %></td>
+        <td><a class="strong mono" href="/team/gst/docs/<%= p.document_id %>#payments"><%= p.number %></a><% if (p.status === 'reversed') { %><span class="sub">Reversed: <%= p.reverse_reason %></span><% } %></td>
         <td><%= p.bill_name %></td>
         <td><%= g.C.modeLabel(p.mode) %><span class="sub"><%= p.reference || '' %></span></td>
         <td class="num"><%= g.money(p.amount, p.currency) %><% if (p.currency !== 'INR') { %><span class="sub"><%= h.inr(p.inr_amount) %></span><% } %></td>
@@ -28,6 +28,6 @@
       <% }) %>
     </tbody>
   </table></div>
-  <%- include('../../partials/pager', { pagerBase: '/invoices/payments', pagerQuery: { q: q, mode: mode, from: from, to: to } }) %>
+  <%- include('../../partials/pager', { pagerBase: '/team/gst/payments', pagerQuery: { q: q, mode: mode, from: from, to: to } }) %>
   <% } %>
 </div>

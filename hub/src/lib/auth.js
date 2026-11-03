@@ -29,7 +29,7 @@ async function loadUser(req, res, next) {
       res.locals.isStaff = STAFF_ROLES.includes(user.role);
       res.locals.isAdmin = ADMIN_ROLES.includes(user.role);
     } else {
-      req.session = null;
+      req.session = {}; // signed out (removed, deactivated or password reset); an empty session, not null, so later middleware still works
     }
   }
   next();
@@ -42,7 +42,7 @@ function signIn(req, user) {
 }
 
 function homeFor(user) {
-  return user && user.role === 'client' ? '/portal' : '/admin';
+  return user && user.role === 'client' ? '/portal' : (process.env.ENABLE_ADMIN === '1' ? '/admin' : '/team');
 }
 
 function requireRole(roles) {
@@ -52,6 +52,8 @@ function requireRole(roles) {
       return res.redirect(`/login?next=${nextUrl}`);
     }
     if (!roles.includes(req.user.role)) {
+      // A client should never learn that team pages exist: to them it is simply a page that isn't there.
+      if (req.user.role === 'client') return require('./middleware').notFound(req, res);
       return res.status(403).render('public/message', {
         title: 'Not allowed', heading: 'You don’t have access to this page', body: 'Ask an administrator if you need access.',
         link: { href: homeFor(req.user), label: 'Go to my dashboard' },

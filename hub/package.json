@@ -1,14 +1,14 @@
 {
-  "name": "haptags-hub",
+  "name": "haptags-portal",
   "version": "1.0.0",
   "private": true,
-  "description": "Haptags Hub: leads, clients, projects, quotes, GST invoices, payments and client portal for Haptags LLP.",
+  "description": "Haptags Portal: a company view for the Haptags team (clients, projects, billing, GST invoices, education, chat and calls) and a client portal for clients.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "create-admin": "node scripts/create-admin.js",
-    "seed-demo": "node scripts/seed-demo.js",
+    "seed-demo": "node scripts/demo/accounts.js && node scripts/demo/projects.js && node scripts/demo/chat.js && node scripts/demo/extras.js && node scripts/demo/client-lvs.js",
     "test": "node --test"
   },
   "engines": {

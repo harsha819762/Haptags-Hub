@@ -19,6 +19,7 @@ Object.assign(process.env, {
   LMS_API_URL: '', // tests never call the real LMS
   HOLIDAYS_ICS_URL: '',
   NODE_ENV: 'test',
+  ENABLE_ADMIN: '1',
 });
 
 const { db, migrate } = require('../src/db');
@@ -145,7 +146,7 @@ test('programs page, enrolment on the Certificate plan, and the offer letter', a
   const b = new Browser();
   await b.login('owner@test.local', 'owner-password-1');
 
-  let page = (await b.get('/admin/education/programs')).text;
+  let page = (await b.get('/team/education/programs')).text;
   assert.match(page, /43 active/);
   assert.match(page, /Biology &amp; Life Sciences/);
   assert.match(page, /Certificate ₹999/);
@@ -154,12 +155,12 @@ test('programs page, enrolment on the Certificate plan, and the offer letter', a
   assert.doesNotMatch(page, /Sync from LMS/, 'no sync button without an LMS address');
 
   const java = await db('programs').where({ lms_slug: 'java-internship-training' }).first();
-  page = (await b.get(`/admin/education/students/new?program=${java.id}`)).text;
+  page = (await b.get(`/team/education/students/new?program=${java.id}`)).text;
   assert.match(page, /<optgroup label="IT &amp; Software">/);
   assert.match(page, new RegExp(`value="${java.id}" data-fee="2499" data-cert-fee="999"`));
   assert.match(page, /name="plan"/);
 
-  let res = await b.post('/admin/education/students', {
+  let res = await b.post('/team/education/students', {
     name: 'Meghana S', phone: '9876512345', email: 'meghana@college.test', program_id: String(java.id), plan: 'certificate', fee: '999', installments: '1', state: 'Karnataka',
   });
   assert.equal(res.status, 302);
@@ -176,9 +177,9 @@ test('programs page, enrolment on the Certificate plan, and the offer letter', a
   assert.equal(letter.fee, 99900);
 
   // Programmes without a certificate fee keep a single fee and no plan in the title.
-  await b.post('/admin/education/programs', { name: 'Campus Ambassador', kind: 'internship', fee: '500', fee_includes_gst: '1' });
+  await b.post('/team/education/programs', { name: 'Campus Ambassador', kind: 'internship', fee: '500', fee_includes_gst: '1' });
   const own = await db('programs').where({ name: 'Campus Ambassador' }).first();
-  res = await b.post('/admin/education/students', { name: 'Rahul P', phone: '9876598765', program_id: String(own.id), plan: 'certificate', fee: '500', state: 'Karnataka' });
+  res = await b.post('/team/education/students', { name: 'Rahul P', phone: '9876598765', program_id: String(own.id), plan: 'certificate', fee: '500', state: 'Karnataka' });
   const [inv2] = await db('invoices').where({ client_id: Number(res.location.split('/').pop()) });
   assert.match(inv2.title, /^Campus Ambassador/);
   assert.doesNotMatch(inv2.title, /plan\)/);

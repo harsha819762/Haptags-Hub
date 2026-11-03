@@ -8,23 +8,23 @@
   const open = isInvoice && ['unpaid', 'partially_paid'].includes(doc.status) && Number(doc.balance) > 0;
   const activePayments = payments.filter(function (p) { return p.status === 'active'; });
   const label = C.KINDS[doc.kind].label;
-  const pdf = '/invoices/docs/' + doc.id + '/pdf';
+  const pdf = '/team/gst/docs/' + doc.id + '/pdf';
   const canEditRecipient = !doc.discarded_at && doc.status !== 'cancelled' && !doc.irn;
 %>
 <%- include('../_nav', { active: type }) %>
-<div class="crumbs"><a href="/invoices/docs?type=<%= type %>"><%= isNote ? 'Credit & debit notes' : C.KINDS[doc.kind].plural %></a> / <%= g.docLabel(doc) %></div>
+<div class="crumbs"><a href="/team/gst/docs?type=<%= type %>"><%= isNote ? 'Credit & debit notes' : C.KINDS[doc.kind].plural %></a> / <%= g.docLabel(doc) %></div>
 <div class="page-head">
   <div>
     <h1 class="gst-title"><span class="mono"><%= doc.number || 'Draft ' + label.toLowerCase() %></span> <%- g.badge(status) %><% if (final && doc.status !== 'cancelled') { %><span class="gst-lock" title="Finalised and locked"><%- h.icon('lock', 15) %> Locked</span><% } %></h1>
-    <div class="sub"><%= g.docTitle(doc) %> · <a href="/invoices/clients/<%= client.hub_client_id %>"><%= doc.bill_name %></a> · <%= h.date(doc.issue_date) %> · <%= g.supplyLabel(doc.supply_type) %></div>
+    <div class="sub"><%= g.docTitle(doc) %> · <a href="/team/gst/clients/<%= client.hub_client_id %>"><%= doc.bill_name %></a> · <%= h.date(doc.issue_date) %> · <%= g.supplyLabel(doc.supply_type) %></div>
   </div>
   <div class="actions">
     <% if (doc.discarded_at) { %>
       <span class="muted small">Discarded draft (kept for the record)</span>
     <% } else if (draft) { %>
       <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener"><%- h.icon('external', 16) %> Preview PDF</a>
-      <a class="btn btn-ghost" href="/invoices/docs/<%= doc.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
-      <form method="post" action="/invoices/docs/<%= doc.id %>/finalise" class="inline" data-confirm="Finalise this <%= label.toLowerCase() %> as <%= nextNumber %>? It will be locked: after this it can only be cancelled or corrected with a note.">
+      <a class="btn btn-ghost" href="/team/gst/docs/<%= doc.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+      <form method="post" action="/team/gst/docs/<%= doc.id %>/finalise" class="inline" data-confirm="Finalise this <%= label.toLowerCase() %> as <%= nextNumber %>? It will be locked: after this it can only be cancelled or corrected with a note.">
         <%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('lock', 16) %> Finalise as <%= nextNumber %></button>
       </form>
     <% } else { %>
@@ -35,7 +35,7 @@
       <% if (doc.status !== 'cancelled') { %><button class="btn btn-ghost" type="button" data-dialog="#email-dialog"><%- h.icon('mail', 16) %> Email</button><% } %>
       <% if (open) { %><a class="btn" href="#payments"><%- h.icon('payments', 16) %> Record payment</a><% } %>
       <% if (doc.kind === 'proforma' && doc.status === 'issued') { %>
-        <form method="post" action="/invoices/docs/<%= doc.id %>/convert" class="inline"><%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('retainers', 16) %> Convert to tax invoice</button></form>
+        <form method="post" action="/team/gst/docs/<%= doc.id %>/convert" class="inline"><%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('retainers', 16) %> Convert to tax invoice</button></form>
       <% } %>
     <% } %>
   </div>
@@ -62,7 +62,7 @@
         <dt>Number</dt><dd class="mono"><%= doc.number || '—' %></dd>
         <dt>Date</dt><dd><%= h.date(doc.issue_date) %></dd>
         <% if (doc.due_date) { %><dt><%= doc.kind === 'proforma' ? 'Valid until' : 'Due' %></dt><dd><%= h.date(doc.due_date) %><%= doc.payment_terms ? ' (' + doc.payment_terms + ')' : '' %></dd><% } %>
-        <% if (original) { %><dt>Against</dt><dd><a class="mono" href="/invoices/docs/<%= original.id %>"><%= original.number %></a> dated <%= h.date(original.issue_date) %></dd><% } %>
+        <% if (original) { %><dt>Against</dt><dd><a class="mono" href="/team/gst/docs/<%= original.id %>"><%= original.number %></a> dated <%= h.date(original.issue_date) %></dd><% } %>
         <% if (doc.note_reason) { %><dt>Reason</dt><dd><%= doc.note_reason %></dd><% } %>
         <dt>Place of supply</dt><dd><%= doc.pos_name %> (<%= doc.pos_code %>)</dd>
         <dt>Reverse charge</dt><dd><%= doc.reverse_charge ? 'Yes' : 'No' %></dd>
@@ -140,7 +140,7 @@
           <% if (p.status === 'active') { %>
           <details class="gst-inline-details">
             <summary class="small muted">Reverse</summary>
-            <form method="post" action="/invoices/payments/<%= p.id %>/reverse" class="mt-8" data-confirm="Reverse this payment? It stays on record and the balance goes back up.">
+            <form method="post" action="/team/gst/payments/<%= p.id %>/reverse" class="mt-8" data-confirm="Reverse this payment? It stays on record and the balance goes back up.">
               <%- include('../../partials/csrf') %>
               <input type="text" name="reason" required placeholder="Reason, e.g. cheque bounced" aria-label="Reason" class="mb-8">
               <button class="btn btn-danger btn-sm" type="submit">Reverse payment</button>
@@ -152,7 +152,7 @@
       </ul>
       <% } %>
       <% if (open) { %>
-      <form method="post" action="/invoices/docs/<%= doc.id %>/payments" class="card-body" data-payment-form data-taxable="<%= doc.taxable %>" data-balance="<%= doc.balance %>"<%- payments.length ? ' style="border-top:1px solid var(--border)"' : '' %>>
+      <form method="post" action="/team/gst/docs/<%= doc.id %>/payments" class="card-body" data-payment-form data-taxable="<%= doc.taxable %>" data-balance="<%= doc.balance %>"<%- payments.length ? ' style="border-top:1px solid var(--border)"' : '' %>>
         <%- include('../../partials/csrf') %>
         <div class="form-grid">
           <div class="field"><label for="p-amount">Amount received (<%= cur %>)</label><input id="p-amount" name="amount" type="text" inputmode="decimal" value="<%= g.inputValue(doc.balance) %>" required data-pay-amount></div>
@@ -191,12 +191,12 @@
         <% if (isInvoice) { %>
         <p class="small muted mt-0">A finalised invoice is locked. Correct it with a note linked to <%= doc.number %>.</p>
         <div class="row">
-          <a class="btn btn-ghost btn-sm" href="/invoices/docs/new?kind=credit_note&original=<%= doc.id %>">Credit note<%= creditable > 0 ? '' : ' (nothing left)' %></a>
-          <a class="btn btn-ghost btn-sm" href="/invoices/docs/new?kind=debit_note&original=<%= doc.id %>">Debit note</a>
+          <a class="btn btn-ghost btn-sm" href="/team/gst/docs/new?kind=credit_note&original=<%= doc.id %>">Credit note<%= creditable > 0 ? '' : ' (nothing left)' %></a>
+          <a class="btn btn-ghost btn-sm" href="/team/gst/docs/new?kind=debit_note&original=<%= doc.id %>">Debit note</a>
         </div>
         <% } %>
         <% if (canEinvoice) { %>
-        <p class="small muted mb-0">E-invoicing isn’t switched on (it applies above ₹5 crore turnover). <a href="/invoices/docs/<%= doc.id %>/einvoice.json">Download the IRP request (JSON)</a></p>
+        <p class="small muted mb-0">E-invoicing isn’t switched on (it applies above ₹5 crore turnover). <a href="/team/gst/docs/<%= doc.id %>/einvoice.json">Download the IRP request (JSON)</a></p>
         <% } %>
       </div>
     </section>
@@ -206,9 +206,9 @@
     <section class="card">
       <div class="card-head"><h3>Linked documents</h3></div>
       <ul class="list">
-        <% if (source) { %><li><div class="grow"><a class="title mono" href="/invoices/docs/<%= source.id %>"><%= source.number %></a><span class="meta">Proforma this invoice came from</span></div></li><% } %>
-        <% if (converted) { %><li><div class="grow"><a class="title mono" href="/invoices/docs/<%= converted.id %>"><%= g.docLabel(converted) %></a><span class="meta">Tax invoice from this proforma</span></div><%- g.badge(g.displayStatus(converted)) %></li><% } %>
-        <% notes.forEach(function (n) { %><li><div class="grow"><a class="title mono" href="/invoices/docs/<%= n.id %>"><%= g.docLabel(n) %></a><span class="meta"><%= g.kindLabel(n.kind) %> · <%= h.date(n.issue_date) %> · <%= g.money(n.total, n.currency) %></span></div><%- g.badge(n.status) %></li><% }) %>
+        <% if (source) { %><li><div class="grow"><a class="title mono" href="/team/gst/docs/<%= source.id %>"><%= source.number %></a><span class="meta">Proforma this invoice came from</span></div></li><% } %>
+        <% if (converted) { %><li><div class="grow"><a class="title mono" href="/team/gst/docs/<%= converted.id %>"><%= g.docLabel(converted) %></a><span class="meta">Tax invoice from this proforma</span></div><%- g.badge(g.displayStatus(converted)) %></li><% } %>
+        <% notes.forEach(function (n) { %><li><div class="grow"><a class="title mono" href="/team/gst/docs/<%= n.id %>"><%= g.docLabel(n) %></a><span class="meta"><%= g.kindLabel(n.kind) %> · <%= h.date(n.issue_date) %> · <%= g.money(n.total, n.currency) %></span></div><%- g.badge(n.status) %></li><% }) %>
       </ul>
     </section>
     <% } %>
@@ -233,7 +233,7 @@
     <% if (draft) { %>
     <details>
       <summary class="small muted" style="cursor:pointer">Discard this draft…</summary>
-      <form method="post" action="/invoices/docs/<%= doc.id %>/discard" class="mt-8" data-confirm="Discard this draft? It’s hidden from lists but kept in the database.">
+      <form method="post" action="/team/gst/docs/<%= doc.id %>/discard" class="mt-8" data-confirm="Discard this draft? It’s hidden from lists but kept in the database.">
         <%- include('../../partials/csrf') %>
         <button class="btn btn-danger btn-sm" type="submit">Discard draft</button>
       </form>
@@ -241,7 +241,7 @@
     <% } else if (final && doc.status !== 'cancelled' && doc.status !== 'converted') { %>
     <details>
       <summary class="small muted" style="cursor:pointer">Cancel <%= doc.number %>…</summary>
-      <form method="post" action="/invoices/docs/<%= doc.id %>/cancel" class="mt-8" data-confirm="Cancel <%= doc.number %>? It is marked CANCELLED, the number is never reused, and this can’t be undone.">
+      <form method="post" action="/team/gst/docs/<%= doc.id %>/cancel" class="mt-8" data-confirm="Cancel <%= doc.number %>? It is marked CANCELLED, the number is never reused, and this can’t be undone.">
         <%- include('../../partials/csrf') %>
         <p class="small muted mt-0"><%= isInvoice ? 'Only cancel an invoice that hasn’t been reported in GSTR-1 yet. Once reported, issue a credit note instead.' : 'The record and its number are kept.' %></p>
         <input type="text" name="reason" required maxlength="255" placeholder="Reason, e.g. raised in error, duplicate of HT/26-27/0007" class="mb-8" aria-label="Reason for cancelling">
@@ -254,7 +254,7 @@
 
 <% if (canEditRecipient) { %>
 <dialog class="modal" id="recipient-dialog" aria-labelledby="recipient-title">
-  <form method="post" action="/invoices/docs/<%= doc.id %>/recipient">
+  <form method="post" action="/team/gst/docs/<%= doc.id %>/recipient">
     <%- include('../../partials/csrf') %>
     <div class="modal-head"><h2 id="recipient-title">Edit name &amp; address<%= doc.number ? ' on ' + doc.number : '' %></h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
     <div class="modal-body">
@@ -282,7 +282,7 @@
 
 <% if (final && doc.status !== 'cancelled') { %>
 <dialog class="modal" id="email-dialog" aria-labelledby="email-title">
-  <form method="post" action="/invoices/docs/<%= doc.id %>/email">
+  <form method="post" action="/team/gst/docs/<%= doc.id %>/email">
     <%- include('../../partials/csrf') %>
     <div class="modal-head"><h2 id="email-title">Email <%= doc.number %></h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
     <div class="modal-body">

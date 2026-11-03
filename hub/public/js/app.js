@@ -1,4 +1,4 @@
-/* Haptags Hub — progressive enhancement only; every form also works without JS. */
+/* Haptags Portal — progressive enhancement only; every form also works without JS. */
 (function () {
   'use strict';
 

@@ -1,10 +1,10 @@
-<div class="page-head"><div><h1>Quotations</h1></div></div>
+<div class="page-head"><div><h1>Quotations</h1><div class="sub">Review and approve proposals online.</div></div></div>
 <div class="card">
-  <% if (!quotes.length) { %><div class="empty">No quotations yet.</div><% } else { %>
+  <% if (!quotes.length) { %><div class="empty"><div class="art"><%- h.icon('quotes', 28) %></div><b>No quotations yet</b><p>Proposals from our team will show up here for your approval.</p></div><% } else { %>
   <ul class="list">
     <% quotes.forEach(function (q) { %>
     <li><div class="grow"><a class="title" href="/q/<%= q.public_token %>"><%= q.title %></a><span class="meta mono"><%= q.number %></span><span class="meta"> · <%= h.date(q.issue_date) %></span></div>
-      <b class="small"><%= h.inr(q.total) %></b><%- h.badge(q.status) %>
+      <b><%= h.inr(q.total) %></b><%- h.badge(q.status) %>
       <% if (q.status === 'sent') { %><a class="btn btn-sm" href="/q/<%= q.public_token %>#respond">Review</a><% } %></li>
     <% }) %>
   </ul><% } %>

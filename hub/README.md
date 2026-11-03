@@ -1,4 +1,78 @@
-# Haptags Hub
+# Haptags Portal
+
+One portal with two faces:
+
+- **Company view** (`/team`) for the Haptags team: clients, projects and tasks, billing and the invoice/quotation/receipt generator,
+  support requests, chat and calls, meetings, leave, **Sales** (teammates log what they sold), the team list, and (owners and admins) income and expenses, **GST Invoices**
+  (`/team/gst`: tax invoices, proformas, credit/debit notes, GSTR reports, e-invoice data) and **Education** (`/team/education`: students,
+  fee invoices, programmes, certificates and internship offer letters).
+- **Client portal** (`/portal`) for your clients: one dashboard with their project progress, updates, files and invoices, a read-only
+  Billing page, Support, and a single group chat with their Haptags contacts.
+
+## Who sees what
+
+| | Owner | Admin | Staff | Client |
+|---|---|---|---|---|
+| Company overview, clients, projects and tasks | yes | yes | yes (no money shown) | no |
+| Billing, invoice generator, confirm/record payments | yes | yes | no | read-only view of their own |
+| Income & expenses | yes | yes | no | no |
+| GST Invoices, Education (students, fees, offer letters) | yes | yes | no | no |
+| Support inbox, chat, meetings | yes | yes | yes | their own requests and one group chat |
+| Sales: log and view sales | everyone’s | everyone’s | own only | no |
+| Leave: request / approve | request (auto-approved) / approve all | request / approve staff | request | no |
+| Add clients, archive or delete them, and invite people | yes | yes | no | no |
+| Add team members (with a password or an invite), edit, reset passwords, remove | yes | yes | no | no |
+
+Rules that are tested (`test/portal.test.js`):
+
+- A client person only sees the **projects they were invited for** (or all, if given company-wide access). The same limit applies to
+  invoices, files, updates, notifications, search and support requests.
+- Each client company has **one group chat** with its assigned Haptags contacts. Clients cannot start private chats or other groups.
+- Staff comments and project updates can be marked **internal**; clients never see them.
+- Clients are never told team pages exist: those URLs look like any missing page to them.
+- Inviting a client person requires choosing the project(s) they are for.
+
+## Run it
+
+```bash
+npm install
+npm run seed-demo          # demo team, clients (Priya at Sunrise Interiors; Paru at LVS, invited to one project), projects, chat, finance
+npm run dev                # http://localhost:3000
+npm test                   # 56 tests
+```
+
+Demo sign-ins use the password `demo-password-123`: `demo@haptags.local` (owner), `staff@haptags.local`, `client@haptags.local`
+(Priya) and `paru@lvs.test`.
+
+### Going live checklist
+
+- Set `NODE_ENV=production`, a long random `SESSION_SECRET`, `BASE_URL`, and a MySQL database (or keep SQLite for a single server).
+- Create the owner with `ADMIN_EMAIL` / `ADMIN_PASSWORD` once.
+- **Email is not configured by default** (`SMTP_*`). Until it is, invitations, replies and receipts are only logged: share the invite link
+  shown on screen. Set SMTP before relying on email.
+- **Continue with Google** on the sign-in page is optional. In Google Cloud Console, create an OAuth client ID (type Web application)
+  with the redirect URI `https://hub.haptags.com/auth/google/callback` (and `http://localhost:3000/auth/google/callback` for local use),
+  then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Only people who already have an account can sign in this way, by the email
+  they were invited with; it never creates accounts.
+- Razorpay (`RAZORPAY_*`) is optional; without it, clients pay by UPI/bank transfer and report the reference, and the team confirms it
+  under **Billing → Payments to confirm**.
+- Income & expenses reads **bank statement CSVs** you upload. Live bank sync is not built; it needs a bank-data service and its keys.
+- The lms.haptags.com API stays on in every mode: daily doubt sessions (`/api/v1/lms/doubt-session`) and official GST tax invoices
+  for LMS payments (`/api/v1/lms/invoice`). Both need `LMS_KEY_SHA256`.
+- Migrations keep the Hub's numbering (`001` to `016`), and the portal's own ones follow as `017` to `025`. A database created by
+  the Haptags Portal (Hub 2) is recognised on start: its migration records are renamed, so nothing runs twice.
+- GST Invoices and Education now live inside the company view. The rest of the old back office (leads, partners, retainers, the old
+  invoice screen) is switched **off**; set `ENABLE_ADMIN=1` to turn it back on (the tests do). `/invoices` and `/admin/education` forward to
+  the new addresses.
+- Three one-off GST migrations (`010_gst_fresh_start`, `011_gst_own_series`, `015_gst_cmr_first`) change data on an existing database: they **delete trial GST
+  documents**, move GST tax invoices into the `HTG` series, and renumber CMR's invoice to `HTG/26-27/0001`. Each writes a full backup first (`GST_BACKUP_DIR`) and does nothing on an
+  empty GST ledger. Run a single instance: realtime chat and calls live in one Node process.
+
+---
+
+# Legacy back office (off unless `ENABLE_ADMIN=1`)
+
+## Haptags Hub (original description)
 
 The operations back office for Haptags LLP: leads, clients, projects, quotations, GST invoices,
 payments, retainers, support and a client portal. It runs alongside the marketing site at
@@ -30,7 +104,7 @@ haptags.com, which stays as it is.
 Notifications arrive live in any open Hub tab (toasts and badges), and as desktop notifications
 when the tab is in the background.
 
-## GST Invoices (`/invoices`, owners and admins only)
+## GST Invoices (`/team/gst`, owners and admins only; `/invoices` forwards there)
 
 A separate module for tax invoices under CGST Rule 46, with its own clients, services, payments
 and business profile. It has its own sidebar item under **GST**, which only owners and admins see;

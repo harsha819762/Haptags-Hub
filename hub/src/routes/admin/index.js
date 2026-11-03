@@ -141,7 +141,7 @@ router.use('/chat', require('./chat'));
 router.use('/meetings', require('./meetings'));
 router.use('/calendar', require('./calendar'));
 router.use('/announcements', require('./announcements'));
-router.use('/education', require('./education'));
+router.use('/education', (req, res) => res.redirect(`/team/education${req.url === '/' ? '' : req.url}`)); // moved into the company view (routes/team.js)
 router.use('/partners', require('./partners'));
 router.use('/finance', requireAdmin, require('./finance'));
 router.use('/leads', require('./leads'));

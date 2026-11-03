@@ -39,7 +39,7 @@ router.post('/:id/reverse', async (req, res, next) => {
   if (!p) return next();
   await reversePayment(p.id, str(req.body.reason, 255), actor(req));
   req.flash('success', 'Payment reversed. It stays on record, and the invoice balance is updated.');
-  res.redirect(`/invoices/docs/${p.document_id}#payments`);
+  res.redirect(`/team/gst/docs/${p.document_id}#payments`);
 });
 
 module.exports = router;

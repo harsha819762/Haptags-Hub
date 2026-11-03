@@ -1,6 +1,6 @@
 <div class="doc-actions no-print">
   <div class="row">
-    <% if (user && user.role !== 'client') { %><a class="btn btn-ghost btn-sm" href="/admin/invoices/<%= doc.id %>">← Back to Hub</a><% } else if (user) { %><a class="btn btn-ghost btn-sm" href="/portal/invoices">← My invoices</a><% } %>
+    <% if (user && user.role !== 'client') { %><a class="btn btn-ghost btn-sm" href="<%= adminOn ? '/admin/invoices/' + doc.id : '/team/clients/' + doc.client_id %>">← Back to Hub</a><% } else if (user) { %><a class="btn btn-ghost btn-sm" href="/portal/invoices">← My invoices</a><% } %>
     <% if (doc.status === 'draft') { %><span class="badge tone-amber">Draft preview — not visible to the client yet</span><% } %>
   </div>
   <div class="row">

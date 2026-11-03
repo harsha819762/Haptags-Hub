@@ -48,3 +48,10 @@
   .offer-respond, .offer-banner { display: none !important; }
   .letter-details th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ----- Dark mode: the letter stays printed-paper white, so it keeps the light palette ----- */
+[data-theme=dark] .letter {
+  color-scheme: light;
+  --text: #0b1324; --text-2: #3b4a63; --text-3: #64748b; --border: #e2e8f0; --border-strong: #cbd5e1;
+  --navy: #02213d; --surface: #fff; --surface-2: #f8fafd; --grey-bg: #f1f5f9; --blue-50: #ecf4ff; --blue-100: #d6e8ff;
+}

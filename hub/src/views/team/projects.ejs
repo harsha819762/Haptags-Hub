@@ -1,0 +1,22 @@
+<%
+  const tabs = [['all', 'All'], ['active', 'Active'], ['on_hold', 'On hold'], ['completed', 'Completed']];
+  const today = new Date().toISOString().slice(0, 10);
+%>
+<div class="page-head"><div><h1>Projects</h1><div class="sub">Every project across all clients.</div></div></div>
+<form method="get" action="/team/projects" class="search-big" role="search"><%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search projects or clients…" aria-label="Search projects"><% if (status !== 'all') { %><input type="hidden" name="status" value="<%= status %>"><% } %><button class="btn" type="submit">Search</button></form>
+<div class="tabs"><% tabs.forEach(function (t) { %><a href="/team/projects<%= t[0] === 'all' ? '' : '?status=' + t[0] %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %></div>
+<div class="card plist">
+  <% if (!projects.length) { %><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b>No projects match</b></div><% } else { %>
+  <div class="plist-head tl"><span>Project</span><span>Status</span><span>Progress</span><span>Target</span><span>Tasks</span></div>
+  <% projects.forEach(function (p) { const late = p.due_date && String(p.due_date).slice(0, 10) < today && p.status !== 'completed'; %>
+  <a class="plist-row tl" href="/team/projects/<%= p.id %>">
+    <span class="pl-name"><b><%= p.name %></b><small><%= p.client_name %> · <%= h.service(p.service) || 'Project' %></small></span>
+    <span class="pl-status"><%- h.badge(p.status) %></span>
+    <span class="pl-progress"><span class="progress <%= p.status === 'completed' ? 'done' : '' %>"><span style="width:<%= p.progress %>%"></span></span><em><%= p.progress %>%</em></span>
+    <span class="pl-date <%= late ? 'late' : '' %>"><%= p.due_date ? h.date(p.due_date) : '—' %></span>
+    <span class="pl-who"><%= p.task_count %><% if (Number(p.in_review)) { %> <span class="chip chip-amber"><%= p.in_review %> to approve</span><% } %></span>
+    <span class="pl-go"><%- h.icon('arrow', 16) %></span>
+  </a>
+  <% }) %>
+  <% } %>
+</div>

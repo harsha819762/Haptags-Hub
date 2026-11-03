@@ -1,0 +1,43 @@
+<%
+  const tab = 'settings';
+  const f = function (key, label, opts) {
+    opts = opts || {};
+    const id = 'f-' + key;
+    const input = opts.textarea
+      ? '<textarea id="' + id + '" name="' + key + '" rows="' + (opts.rows || 3) + '">' + h.esc(s[key]) + '</textarea>'
+      : '<input id="' + id + '" name="' + key + '" type="' + (opts.type || 'text') + '" value="' + h.esc(s[key]) + '"' + (opts.mono ? ' class="mono"' : '') + (opts.placeholder ? ' placeholder="' + h.esc(opts.placeholder) + '"' : '') + '>';
+    return '<div class="field' + (opts.full ? ' full' : '') + '"><label for="' + id + '">' + label + '</label>' + input + (opts.hint ? '<div class="hint">' + opts.hint + '</div>' : '') + '</div>';
+  };
+%>
+<%- include('_nav', { tab }) %>
+<form method="post" action="/team/education/settings" class="card card-pad mb-16" style="max-width:900px">
+  <%- include('../../partials/csrf') %><input type="hidden" name="group" value="fees">
+  <h3 class="mt-0">Student fee invoices</h3>
+  <div class="form-grid">
+    <%- f('edu_invoice_prefix', 'Student invoice prefix', { mono: true, hint: 'Numbers look like ' + h.esc(s.edu_invoice_prefix) + '/26-27/0001. Must differ from the client prefix.' }) %>
+    <%- f('edu_sac', 'SAC code', { mono: true, hint: '999293 = commercial training and coaching. Confirm with your CA.' }) %>
+    <%- f('edu_gst_rate', 'GST rate (%)', { type: 'number' }) %>
+    <%- f('edu_due_days', 'Due in (days)', { type: 'number' }) %>
+    <%- f('edu_terms', 'Student invoice terms', { textarea: true, full: true }) %>
+  </div>
+  <button class="btn" type="submit">Save fee settings</button>
+</form>
+
+<form method="post" action="/team/education/settings" class="card card-pad" style="max-width:900px">
+  <%- include('../../partials/csrf') %><input type="hidden" name="group" value="offers">
+  <h3 class="mt-0">Offer letters</h3>
+  <p class="muted">Internship offer letters for students. These are the defaults for new letters; each letter can be adjusted before it is issued. Letters carry the authorised signature from GST Invoices → Business profile.</p>
+  <div class="form-grid">
+    <%- f('offer_signatory_name', 'Signed by (name)', { placeholder: 'Your full name', hint: 'Printed under the signature on every offer letter.' }) %>
+    <%- f('offer_signatory_designation', 'Designation') %>
+    <%- f('offer_reporting_to', 'Interns report to (name)', { placeholder: 'e.g. Priya Sharma' }) %>
+    <%- f('offer_reporting_designation', 'Their designation', { placeholder: 'e.g. Technical Lead' }) %>
+    <div class="field"><label for="f-offer_mode">Default mode</label><select id="f-offer_mode" name="offer_mode"><% [['onsite', 'On-site'], ['hybrid', 'Hybrid'], ['remote', 'Remote']].forEach(function (m) { %><option value="<%= m[0] %>" <%= h.selected(s.offer_mode, m[0]) %>><%= m[1] %></option><% }) %></select></div>
+    <%- f('offer_location', 'Default location') %>
+    <%- f('offer_schedule', 'Working days and hours', { full: true }) %>
+    <%- f('offer_prefix', 'Reference prefix', { mono: true, hint: 'Letters are numbered like ' + h.esc(s.offer_prefix) + '/26-27/0001 when issued.' }) %>
+    <%- f('offer_respond_days', 'Days to accept', { type: 'number', hint: 'The offer lapses if not accepted by then.' }) %>
+    <%- f('offer_terms', 'Terms and conditions', { textarea: true, rows: 14, full: true, hint: 'One term per paragraph (leave a blank line between them), written as “Heading: text”. They are numbered automatically. Issued letters keep the wording they were issued with.' }) %>
+  </div>
+  <button class="btn" type="submit">Save offer letter settings</button>
+</form>

@@ -1,0 +1,88 @@
+<%
+  const statusTone = { pending: 'amber', approved: 'green', rejected: 'red', cancelled: 'grey' };
+  const range = function (r) { return r.start_date === r.end_date ? h.date(r.start_date) : h.date(r.start_date) + ' – ' + h.date(r.end_date); };
+  const num = function (n) { return Number(n) % 1 ? Number(n).toFixed(1) : String(Number(n)); };
+%>
+<div class="page-head"><div><h1>Leave</h1><div class="sub">Request time off and see who’s away.</div></div></div>
+
+<div class="kpis">
+  <% balances.forEach(function (b) { %>
+  <div class="kpi"><span class="ic <%= { blue: 'blue', amber: 'amber', green: 'green', grey: 'violet' }[b.tone] %>"><%- h.icon('calendar', 22) %></span>
+    <div><b><%= b.left === null ? '∞' : num(b.left) %></b><span><%= b.label %> left<%= b.allowance ? ' of ' + b.allowance : '' %><%= b.pending ? ' · ' + num(b.pending) + ' pending' : '' %></span></div></div>
+  <% }) %>
+</div>
+
+<% if (approver) { %>
+<section class="card mb-16 <%= approvals.length ? 'approve-card' : '' %>">
+  <div class="card-head"><h3>Waiting for your approval</h3><span class="muted small"><%= approvals.length %></span></div>
+  <% if (!approvals.length) { %><div class="empty" style="padding:26px"><b>Nothing waiting</b>New requests will show up here.</div><% } else { %>
+  <ul class="list leave-list">
+    <% approvals.forEach(function (r) { %>
+    <li>
+      <span class="avatar"><%= h.initials(r.user_name) %></span>
+      <div class="grow"><span class="title"><%= r.user_name %> <span class="badge tone-<%= TYPES[r.type].tone %>"><%= TYPES[r.type].label %></span></span>
+        <span class="meta"><%= range(r) %> · <%= num(r.days) %> day<%= Number(r.days) === 1 ? '' : 's' %><%= r.half_day ? ' (half day)' : '' %></span>
+        <% if (r.reason) { %><span class="meta">“<%= r.reason %>”</span><% } %></div>
+      <form method="post" action="/team/leave/<%= r.id %>/decide" class="row" style="flex-wrap:nowrap"><%- include('../partials/csrf') %>
+        <input type="text" name="note" placeholder="Note (optional)" maxlength="500" aria-label="Note" style="width:150px;padding:7px 10px;font-size:13px">
+        <button class="btn btn-success btn-sm" type="submit" name="action" value="approve"><%- h.icon('check', 14) %> Approve</button>
+        <button class="btn btn-danger btn-sm" type="submit" name="action" value="reject">Reject</button>
+      </form>
+    </li>
+    <% }) %>
+  </ul><% } %>
+</section>
+<% } %>
+
+<div class="split">
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>My leave</h3></div>
+      <% if (!mine.length) { %><div class="empty" style="padding:30px"><div class="art"><%- h.icon('calendar', 26) %></div><b>No leave yet</b><p class="mb-0">Use the form to request time off.</p></div><% } else { %>
+      <ul class="list leave-list">
+        <% mine.forEach(function (r) { const future = String(r.end_date).slice(0, 10) >= today; %>
+        <li>
+          <div class="when" style="width:96px"><b><%= h.date(r.start_date).slice(0, 6) %></b><span><%= r.start_date === r.end_date ? (r.half_day ? 'Half day' : '1 day') : num(r.days) + ' days' %></span></div>
+          <div class="grow"><span class="title"><%= TYPES[r.type].label %></span><span class="meta"><%= range(r) %><%= r.reason ? ' · ' + r.reason : '' %></span>
+            <% if (r.status !== 'pending' && r.decider && r.decider !== user.name) { %><span class="meta"><%= r.status === 'approved' ? 'Approved' : r.status === 'rejected' ? 'Rejected' : '' %> by <%= r.decider %><%= r.decision_note ? ' — “' + r.decision_note + '”' : '' %></span><% } %></div>
+          <span class="badge tone-<%= statusTone[r.status] %>"><%= h.humanize(r.status) %></span>
+          <% if ((r.status === 'pending' || r.status === 'approved') && future) { %><form method="post" action="/team/leave/<%= r.id %>/cancel" data-confirm="Cancel this leave?"><%- include('../partials/csrf') %><button class="x-btn" aria-label="Cancel leave"><%- h.icon('x', 14) %></button></form><% } %>
+        </li>
+        <% }) %>
+      </ul><% } %>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h3>Who’s away</h3><span class="muted small">next 6 weeks</span></div>
+      <% if (!off.length) { %><div class="empty" style="padding:26px"><b>Everyone’s in</b>No approved leave coming up.</div><% } else { %>
+      <ul class="list"><% off.forEach(function (r) { %><li><span class="avatar avatar-sm"><%= h.initials(r.user_name) %></span><div class="grow"><span class="title"><%= r.user_name %></span><span class="meta"><%= range(r) %> · <%= num(r.days) %> day<%= Number(r.days) === 1 ? '' : 's' %></span></div><span class="badge tone-<%= TYPES[r.type].tone %>"><%= TYPES[r.type].label.replace(' leave', '') %></span></li><% }) %></ul><% } %>
+    </section>
+  </div>
+
+  <div class="stack">
+    <form method="post" action="/team/leave" class="card card-pad" novalidate>
+      <%- include('../partials/csrf') %>
+      <h3>Request leave</h3>
+      <div class="field"><label for="lv-type">Type</label>
+        <select id="lv-type" name="type"><% Object.keys(TYPES).forEach(function (k) { %><option value="<%= k %>" <%= values.type === k ? 'selected' : '' %>><%= TYPES[k].label %></option><% }) %></select>
+        <% if (errors.type) { %><div class="error"><%= errors.type %></div><% } %></div>
+      <div class="form-grid">
+        <div class="field"><label for="lv-from">From</label><input id="lv-from" name="start_date" type="date" value="<%= values.start_date %>" <%- errors.start_date ? 'aria-invalid="true"' : '' %>></div>
+        <div class="field"><label for="lv-to">To</label><input id="lv-to" name="end_date" type="date" value="<%= values.end_date %>" <%- errors.end_date ? 'aria-invalid="true"' : '' %>></div>
+      </div>
+      <% if (errors.start_date) { %><div class="error" style="margin:-8px 0 12px"><%= errors.start_date %></div><% } %>
+      <% if (errors.end_date) { %><div class="error" style="margin:-8px 0 12px"><%= errors.end_date %></div><% } %>
+      <label class="check mb-16"><input type="checkbox" name="half_day" value="1" <%= values.half_day ? 'checked' : '' %>> Half day <span class="muted">(only for a single day)</span></label>
+      <div class="field"><label for="lv-reason">Reason <span class="muted">(optional)</span></label><textarea id="lv-reason" name="reason" rows="3" maxlength="1000" placeholder="e.g. Family function, doctor’s appointment"><%= values.reason || '' %></textarea></div>
+      <p class="small muted">Weekends and public holidays aren’t counted.<%= user.role === 'owner' ? ' As owner, your leave is approved automatically.' : user.role === 'admin' ? ' The owner approves admin leave.' : ' An owner or admin will review it.' %></p>
+      <button class="btn" type="submit"><%- h.icon('send', 16) %> Send request</button>
+    </form>
+
+    <% if (approver && decided.length) { %>
+    <section class="card">
+      <div class="card-head"><h3>Recent decisions</h3></div>
+      <ul class="list"><% decided.forEach(function (r) { %><li><div class="grow"><span class="title"><%= r.user_name %></span><span class="meta"><%= range(r) %> · <%= TYPES[r.type].label %></span></div><span class="badge tone-<%= statusTone[r.status] %>"><%= h.humanize(r.status) %></span></li><% }) %></ul>
+    </section>
+    <% } %>
+  </div>
+</div>

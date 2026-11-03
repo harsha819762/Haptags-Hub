@@ -68,14 +68,16 @@ async function loadProject(req) {
 router.get('/:id', async (req, res, next) => {
   const project = await loadProject(req);
   if (!project) return next();
-  const [milestones, updates, links, invoices, tickets] = await Promise.all([
+  const [milestones, updates, links, invoices, tickets, tasks] = await Promise.all([
     db('milestones').where({ project_id: project.id }).orderByRaw('CASE WHEN due_date IS NULL THEN 1 ELSE 0 END').orderBy('due_date').orderBy('id'),
     db('project_updates as u').leftJoin('users as us', 'us.id', 'u.user_id').where('u.project_id', project.id).orderBy('u.id', 'desc').select('u.*', 'us.name as user_name'),
     db('project_links').where({ project_id: project.id }).orderBy('id', 'desc'),
     db('invoices').where({ project_id: project.id }).orderBy('id', 'desc'),
     db('tickets').where({ project_id: project.id }).orderBy('id', 'desc').limit(10),
+    db('project_tasks as t').where('t.project_id', project.id).orderBy('t.id').select('t.*',
+      db.raw('(select count(*) from task_comments c where c.task_id = t.id) as comments')),
   ]);
-  res.render('admin/projects/show', { title: project.name, project, milestones, updates, links, invoices, tickets });
+  res.render('admin/projects/show', { title: project.name, project, milestones, updates, links, invoices, tickets, tasks });
 });
 
 router.get('/:id/edit', async (req, res, next) => {

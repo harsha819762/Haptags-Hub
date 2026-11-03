@@ -19,7 +19,7 @@
 <% if (Object.keys(errors).length) { %><div class="flash flash-error" role="alert"><%- h.icon('alert') %><span>Please fix the highlighted fields. Nothing was saved.</span></div><% } %>
 
 <div class="split gst-split-wide">
-  <form method="post" action="/invoices/profile" class="stack" novalidate>
+  <form method="post" action="/team/gst/profile" class="stack" novalidate>
     <%- include('../partials/csrf') %>
     <section class="card card-pad">
       <h3>GST registration</h3>
@@ -108,16 +108,16 @@
         <div>
           <b class="small"><%= img[1] %></b>
           <div class="gst-image-preview<%= img[0] === 'signature' ? ' wide' : '' %>">
-            <% if (has) { %><img src="/invoices/profile/image/<%= img[0] %>?v=<%= form[img[0] + '_file_id'] || 'default' %>" alt="<%= img[1] %>"><% } else { %><span class="muted small">None</span><% } %>
+            <% if (has) { %><img src="/team/gst/profile/image/<%= img[0] %>?v=<%= form[img[0] + '_file_id'] || 'default' %>" alt="<%= img[1] %>"><% } else { %><span class="muted small">None</span><% } %>
           </div>
-          <form class="gst-upload" data-image-upload="/invoices/profile/image/<%= img[0] %>">
+          <form class="gst-upload" data-image-upload="/team/gst/profile/image/<%= img[0] %>">
             <input type="file" accept="image/png,image/jpeg" data-file aria-label="Choose <%= img[1].toLowerCase() %> image">
             <button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('upload', 14) %> Upload</button>
           </form>
           <div class="error small" data-upload-error></div>
           <p class="hint small mb-8"><%= img[2] %> PNG (transparent background is best) or JPEG, up to 2 MB.</p>
           <% if (form[img[0] + '_file_id']) { %>
-          <form method="post" action="/invoices/profile/image/<%= img[0] %>/remove" data-confirm="<%= img[0] === 'logo' ? 'Go back to the Haptags mark?' : 'Remove the signature image from new documents?' %>"><%- include('../partials/csrf') %><button class="btn-link small" type="submit"><%= img[0] === 'logo' ? 'Reset to Haptags mark' : 'Remove signature' %></button></form>
+          <form method="post" action="/team/gst/profile/image/<%= img[0] %>/remove" data-confirm="<%= img[0] === 'logo' ? 'Go back to the Haptags mark?' : 'Remove the signature image from new documents?' %>"><%- include('../partials/csrf') %><button class="btn-link small" type="submit"><%= img[0] === 'logo' ? 'Reset to Haptags mark' : 'Remove signature' %></button></form>
           <% } %>
         </div>
         <% }) %>
@@ -126,7 +126,7 @@
 
     <section class="card" id="numbering">
       <div class="card-head"><h3>Numbering · FY <%= fy %></h3></div>
-      <form method="post" action="/invoices/profile/numbering" class="card-body" data-confirm="Move these series forward? Numbers skipped are never used.">
+      <form method="post" action="/team/gst/profile/numbering" class="card-body" data-confirm="Move these series forward? Numbers skipped are never used.">
         <%- include('../partials/csrf') %>
         <p class="small muted mt-0">Consecutive per financial year, restarting on 1 April. A number is taken on finalising and never reused, even if the document is cancelled.</p>
         <% series.forEach(function (s) { %>
@@ -148,12 +148,12 @@
       <div class="card-body">
         <p class="small muted mt-0">Saved on the server once a day (last 30 kept)<%= form.backup_last_run ? ', last at ' + h.dateTime(form.backup_last_run) : '' %>. Download one regularly and keep it off the server too.</p>
         <div class="row mb-16">
-          <a class="btn btn-ghost btn-sm" href="/invoices/profile/backup"><%- h.icon('download', 14) %> Download now</a>
-          <form method="post" action="/invoices/profile/backup" class="inline"><%- include('../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit">Save on server now</button></form>
+          <a class="btn btn-ghost btn-sm" href="/team/gst/profile/backup"><%- h.icon('download', 14) %> Download now</a>
+          <form method="post" action="/team/gst/profile/backup" class="inline"><%- include('../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit">Save on server now</button></form>
         </div>
         <% if (backups.length) { %>
         <ul class="list gst-backups">
-          <% backups.slice(0, 10).forEach(function (b) { %><li><span class="grow mono small"><%= b.name %></span><span class="small muted"><%= Math.max(1, Math.round(b.size / 1024)) %> KB</span><a class="small" href="/invoices/profile/backups/<%= b.name %>">Download</a></li><% }) %>
+          <% backups.slice(0, 10).forEach(function (b) { %><li><span class="grow mono small"><%= b.name %></span><span class="small muted"><%= Math.max(1, Math.round(b.size / 1024)) %> KB</span><a class="small" href="/team/gst/profile/backups/<%= b.name %>">Download</a></li><% }) %>
         </ul>
         <% } %>
       </div>

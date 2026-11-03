@@ -1,0 +1,32 @@
+<div class="page-head">
+  <div><h1>Meetings</h1><div class="sub">Video and voice meetings with the Haptags team, right in your browser.</div></div>
+  <div class="actions">
+    <form method="post" action="<%= base %>/meetings/now" target="_blank" class="inline" data-no-disable><%- include('../partials/csrf') %><button class="btn btn-ghost" type="submit"><%- h.icon('video', 16) %> Meet now</button></form>
+    <a class="btn" href="<%= base %>/meetings/new"><%- h.icon('plus', 16) %> Schedule</a>
+  </div>
+</div>
+<div class="crumbs"><a href="<%= base %>">← Back to chat</a></div>
+
+<div class="card">
+  <div class="card-head"><h3>Upcoming</h3></div>
+  <% if (!rows.length) { %><div class="empty"><div class="art"><%- h.icon('calendar', 28) %></div><b>No meetings scheduled</b><p>Book a time with the team, or start an instant meeting.</p><a class="btn btn-sm" href="<%= base %>/meetings/new">Schedule a meeting</a></div><% } else { %>
+  <ul class="list">
+    <% rows.forEach(function (m) { %>
+    <li>
+      <div class="when"><b><%= h.date(m.when.date) %></b><span><%= m.when.time %></span></div>
+      <div class="grow"><a class="title" href="<%= base %>/meetings/<%= m.id %>"><%= m.title %></a><span class="meta"><%= m.duration_min %> min · with <%= m.organizer_name %></span></div>
+      <% if (m.inCall) { %><span class="badge tone-green"><%= m.inCall %> in call</span><% } else if (m.soon) { %><span class="badge tone-amber">Starting now</span><% } %>
+      <a class="btn btn-sm <%= m.soon || m.inCall ? '' : 'btn-ghost' %>" href="/meet/<%= m.room_token %>" target="_blank"><%- h.icon('video', 15) %> Join</a>
+    </li>
+    <% }) %>
+  </ul><% } %>
+</div>
+
+<% if (past.length) { %>
+<div class="card mt-16">
+  <div class="card-head"><h3>Recent</h3></div>
+  <ul class="list">
+    <% past.forEach(function (m) { %><li><div class="when"><b><%= h.date(m.when.date) %></b><span><%= m.when.time %></span></div><div class="grow"><a class="title" href="<%= base %>/meetings/<%= m.id %>"><%= m.title %></a><span class="meta"><%= m.duration_min %> min</span></div><%- h.badge(m.status === 'cancelled' ? 'void' : 'paid', m.status === 'cancelled' ? 'Cancelled' : 'Done') %></li><% }) %>
+  </ul>
+</div>
+<% } %>

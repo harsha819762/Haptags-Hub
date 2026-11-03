@@ -1,0 +1,12 @@
+<div class="crumbs"><a href="/portal/projects">Projects</a> / New</div>
+<div class="page-head"><div><h1>New project</h1><div class="sub">It lands in <b>To do</b> — drag it along the board as work progresses.</div></div></div>
+<form method="post" action="/portal/projects" class="card card-pad" style="max-width:720px" novalidate>
+  <%- include('../partials/csrf') %>
+  <div class="field"><label for="name">Project name</label><input id="name" name="name" type="text" value="<%= values.name || '' %>" placeholder="e.g. Mobile app for orders" <%- errors.name ? 'aria-invalid="true"' : '' %> autofocus><% if (errors.name) { %><div class="error"><%= errors.name %></div><% } %></div>
+  <div class="form-grid">
+    <div class="field"><label for="service">Type of work</label><select id="service" name="service"><option value="">Select…</option><% services.forEach(function (s) { %><option value="<%= s[0] %>" <%= h.selected(values.service, s[0]) %>><%= s[1] %></option><% }) %></select></div>
+    <div class="field"><label for="due_date">Target date</label><input id="due_date" name="due_date" type="date" value="<%= values.due_date || '' %>" <%- errors.due_date ? 'aria-invalid="true"' : '' %>><% if (errors.due_date) { %><div class="error"><%= errors.due_date %></div><% } %></div>
+  </div>
+  <div class="field"><label for="description">Notes <span class="muted">(optional)</span></label><textarea id="description" name="description" rows="4" placeholder="What should it do? Anything we should know?"><%= values.description || '' %></textarea></div>
+  <div class="form-actions"><button class="btn" type="submit"><%- h.icon('plus', 16) %> Add to To do</button><a class="btn btn-ghost" href="/portal/projects">Cancel</a></div>
+</form>

@@ -4,10 +4,10 @@
   const first = letter.candidate_name.split(/\s+/)[0];
   const live = ['issued', 'expired', 'accepted', 'declined', 'withdrawn'].includes(status);
   const wa = status === 'issued' ? h.waLink(letter.candidate_phone, 'Hi ' + first + ', congratulations! Here is your internship offer letter ' + letter.number + ' from ' + c.company.legal_name + ' for the role of ' + letter.role_title + '. Please read and accept it by ' + h.date(letter.respond_by) + ': ' + link) : null;
-  const pdf = '/admin/education/offers/' + letter.id + '/pdf';
+  const pdf = '/team/education/offers/' + letter.id + '/pdf';
 %>
 <%- include('_nav') %>
-<div class="crumbs"><a href="/admin/education/offers">Offer letters</a> / <a href="/admin/education/students/<%= letter.client_id %>"><%= letter.candidate_name %></a> / <%= letter.number || 'Draft' %></div>
+<div class="crumbs"><a href="/team/education/offers">Offer letters</a> / <a href="/team/education/students/<%= letter.client_id %>"><%= letter.candidate_name %></a> / <%= letter.number || 'Draft' %></div>
 <div class="page-head">
   <div>
     <h2 class="mb-0"><span class="mono"><%= letter.number || 'Draft offer letter' %></span> <%- h.badge(tone[status], label) %></h2>
@@ -15,9 +15,9 @@
   </div>
   <div class="actions">
     <% if (letter.status === 'draft') { %>
-      <a class="btn btn-ghost" href="/admin/education/offers/<%= letter.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
+      <a class="btn btn-ghost" href="/team/education/offers/<%= letter.id %>/edit"><%- h.icon('edit', 16) %> Edit</a>
       <a class="btn btn-ghost" href="<%= pdf %>" target="_blank" rel="noopener"><%- h.icon('external', 16) %> Preview PDF</a>
-      <form method="post" action="/admin/education/offers/<%= letter.id %>/issue" class="inline" data-confirm="Issue this offer letter? It gets its number and its wording is fixed; you can still withdraw it.">
+      <form method="post" action="/team/education/offers/<%= letter.id %>/issue" class="inline" data-confirm="Issue this offer letter? It gets its number and its wording is fixed; you can still withdraw it.">
         <%- include('../../partials/csrf') %><button class="btn" type="submit"><%- h.icon('send', 16) %> Issue letter</button>
       </form>
     <% } else { %>
@@ -50,7 +50,7 @@
       <div class="card-head"><h3>Status</h3><%- h.badge(tone[status], label) %></div>
       <div class="card-body">
         <dl class="dl">
-          <dt>Student</dt><dd><a href="/admin/education/students/<%= letter.client_id %>"><%= letter.candidate_name %></a></dd>
+          <dt>Student</dt><dd><a href="/team/education/students/<%= letter.client_id %>"><%= letter.candidate_name %></a></dd>
           <dt>Issued</dt><dd><%= letter.issued_on ? h.date(letter.issued_on) : 'Not yet' %></dd>
           <% if (letter.respond_by) { %><dt>Accept by</dt><dd><%= h.date(letter.respond_by) %><%= status === 'expired' ? ' (lapsed)' : '' %></dd><% } %>
           <% if (letter.responded_at) { %>
@@ -59,7 +59,7 @@
           <% } %>
           <% if (letter.withdrawn_at) { %><dt>Withdrawn</dt><dd><%= h.dateTime(letter.withdrawn_at) %>: <%= letter.withdraw_reason %></dd><% } %>
         </dl>
-        <% if (letter.status === 'draft' && !c.signoff.name) { %><p class="small down mb-0 mt-8">The signatory’s name is blank. Add it in <a href="/admin/settings?tab=offers">Settings → Offer letters</a> before issuing.</p><% } %>
+        <% if (letter.status === 'draft' && !c.signoff.name) { %><p class="small down mb-0 mt-8">The signatory’s name is blank. Add it in <a href="/team/education/settings">Settings → Offer letters</a> before issuing.</p><% } %>
       </div>
     </section>
 
@@ -69,13 +69,13 @@
     </section>
 
     <% if (letter.status === 'draft') { %>
-      <form method="post" action="/admin/education/offers/<%= letter.id %>/delete" data-confirm="Delete this draft offer letter?"><%- include('../../partials/csrf') %><button class="btn btn-danger btn-sm" type="submit"><%- h.icon('trash', 14) %> Delete draft</button></form>
+      <form method="post" action="/team/education/offers/<%= letter.id %>/delete" data-confirm="Delete this draft offer letter?"><%- include('../../partials/csrf') %><button class="btn btn-danger btn-sm" type="submit"><%- h.icon('trash', 14) %> Delete draft</button></form>
     <% } else { %>
-      <form method="post" action="/admin/education/offers/<%= letter.id %>/revise" data-confirm="Create a revised copy as a new draft?"><%- include('../../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('copy', 14) %> Make a revised copy</button></form>
+      <form method="post" action="/team/education/offers/<%= letter.id %>/revise" data-confirm="Create a revised copy as a new draft?"><%- include('../../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('copy', 14) %> Make a revised copy</button></form>
       <% if (['issued', 'accepted'].includes(letter.status)) { %>
       <details>
         <summary class="small muted" style="cursor:pointer">Withdraw this offer…</summary>
-        <form method="post" action="/admin/education/offers/<%= letter.id %>/withdraw" class="mt-8" data-confirm="Withdraw <%= letter.number %>? The student’s link will show the offer is no longer open.">
+        <form method="post" action="/team/education/offers/<%= letter.id %>/withdraw" class="mt-8" data-confirm="Withdraw <%= letter.number %>? The student’s link will show the offer is no longer open.">
           <%- include('../../partials/csrf') %>
           <input type="text" name="reason" required maxlength="255" placeholder="Reason, e.g. issued with wrong dates" class="mb-8" aria-label="Reason for withdrawing">
           <button class="btn btn-danger btn-sm" type="submit"><%- h.icon('ban', 14) %> Withdraw offer</button>
@@ -88,7 +88,7 @@
 
 <% if (status === 'issued') { %>
 <dialog class="modal" id="offer-email" aria-labelledby="offer-email-title">
-  <form method="post" action="/admin/education/offers/<%= letter.id %>/email">
+  <form method="post" action="/team/education/offers/<%= letter.id %>/email">
     <%- include('../../partials/csrf') %>
     <div class="modal-head"><h2 id="offer-email-title">Email the offer letter</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
     <div class="modal-body">

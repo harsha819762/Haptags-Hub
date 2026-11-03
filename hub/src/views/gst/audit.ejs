@@ -4,7 +4,7 @@
 </div>
 <nav class="tabs">
   <% [['', 'Everything'], ['document', 'Documents'], ['payment', 'Payments'], ['client', 'Clients'], ['item', 'Services'], ['profile', 'Business profile'], ['report', 'Exports'], ['backup', 'Backups']].forEach(function (t) { %>
-    <a href="<%= h.qs('/invoices/audit', { entity: t[0] }) %>" class="<%= entity === t[0] ? 'active' : '' %>"><%= t[1] %></a>
+    <a href="<%= h.qs('/team/gst/audit', { entity: t[0] }) %>" class="<%= entity === t[0] ? 'active' : '' %>"><%= t[1] %></a>
   <% }) %>
 </nav>
 <div class="card">
@@ -16,7 +16,7 @@
       <tr>
         <td class="nowrap small"><%= h.dateTime(a.created_at) %></td>
         <td class="small"><%= a.user_name || 'System' %><span class="sub mono"><%= a.ip || '' %></span></td>
-        <td class="small"><b><%= h.humanize(a.entity_type) %></b> · <%= h.humanize(a.action) %><% if (d) { %><span class="sub"><a class="mono" href="/invoices/docs/<%= d.id %>"><%= g.docLabel(d) %></a></span><% } else if (a.entity_type === 'client' && a.entity_id) { %><span class="sub"><a href="/invoices/clients/<%= a.entity_id %>">Open client</a></span><% } %></td>
+        <td class="small"><b><%= h.humanize(a.entity_type) %></b> · <%= h.humanize(a.action) %><% if (d) { %><span class="sub"><a class="mono" href="/team/gst/docs/<%= d.id %>"><%= g.docLabel(d) %></a></span><% } else if (a.entity_type === 'client' && a.entity_id) { %><span class="sub"><a href="/team/gst/clients/<%= a.entity_id %>">Open client</a></span><% } %></td>
         <td class="small"><%= a.summary %>
           <% if (a.changes) { const ch = JSON.parse(a.changes); %><details class="mt-8"><summary class="muted">Changes</summary><% Object.keys(ch).forEach(function (f) { %><div><b><%= h.humanize(f) %></b>: <%= ch[f][0] || '—' %> → <%= ch[f][1] || '—' %></div><% }) %></details><% } %>
         </td>
@@ -24,6 +24,6 @@
       <% }) %>
     </tbody>
   </table></div>
-  <%- include('../partials/pager', { pagerBase: '/invoices/audit', pagerQuery: { entity: entity } }) %>
+  <%- include('../partials/pager', { pagerBase: '/team/gst/audit', pagerQuery: { entity: entity } }) %>
   <% } %>
 </div>

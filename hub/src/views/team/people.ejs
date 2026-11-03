@@ -1,0 +1,72 @@
+<%
+  const ROLE = { owner: ['Owner', 'violet', 'Full access, including finance and team'], admin: ['Admin', 'blue', 'Manages clients, billing and the team'], staff: ['Staff', 'grey', 'Works on projects and talks to clients'] };
+%>
+<div class="page-head"><div><h1>Team</h1><div class="sub">Everyone in the Haptags organisation and what they can do.</div></div></div>
+
+<div class="kpis">
+  <div class="kpi"><span class="ic blue"><%- h.icon('team', 22) %></span><div><b><%= counts.total %></b><span>People</span></div></div>
+  <div class="kpi"><span class="ic violet"><%- h.icon('lock', 22) %></span><div><b><%= counts.owner %></b><span>Owner<%= counts.owner === 1 ? '' : 's' %></span></div></div>
+  <div class="kpi"><span class="ic amber"><%- h.icon('settings', 22) %></span><div><b><%= counts.admin %></b><span>Admin<%= counts.admin === 1 ? '' : 's' %></span></div></div>
+  <div class="kpi"><span class="ic green"><%- h.icon('user', 22) %></span><div><b><%= counts.staff %></b><span>Staff</span></div></div>
+</div>
+
+<div class="split">
+  <section class="card">
+    <% if (inviteLink) { %><div class="card-body" style="border-bottom:1px solid var(--border)">
+      <div class="small mb-8"><b><%= inviteLink.name %></b> was added<%= inviteLink.sent ? ' and emailed.' : '.' %> Share this link so they can set a password:</div>
+      <div class="row" style="flex-wrap:nowrap"><input id="invite-link" type="text" readonly value="<%= inviteLink.link %>"><button class="btn btn-ghost btn-sm" type="button" data-copy="#invite-link">Copy</button></div>
+    </div><% } %>
+    <ul class="list people-list">
+      <% people.forEach(function (p) { const r = ROLE[p.role]; const locked = p.role === 'owner' || p.id === user.id; %>
+      <li class="<%= p.is_active ? '' : 'is-read' %>">
+        <span class="avatar<%= online.has(p.id) ? ' online' : '' %>"><%= h.initials(p.name) %></span>
+        <div class="grow">
+          <span class="title"><%= p.name %><%= p.id === user.id ? ' (you)' : '' %></span>
+          <span class="meta"><%= p.email %><%= p.job_title ? ' · ' + p.job_title : '' %></span>
+          <% if (manage && p.is_active && sales[p.id]) { %><span class="meta">Sales this month: <b><%= h.inr(sales[p.id].total) %></b> · <%= sales[p.id].n %></span><% } %>
+          <span class="meta"><% if (!p.is_active) { %>Access removed<% } else if (!p.password_hash) { %><span class="badge tone-amber">Invite pending</span><% } else { %><%= online.has(p.id) ? 'Online now' : p.last_login_at ? 'Last seen ' + h.ago(p.last_login_at) : 'Hasn’t signed in yet' %><% } %></span>
+        </div>
+        <% if (manage && !locked) { %>
+        <details class="access-edit">
+          <summary class="btn btn-ghost btn-sm">Edit</summary>
+          <form method="post" action="/team/people/<%= p.id %>" class="access-form"><%- include('../partials/csrf') %><input type="hidden" name="action" value="details">
+            <div class="field"><label>Name</label><input name="name" type="text" maxlength="190" value="<%= p.name %>" required></div>
+            <div class="field"><label>Job title</label><input name="job_title" type="text" maxlength="120" value="<%= p.job_title || '' %>"></div>
+            <button class="btn btn-sm" type="submit">Save</button>
+          </form>
+          <form method="post" action="/team/people/<%= p.id %>" class="access-form"><%- include('../partials/csrf') %><input type="hidden" name="action" value="password">
+            <div class="field"><label>Set a new password</label><input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"><div class="hint">They’ll be signed out everywhere.</div></div>
+            <button class="btn btn-ghost btn-sm" type="submit">Set password</button>
+          </form>
+        </details>
+        <form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="role">
+          <select name="role" data-autosubmit class="sel-sm" aria-label="Role"><option value="staff" <%= p.role === 'staff' ? 'selected' : '' %>>Staff</option><option value="admin" <%= p.role === 'admin' ? 'selected' : '' %>>Admin</option></select></form>
+        <% if (p.is_active && !p.password_hash) { %><form method="post" action="/team/people/<%= p.id %>" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="action" value="resend"><button class="btn btn-ghost btn-sm" type="submit">Resend invite</button></form><% } %>
+        <form method="post" action="/team/people/<%= p.id %>" class="inline" data-confirm="<%= p.is_active ? 'Remove ' + p.name + '’s access?' : 'Restore access?' %>"><%- include('../partials/csrf') %><input type="hidden" name="action" value="toggle"><button class="btn btn-ghost btn-sm" type="submit"><%= p.is_active ? 'Remove' : 'Restore' %></button></form>
+        <% } else { %><span class="badge tone-<%= r[1] %>"><%= r[0] %></span><% } %>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+
+  <div class="stack">
+    <section class="card card-pad">
+      <h3>Roles</h3>
+      <% Object.keys(ROLE).forEach(function (k) { %><div class="mb-8"><span class="badge tone-<%= ROLE[k][1] %>"><%= ROLE[k][0] %></span> <span class="small muted"><%= ROLE[k][2] %></span></div><% }) %>
+    </section>
+    <% if (manage) { %>
+    <form method="post" action="/team/people" class="card card-pad">
+      <%- include('../partials/csrf') %>
+      <h3>Add a team member</h3>
+      <div class="field"><label for="pn">Full name</label><input id="pn" name="name" type="text" maxlength="190" required></div>
+      <div class="field"><label for="pe">Work email</label><input id="pe" name="email" type="email" required></div>
+      <div class="field"><label for="pp">Password <span class="muted">(optional)</span></label><input id="pp" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Set one now, or leave empty to email an invite"><div class="hint">If you set a password they can sign in straight away, with no email needed.</div></div>
+      <div class="form-grid">
+        <div class="field"><label for="pr">Role</label><select id="pr" name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+        <div class="field"><label for="pt">Job title <span class="muted">(optional)</span></label><input id="pt" name="job_title" type="text" maxlength="120"></div>
+      </div>
+      <button class="btn" type="submit"><%- h.icon('plus', 16) %> Add member</button>
+    </form>
+    <% } else { %><section class="card card-pad small muted">Only owners and admins can add people or change roles.</section><% } %>
+  </div>
+</div>

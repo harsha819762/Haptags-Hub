@@ -1,0 +1,61 @@
+/* Project board: drag & drop + assignee. */
+.bcard { cursor: grab; }
+.bcard.dragging { opacity: .45; transform: rotate(2deg) scale(.98); cursor: grabbing; }
+.bcard .bt { display: block; color: var(--text); font-weight: 650; margin-bottom: 2px; }
+.bcard .bt:hover { color: var(--blue-600); text-decoration: none; }
+.col-body { min-height: 90px; border-radius: 14px; transition: background .15s, outline-color .15s; outline: 2px dashed transparent; outline-offset: 2px; }
+.col.over .col-body { background: rgba(0,122,245,.08); outline-color: var(--blue); }
+.col.over .col-empty { display: none; }
+.assign { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); cursor: pointer; }
+.avatar.sm { width: 26px; height: 26px; font-size: 10.5px; }
+.avatar.unset { background: var(--grey-bg); color: var(--text-3); border: 1px dashed var(--border-strong); box-shadow: none; }
+.assign-select { border: 0; background: transparent; padding: 2px 4px; font: 600 12.5px var(--font-body); color: var(--text-2); width: auto; max-width: 100%; box-shadow: none; cursor: pointer; flex: 1; min-width: 0; }
+.assign-select:hover { color: var(--blue-600); }
+.move-select { display: none; margin-top: 10px; font-size: 13px; padding: 7px 10px; }
+@media (hover: none) { .move-select { display: block; } .bcard { cursor: default; } }
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 11px 18px; border-radius: 12px; font-weight: 600; box-shadow: var(--shadow-lift); z-index: 60; animation: rise .3s both; }
+.toast.err { background: var(--red); }
+.add-card { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px; border: 2px dashed #b7c8e3; border-radius: 14px; color: var(--text-2); font-weight: 600; font-size: 13.5px; transition: background .15s, border-color .15s, color .15s; }
+.add-card:hover { background: var(--surface); border-color: var(--blue); color: var(--blue-600); text-decoration: none; }
+.add-task { display: flex; gap: 8px; }
+.add-task input { flex: 1; min-width: 0; background: var(--surface); border: 2px dashed #b7c8e3; padding: 9px 12px; }
+.add-task input:focus { border-style: solid; }
+.task .task-top { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.task .bt { margin: 0; line-height: 1.35; word-break: break-word; }
+.task .x { background: none; border: 0; padding: 4px; border-radius: 8px; color: var(--text-3); cursor: pointer; opacity: 0; transition: opacity .15s, background .15s; }
+.task:hover .x, .task .x:focus-visible { opacity: 1; }
+.task .x:hover { background: var(--red-bg); color: var(--red); }
+.task .assign { margin-top: 10px; padding-top: 10px; }
+@media (hover: none) { .task .x { opacity: 1; } }
+.assign-input { border: 0; background: transparent; padding: 4px 6px; font: 600 12.5px var(--font-body); color: var(--text-2); flex: 1; min-width: 0; box-shadow: none; border-radius: 8px; }
+.assign-input::placeholder { color: var(--text-3); font-weight: 500; }
+.assign-input:hover { background: var(--grey-bg); }
+.assign-input:focus { background: var(--surface); box-shadow: var(--focus); color: var(--text); }
+
+/* ----- Task cards: big title, small assignee ----- */
+.bcard.task { padding: 18px 18px 14px; min-height: 110px; display: flex; flex-direction: column; border-radius: 16px; }
+.task .bt { font: 650 17px/1.35 var(--font-head); letter-spacing: -.01em; color: var(--text); }
+.task .assign { margin-top: auto; padding-top: 14px; gap: 6px; border-top: 0; }
+.task .avatar.sm { width: 18px; height: 18px; font-size: 8px; }
+.task .assign-input { font: 500 11.5px var(--font-body); color: var(--text-3); padding: 2px 4px; background: transparent; border-radius: 6px; }
+.task .assign-input:hover { background: var(--grey-bg); }
+.task .assign-input:focus { color: var(--text); }
+.task .task-top { margin-bottom: 0; }
+.task .assign input.assign-input { border: 1px solid transparent; background: transparent; box-shadow: none; width: auto; flex: 1; }
+.task .assign input.assign-input:hover { border-color: var(--border); background: var(--surface-2); }
+.task .assign input.assign-input:focus { border-color: var(--blue); background: var(--surface); box-shadow: var(--focus); }
+
+/* ----- Task cards: chips, task page, files ----- */
+.task-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.task-chips:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; background: var(--grey-bg); color: var(--grey); font: 600 11.5px var(--font-body); }
+.chip-red { background: var(--red-bg); color: var(--red); } .chip-amber { background: var(--amber-bg); color: var(--amber); }
+a.chip:hover { text-decoration: none; filter: brightness(.96); }
+.approve-card { border-color: #f6d9a6; background: linear-gradient(135deg, #fffaf0, #fff); }
+.dropzone { margin: 16px; padding: 26px 16px; border: 2px dashed #b7c8e3; border-radius: 14px; text-align: center; color: var(--text-3); display: grid; gap: 4px; justify-items: center; transition: background .15s, border-color .15s; }
+.dropzone b { color: var(--text); font-family: var(--font-head); }
+.dropzone.over { background: var(--blue-50); border-color: var(--blue); }
+.ficon { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.add-link { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: 8px; border-top: 1px solid var(--border); }
+.add-link input { padding: 8px 10px; font-size: 13px; }
+@media (max-width: 600px) { .add-link { grid-template-columns: 1fr; } }

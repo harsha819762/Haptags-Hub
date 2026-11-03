@@ -10,7 +10,7 @@ function back(req, fallback) {
   if (ref) {
     try {
       const u = new URL(ref);
-      if (u.pathname === '/invoices' || u.pathname.startsWith('/invoices/')) return u.pathname + u.search;
+      if (u.pathname === '/team/gst' || u.pathname.startsWith('/team/gst/')) return u.pathname + u.search;
     } catch { /* ignore */ }
   }
   return fallback;

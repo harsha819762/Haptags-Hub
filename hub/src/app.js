@@ -6,7 +6,7 @@ const helmet = require('helmet');
 const cookieSession = require('cookie-session');
 const config = require('./config');
 const { getSettings } = require('./lib/settings');
-const { loadUser, requireStaff, requireAdmin, requireClient } = require('./lib/auth');
+const { loadUser, requireStaff, requireAdmin, requireClient, homeFor } = require('./lib/auth');
 const { csrf, flash, notFound } = require('./lib/middleware');
 const viewHelpers = require('./lib/view-helpers');
 
@@ -74,7 +74,7 @@ app.use((req, res, next) => {
     render(view, locals, (err, html) => {
       if (err) return next(err);
       const layout = locals.layout !== undefined ? locals.layout
-        : view.startsWith('admin/') ? 'admin' : view.startsWith('portal/') ? 'portal' : 'public';
+        : view.startsWith('admin/') ? 'admin' : view.startsWith('portal/') || view.startsWith('team/') ? 'portal' : 'public';
       if (!layout) return res.send(html);
       render(`layouts/${layout}`, { ...locals, body: html }, (err2, page) => (err2 ? next(err2) : res.send(page)));
     });
@@ -88,6 +88,8 @@ app.use(async (req, res, next) => {
   res.locals.fullPath = req.path;
   res.locals.searchQuery = req.path === '/admin/search' ? String(req.query.q || '') : '';
   res.locals.baseUrl = config.baseUrl;
+  res.locals.adminOn = process.env.ENABLE_ADMIN === '1'; // the legacy back office at /admin
+  res.locals.googleSignIn = require('./lib/google').enabled();
   res.locals.title = '';
   next();
 });
@@ -96,13 +98,22 @@ app.use(loadUser);
 app.use(flash);
 app.use(csrf);
 
+// Company view for the Haptags team at /team, and the client portal at /portal. The old back office (/admin) is switched off.
 app.use('/api/rt', require('./routes/realtime'));
 app.use(require('./routes/meet'));
+// The lms.haptags.com API (doubt sessions, tax invoices for LMS payments) is called by the LMS server, so it is always on.
 app.use(require('./routes/lms'));
+// The old back office (leads, finance, education, GST screens...) is off unless ENABLE_ADMIN=1. The tests turn it on.
+if (process.env.ENABLE_ADMIN === '1') {
+  app.use('/admin', requireStaff, require('./routes/admin'));
+} else {
+  app.use(['/start', '/api/v1/leads'], notFound); // the public enquiry form feeds that back office, so it is off too
+}
+app.use('/invoices', requireStaff, (req, res) => res.redirect(`/team/gst${req.url === '/' ? '' : req.url}`)); // GST Invoices moved into the company view
+app.get('/', (req, res) => res.redirect(homeFor(req.user)));
 app.use(require('./routes/public'));
 app.use(require('./routes/auth'));
-app.use('/admin', requireStaff, require('./routes/admin'));
-app.use('/invoices', requireAdmin, require('./routes/gst'));
+app.use('/team', requireStaff, require('./routes/team'));
 app.use('/portal', requireClient, require('./routes/portal'));
 
 app.use(notFound);

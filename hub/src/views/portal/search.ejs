@@ -1,0 +1,19 @@
+<div class="page-head"><div><h1>Search</h1><div class="sub">Projects, tasks, billing, requests and messages.</div></div></div>
+<form method="get" action="/portal/search" class="search-big" role="search">
+  <%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search everything…" aria-label="Search" autofocus>
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<% if (q.length < 2) { %>
+<div class="card"><div class="empty"><div class="art"><%- h.icon('search', 28) %></div><b>Find anything fast</b><p>Type at least two letters. Tip: press <kbd>Ctrl</kbd> + <kbd>K</kbd> from any page.</p></div></div>
+<% } else if (!total) { %>
+<div class="card"><div class="empty"><div class="art"><%- h.icon('search', 28) %></div><b>No results for “<%= q %>”</b><p>Try a different word, or part of a name or number.</p></div></div>
+<% } else { %>
+<div class="stack">
+  <% if (results.projects.length) { %><section class="card"><div class="card-head"><h3>Projects</h3></div><ul class="list"><% results.projects.forEach(function (p) { %><li><div class="grow"><a class="title" href="/portal/projects/<%= p.id %>"><%= p.name %></a><span class="meta"><%= h.service(p.service) || 'Project' %></span></div><%- h.badge(p.status) %></li><% }) %></ul></section><% } %>
+  <% if (results.tasks.length) { %><section class="card"><div class="card-head"><h3>Tasks</h3></div><ul class="list"><% results.tasks.forEach(function (t) { %><li><div class="grow"><a class="title" href="/portal/tasks/<%= t.id %>"><%= t.title %></a><span class="meta"><%= t.project_name %></span></div><span class="badge tone-<%= { todo: 'grey', doing: 'blue', review: 'amber', done: 'green' }[t.status] %>"><%= { todo: 'To do', doing: 'In progress', review: 'Under review', done: 'Completed' }[t.status] %></span></li><% }) %></ul></section><% } %>
+  <% if (results.billing.length) { %><section class="card"><div class="card-head"><h3>Billing</h3></div><ul class="list"><% results.billing.forEach(function (b) { %><li><div class="grow"><a class="title" href="<%= b.href %>"><%= b.title %></a><span class="meta"><%= b.sub %></span></div></li><% }) %></ul></section><% } %>
+  <% if (results.tickets.length) { %><section class="card"><div class="card-head"><h3>Requests</h3></div><ul class="list"><% results.tickets.forEach(function (t) { %><li><div class="grow"><a class="title" href="/portal/tickets/<%= t.id %>"><%= t.subject %></a></div><%- h.badge(t.status) %></li><% }) %></ul></section><% } %>
+  <% if (results.messages.length) { %><section class="card"><div class="card-head"><h3>Messages</h3></div><ul class="list"><% results.messages.forEach(function (m) { %><li><div class="grow"><a class="title" href="/portal/chat/<%= m.channel_id %>"><%= m.body.length > 90 ? m.body.slice(0, 90) + '…' : m.body %></a><span class="meta">Chat</span></div></li><% }) %></ul></section><% } %>
+</div>
+<% } %>

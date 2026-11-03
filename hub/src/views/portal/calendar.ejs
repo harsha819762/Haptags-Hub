@@ -1,0 +1,36 @@
+<div class="page-head">
+  <div><h1>Calendar</h1><div class="sub">Meetings, deadlines and due dates in one view.</div></div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="/portal/calendar?m=<%= prev %>" aria-label="Previous month"><%- h.icon('back', 16) %></a>
+    <a class="btn btn-ghost" href="/portal/calendar?m=<%= thisMonth %>">Today</a>
+    <a class="btn btn-ghost" href="/portal/calendar?m=<%= next %>" aria-label="Next month" style="transform:none"><span style="display:inline-block;transform:scaleX(-1)"><%- h.icon('back', 16) %></span></a>
+    <a class="btn" href="/portal/chat/meetings/new"><%- h.icon('plus', 16) %> Schedule</a>
+  </div>
+</div>
+<div class="cal-legend">
+  <span><i class="k-meeting"></i> Meeting</span><span><i class="k-task"></i> Task due</span><span><i class="k-invoice"></i> Invoice due</span><span><i class="k-project"></i> Project target</span>
+</div>
+<div class="split">
+  <section class="card cal">
+    <div class="cal-title"><h2><%= monthLabel %></h2></div>
+    <div class="cal-head"><% ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(function (d) { %><span><%= d %></span><% }) %></div>
+    <div class="cal-grid">
+      <% weeks.forEach(function (w) { w.forEach(function (d) { %>
+      <div class="cal-day<%= d.inMonth ? '' : ' out' %><%= d.today ? ' today' : '' %>">
+        <span class="n"><%= Number(d.date.slice(8)) %></span>
+        <% d.events.slice(0, 3).forEach(function (e) { %><a class="ev k-<%= e.kind %>" href="<%= e.href %>" title="<%= e.label %><%= e.sub ? ' · ' + e.sub : '' %>"><%= e.label %></a><% }) %>
+        <% if (d.events.length > 3) { %><span class="more">+<%= d.events.length - 3 %> more</span><% } %>
+      </div>
+      <% }) }) %>
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h3>Coming up</h3></div>
+    <% if (!upcoming.length) { %><div class="empty" style="padding:28px"><b>Nothing this month</b>No deadlines or meetings ahead.</div><% } %>
+    <ul class="list">
+      <% upcoming.forEach(function (d) { d.events.forEach(function (e) { %>
+      <li><div class="when" style="width:62px"><b><%= h.date(d.date).slice(0, 6) %></b></div><div class="grow"><a class="title" href="<%= e.href %>"><%= e.label %></a><span class="meta"><%= e.sub || h.humanize(e.kind) %></span></div></li>
+      <% }) }) %>
+    </ul>
+  </section>
+</div>

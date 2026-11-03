@@ -23,6 +23,7 @@ Object.assign(process.env, {
   LMS_API_URL: process.env.TEST_LMS_API_URL || '', // tests never call the real LMS
   HOLIDAYS_ICS_URL: '', // nor Google's holiday calendar
   NODE_ENV: 'test',
+  ENABLE_ADMIN: '1',
   LMS_KEY_SHA256: crypto.createHash('sha256').update('test-lms-key').digest('hex'),
 });
 
@@ -251,8 +252,12 @@ test('client portal is isolated and CSRF is enforced', async () => {
   assert.equal((await alice.get(setPath)).status, 410, 'set-password links are single use');
 
   assert.equal((await alice.get('/portal')).status, 200);
-  assert.equal((await alice.get(`/portal/projects/${pb}`)).status, 404);
-  assert.equal((await alice.get('/admin')).status, 403);
+  // Clients have no Projects section: every old project link goes to the dashboard, and another client's data is never shown there.
+  res = await alice.get(`/portal/projects/${pb}`);
+  assert.equal(res.status, 302);
+  assert.equal(res.location, '/portal');
+  assert.doesNotMatch((await alice.get('/portal')).text, /B secret project/);
+  assert.equal((await alice.get('/admin')).status, 404, 'a client is never told team pages exist');
 
   await alice.get('/portal/tickets/new');
   res = await alice.post('/portal/tickets', { subject: 'Need help', body: 'Please call me', priority: 'high' });
@@ -472,17 +477,17 @@ test('LMS daily doubt session: one meeting per course per day, students invited 
 test('education: programs, enrolment with instalments, student invoices and their own series', async () => {
   const owner = new Browser();
   await owner.login('owner@test.local', 'owner-password-1');
-  await owner.get('/admin/education/programs');
-  await owner.post('/admin/education/programs', { name: 'Web dev internship', kind: 'internship', fee: '11800', fee_includes_gst: '1', duration: '8 weeks' });
+  await owner.get('/team/education/programs');
+  await owner.post('/team/education/programs', { name: 'Web dev internship', kind: 'internship', fee: '11800', fee_includes_gst: '1', duration: '8 weeks' });
   const program = await db('programs').where({ name: 'Web dev internship' }).first();
   assert.equal(Number(program.fee), 1180000);
 
-  await owner.get('/admin/education/students/new');
-  let res = await owner.post('/admin/education/students', { name: 'Kiran Rao', phone: '9876543210', fee: '11800' });
+  await owner.get('/team/education/students/new');
+  let res = await owner.post('/team/education/students', { name: 'Kiran Rao', phone: '9876543210', fee: '11800' });
   assert.equal(res.status, 302);
-  res = await owner.post('/admin/education/students', { name: '', fee: '' });
+  res = await owner.post('/team/education/students', { name: '', fee: '' });
   assert.equal(res.status, 422, 'name and fee are required');
-  res = await owner.post('/admin/education/students', {
+  res = await owner.post('/team/education/students', {
     name: 'Divya N', phone: '9876500000', email: 'divya@college.test', college: 'RVCE', course: 'B.E. CSE 3rd year',
     program_id: String(program.id), batch: 'Jan 2027', fee: '11800', installments: '2', paid_now: '7000', method: 'upi', reference: 'UPI123',
     state: 'Karnataka',
@@ -501,22 +506,22 @@ test('education: programs, enrolment with instalments, student invoices and thei
   assert.equal(invoices[1].due_date > invoices[0].due_date, true);
 
   // Students stay out of the business client list but show under Education.
-  assert.match((await owner.get(`/admin/education/students/${studentId}`)).text, /instalment 2 of 2/);
+  assert.match((await owner.get(`/team/education/students/${studentId}`)).text, /instalment 2 of 2/);
   assert.doesNotMatch((await owner.get('/admin/clients')).text, /Divya N/);
-  assert.equal((await owner.get(`/admin/clients/${studentId}`)).location, `/admin/education/students/${studentId}`);
-  const list = await owner.get('/admin/education/students?status=due');
+  assert.equal((await owner.get(`/admin/clients/${studentId}`)).location, `/team/education/students/${studentId}`);
+  const list = await owner.get('/team/education/students?status=due');
   assert.match(list.text, /Divya N/);
-  const overview = await owner.get('/admin/education?period=all');
+  const overview = await owner.get('/team/education?period=all');
   assert.equal(overview.status, 200);
   assert.match(overview.text, /Web dev internship/);
-  assert.match((await owner.get('/admin/education/students.csv')).text, /Divya N/);
+  assert.match((await owner.get('/team/education/students.csv')).text, /Divya N/);
 
   // A duplicate created by mistake can be deleted (by owners/admins), invoices and all.
-  res = await owner.post('/admin/education/students', { name: 'Dup Student', phone: '9000000000', fee: '999' });
+  res = await owner.post('/team/education/students', { name: 'Dup Student', phone: '9000000000', fee: '999' });
   const dupId = Number(res.location.split('/').pop());
-  await owner.get(`/admin/education/students/${dupId}`);
-  res = await owner.post(`/admin/education/students/${dupId}/delete`, {});
-  assert.equal(res.location, '/admin/education/students');
+  await owner.get(`/team/education/students/${dupId}`);
+  res = await owner.post(`/team/education/students/${dupId}/delete`, {});
+  assert.equal(res.location, '/team/education/students');
   assert.equal(await db('clients').where({ id: dupId }).first(), undefined);
   assert.equal(Number((await db('invoices').where({ client_id: dupId }).count({ n: '*' }).first()).n), 0);
 });
@@ -589,7 +594,7 @@ test('finance: bank statement import, dedupe, categories, matching and the CEO v
   // Finance is for owners and admins only.
   const staff = await staffUser('Sam Staff', 'sam@test.local');
   assert.equal((await staff.b.get('/admin/finance')).status, 403);
-  assert.equal((await staff.b.get('/admin/education')).status, 200, 'the team can still enrol students');
+  assert.equal((await staff.b.get('/team/education')).status, 403, 'students and their fees are for owners and admins');
 });
 
 test('certificates from the LMS, CSV import of past students, and uploads', async () => {
@@ -619,8 +624,8 @@ test('certificates from the LMS, CSV import of past students, and uploads', asyn
     await owner.login('owner@test.local', 'owner-password-1');
 
     // Sync: 001 matches the existing student by name, 002 creates a new one.
-    await owner.get('/admin/education/certificates');
-    await owner.post('/admin/education/certificates/sync', {});
+    await owner.get('/team/education/certificates');
+    await owner.post('/team/education/certificates/sync', {});
     const divya = await db('clients').where({ name: 'Divya N', segment: 'student' }).first();
     const c1 = await db('certificates').where({ certificate_no: 'HAP-INT-001' }).first();
     assert.equal(c1.client_id, divya.id);
@@ -629,10 +634,10 @@ test('certificates from the LMS, CSV import of past students, and uploads', asyn
     const fresh = await db('clients').where({ name: 'Fresh Intern' }).first();
     assert.equal(fresh.segment, 'student');
     assert.equal(fresh.end_date.slice(0, 10), '2026-10-17');
-    const pdf = await fetch(`${base}/admin/education/certificates/${c1.id}/pdf`, { headers: { cookie: owner.header() } });
+    const pdf = await fetch(`${base}/team/education/certificates/${c1.id}/pdf`, { headers: { cookie: owner.header() } });
     assert.equal(pdf.headers.get('content-type'), 'application/pdf');
     assert.equal(await pdf.text(), '%PDF-1.4 fake certificate');
-    await owner.post('/admin/education/certificates/sync', {});
+    await owner.post('/team/education/certificates/sync', {});
     assert.equal(Number((await db('certificates').count({ n: '*' }).first()).n), 2, 'syncing again adds nothing');
 
     // CSV import: a new student (with invoice, payment and certificate) and Divya (already invoiced).
@@ -643,8 +648,8 @@ test('certificates from the LMS, CSV import of past students, and uploads', asyn
       'Divya N,,,,,,,,,11800,,,,,,,,',
       ',,,,,,,,,,,,,,,,,',
     ].join('\n');
-    await owner.get('/admin/education/import');
-    const res = await owner.post('/admin/education/import', { csv });
+    await owner.get('/team/education/import');
+    const res = await owner.post('/team/education/import', { csv });
     assert.equal(res.status, 200);
     assert.match(res.text, /Imported 2 of 2 rows/);
     assert.match(res.text, /already invoiced/);
@@ -660,20 +665,20 @@ test('certificates from the LMS, CSV import of past students, and uploads', asyn
     assert.equal(Number((await db('email_log').where({ to_email: 'csv@student.test' }).count({ n: '*' }).first()).n), 0, 'imports send no emails');
     assert.ok(Number((await db('email_log').count({ n: '*' }).first()).n) >= mailsBefore);
     // Re-importing doesn't duplicate.
-    await owner.post('/admin/education/import', { csv });
+    await owner.post('/team/education/import', { csv });
     assert.equal(Number((await db('clients').where({ email: 'csv@student.test' }).count({ n: '*' }).first()).n), 1);
     assert.equal(Number((await db('invoices').where({ client_id: st.id }).count({ n: '*' }).first()).n), 1);
 
     // Upload a certificate by hand.
-    await owner.get(`/admin/education/students/${fresh.id}`);
-    const up = await fetch(`${base}/admin/education/students/${fresh.id}/certificates?certificate_no=MANUAL-7&programme=Data%20Science&issued_on=2026-09-01`, {
+    await owner.get(`/team/education/students/${fresh.id}`);
+    const up = await fetch(`${base}/team/education/students/${fresh.id}/certificates?certificate_no=MANUAL-7&programme=Data%20Science&issued_on=2026-09-01`, {
       method: 'POST', body: Buffer.from('%PDF-1.4 manual'),
       headers: { cookie: owner.header(), 'content-type': 'application/pdf', accept: 'application/json', 'x-csrf-token': owner.csrf },
     });
     assert.equal(up.status, 200);
     const manual = await db('certificates').where({ certificate_no: 'MANUAL-7' }).first();
     assert.equal(manual.source, 'upload');
-    assert.match((await owner.get(`/admin/education/students/${fresh.id}`)).text, /MANUAL-7/);
+    assert.match((await owner.get(`/team/education/students/${fresh.id}`)).text, /MANUAL-7/);
   } finally {
     config.lms.apiUrl = '';
     lms.close();

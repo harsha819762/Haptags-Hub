@@ -1,0 +1,47 @@
+<%
+  const today = new Date().toISOString().slice(0, 10);
+  const late = task.due_date && String(task.due_date).slice(0, 10) < today && task.status !== 'done';
+%>
+<div class="crumbs"><a href="/team/projects">Projects</a> / <a href="/team/projects/<%= task.project_id %>"><%= task.project_name %></a> / Task</div>
+<div class="page-head">
+  <div><h1><%= task.title %></h1><div class="sub"><%= task.client_name %> · <a href="/team/projects/<%= task.project_id %>"><%= task.project_name %></a></div></div>
+  <div class="actions">
+    <form method="post" action="/team/tasks/<%= task.id %>/status"><%- include('../partials/csrf') %>
+      <select name="status" data-autosubmit aria-label="Task status"><% Object.keys(TASK_LABEL).forEach(function (k) { %><option value="<%= k %>" <%= task.status === k ? 'selected' : '' %>><%= TASK_LABEL[k] %></option><% }) %></select>
+    </form>
+  </div>
+</div>
+<div class="split">
+  <div class="stack">
+    <section class="card card-pad">
+      <h3>Details</h3>
+      <div class="small" style="white-space:pre-wrap"><%= task.description || 'No description.' %></div>
+      <div class="row mt-16">
+        <span class="chip <%= task.priority === 'high' ? 'chip-red' : '' %>">Priority: <%= h.humanize(task.priority) %></span>
+        <span class="chip <%= late ? 'chip-red' : '' %>"><%- h.icon('calendar', 11) %> <%= task.due_date ? h.date(task.due_date) : 'No due date' %></span>
+      </div>
+      <form method="post" action="/team/tasks/<%= task.id %>/assign" class="row mt-16" style="flex-wrap:nowrap"><%- include('../partials/csrf') %>
+        <input type="text" name="assignee" value="<%= task.assignee || '' %>" placeholder="Assigned to" maxlength="80" aria-label="Assigned to"><button class="btn btn-ghost btn-sm" type="submit">Save</button>
+      </form>
+    </section>
+    <section class="card" id="comments">
+      <div class="card-head"><h3>Comments <span class="muted small">(<%= comments.length %>)</span></h3></div>
+      <div class="card-body">
+        <% if (!comments.length) { %><p class="muted small">No comments yet.</p><% } %>
+        <div class="thread"><% comments.forEach(function (c) { const mine = c.user_id === user.id; %><div class="msg <%= mine ? 'mine' : '' %> <%= c.internal ? 'internal' : '' %>"><div class="meta"><b><%= mine ? 'You' : (c.user_name || 'Someone') %></b><%= c.user_role === 'client' ? ' · Client' : '' %> · <%= h.dateTime(c.created_at) %><% if (c.internal) { %> <span class="chip chip-amber">Internal</span><% } %></div><div class="body"><%= c.body %></div></div><% }) %></div>
+        <form method="post" action="/team/tasks/<%= task.id %>/comment" class="mt-16"><%- include('../partials/csrf') %>
+          <div class="field"><textarea name="body" rows="3" placeholder="Reply to the client, or tick Internal note…" aria-label="Comment" required></textarea></div>
+          <label class="check mb-8"><input type="checkbox" name="internal" value="1"> Internal note <span class="muted">(only your team can see it)</span></label>
+          <button class="btn btn-sm" type="submit"><%- h.icon('send', 15) %> Comment</button>
+        </form>
+      </div>
+    </section>
+  </div>
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Attachments</h3></div>
+      <% if (!files.length) { %><div class="empty" style="padding:22px">None.</div><% } %>
+      <ul class="list"><% files.forEach(function (f) { %><li><span class="ic blue ficon"><%- h.icon(f.url ? 'link' : 'paperclip', 15) %></span><div class="grow"><a class="title" href="<%= f.url || '/team/files/' + f.id %>" <%- f.url ? 'target="_blank" rel="noopener noreferrer"' : '' %>><%= f.label %></a><span class="meta"><%= h.ago(f.created_at) %></span></div></li><% }) %></ul>
+    </section>
+  </div>
+</div>

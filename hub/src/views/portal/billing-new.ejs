@@ -1,0 +1,81 @@
+<%
+  const v = values;
+  const rupees = function (p) { return p ? String(p / 100) : ''; };
+%>
+<div class="crumbs"><a href="<%= locals.billBase || '/portal/billing' %>">Billing</a> / New</div>
+<div class="page-head"><div><h1>Create a document</h1><div class="sub">Fill in the details — your document builds itself as you type.</div></div></div>
+
+<div class="builder">
+  <form method="post" action="<%= locals.billBase || '/portal/billing' %>" id="builder" class="card card-pad builder-form" novalidate>
+    <%- include('../partials/csrf') %>
+
+    <div class="step"><span class="n">1</span><h3>What are you making?</h3></div>
+    <div class="type-pick" role="radiogroup">
+      <% Object.keys(DOC_TYPES).forEach(function (k) { %>
+      <label><input type="radio" name="type" value="<%= k %>" <%= v.type === k ? 'checked' : '' %>><span><%- h.icon(k === 'receipt' ? 'check' : k === 'quotation' ? 'quotes' : 'invoices', 18) %><b><%= DOC_TYPES[k].label %></b></span></label>
+      <% }) %>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label for="issue_date">Date</label><input id="issue_date" name="issue_date" type="date" value="<%= v.issue_date || '' %>"></div>
+      <div class="field" id="due-field"><label for="due_date" id="due-label"><%= v.type === 'quotation' ? 'Valid until' : 'Due date' %></label><input id="due_date" name="due_date" type="date" value="<%= v.due_date ? String(v.due_date).slice(0, 10) : '' %>"></div>
+    </div>
+
+    <div class="step"><span class="n">2</span><h3>Who is it for?</h3></div>
+    <% if (locals.clients) { %>
+    <div class="field"><label for="client_id">Which client?</label>
+      <select id="client_id" name="client_id" data-client-pick <%- errors.client ? 'aria-invalid="true"' : '' %>>
+        <option value="">Choose a client…</option>
+        <% clients.forEach(function (c) { %><option value="<%= c.id %>" <%= Number(clientId) === c.id ? 'selected' : '' %>
+          data-name="<%= c.name %>" data-email="<%= c.email || '' %>" data-phone="<%= c.phone || '' %>" data-gstin="<%= c.gstin || '' %>"
+          data-address="<%= [c.address, c.city, c.state, c.pincode].filter(Boolean).join(', ') %>" data-igst="<%= c.state && c.state.toLowerCase() !== 'karnataka' ? 1 : 0 %>"><%= c.name %></option><% }) %>
+      </select><% if (errors.client) { %><div class="error"><%= errors.client %></div><% } %>
+      <div class="hint">Picking a client fills in their details below.</div>
+    </div>
+    <% } %>
+    <div class="field"><label for="bill_name">Client name</label><input id="bill_name" name="bill_name" type="text" value="<%= v.bill_name || '' %>" placeholder="e.g. Sunrise Interiors" <%- errors.bill_name ? 'aria-invalid="true"' : '' %> autofocus><% if (errors.bill_name) { %><div class="error"><%= errors.bill_name %></div><% } %></div>
+    <div class="form-grid">
+      <div class="field"><label for="bill_email">Email <span class="muted">(optional)</span></label><input id="bill_email" name="bill_email" type="email" value="<%= v.bill_email || '' %>"></div>
+      <div class="field"><label for="bill_phone">Phone <span class="muted">(optional)</span></label><input id="bill_phone" name="bill_phone" type="tel" value="<%= v.bill_phone || '' %>"></div>
+    </div>
+    <div class="field"><label for="bill_address">Address <span class="muted">(optional)</span></label><textarea id="bill_address" name="bill_address" rows="2"><%= v.bill_address || '' %></textarea></div>
+    <div class="field"><label for="bill_gstin">Client GSTIN <span class="muted">(optional)</span></label><input id="bill_gstin" name="bill_gstin" type="text" value="<%= v.bill_gstin || '' %>" maxlength="15" style="text-transform:uppercase"></div>
+
+    <div class="step"><span class="n">3</span><h3>What are you billing for?</h3></div>
+    <% if (errors.items) { %><div class="flash flash-error"><%- h.icon('alert') %><span><%= errors.items %></span></div><% } %>
+    <div class="items-head"><span>Item</span><span>Qty</span><span>Rate (₹)</span><span>Amount</span><span></span></div>
+    <div id="items">
+      <% v.items.forEach(function (it) { %>
+      <div class="item-row">
+        <input type="text" name="item_desc" value="<%= it.description %>" placeholder="e.g. Website design" aria-label="Item description">
+        <input type="number" name="item_qty" value="<%= it.quantity %>" min="0" step="any" aria-label="Quantity">
+        <input type="number" name="item_rate" value="<%= rupees(it.rate) %>" min="0" step="any" placeholder="0" aria-label="Rate in rupees">
+        <output class="item-amt">₹0.00</output>
+        <button type="button" class="x-btn" data-remove-item aria-label="Remove item"><%- h.icon('x', 14) %></button>
+      </div>
+      <% }) %>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" id="add-item"><%- h.icon('plus', 15) %> Add another item</button>
+
+    <div class="step"><span class="n">4</span><h3>Tax &amp; extras</h3></div>
+    <div class="form-grid">
+      <div class="field"><label for="gst_rate">GST</label>
+        <select id="gst_rate" name="gst_rate"><% [0, 5, 12, 18, 28].forEach(function (r) { %><option value="<%= r %>" <%= Number(v.gst_rate) === r ? 'selected' : '' %>><%= r === 0 ? 'No GST' : r + '%' %></option><% }) %></select></div>
+      <div class="field"><label for="discount">Discount (₹)</label><input id="discount" name="discount" type="number" min="0" step="any" value="<%= rupees(v.discount) %>" placeholder="0"></div>
+    </div>
+    <label class="check" id="igst-row"><input type="checkbox" name="igst" value="1" <%= v.igst ? 'checked' : '' %>> Client is outside Karnataka <span class="muted">(IGST instead of CGST + SGST)</span></label>
+
+    <div id="receipt-fields" class="form-grid" <%- v.type === 'receipt' ? '' : 'hidden' %>>
+      <div class="field"><label for="pay_method">Paid by</label><select id="pay_method" name="pay_method"><% PAY_METHODS.forEach(function (m) { %><option <%= v.pay_method === m ? 'selected' : '' %>><%= m %></option><% }) %></select></div>
+      <div class="field"><label for="pay_ref">Transaction / reference no. <span class="muted">(optional)</span></label><input id="pay_ref" name="pay_ref" type="text" value="<%= v.pay_ref || '' %>"></div>
+    </div>
+    <div class="field"><label for="notes">Notes <span class="muted">(optional)</span></label><textarea id="notes" name="notes" rows="2" placeholder="Terms, thank-you note, anything to add"><%= v.notes || '' %></textarea></div>
+
+    <div class="form-actions"><button class="btn btn-lg" type="submit"><%- h.icon('check', 16) %> Save document</button><a class="btn btn-ghost btn-lg" href="<%= locals.billBase || '/portal/billing' %>">Cancel</a></div>
+  </form>
+
+  <aside class="builder-preview">
+    <div class="preview-label"><%- h.icon('zap', 14) %> Live preview</div>
+    <%- include('../partials/bill-paper', { doc: doc }) %>
+  </aside>
+</div>
+<script src="/static/js/builder.js?v=1" defer></script>

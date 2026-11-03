@@ -1,4 +1,4 @@
-/* Haptags Hub: live updates (long-polling), toasts and desktop notifications. */
+/* Haptags Portal: live updates (long-polling), toasts and desktop notifications. */
 (function () {
   'use strict';
 
@@ -186,7 +186,7 @@
       if (watching) return;
       if (HubRT.activeChannel !== d.channelId) badge('chat', 1);
       if (m.kind === 'call') return; // the call.ring event handles calls
-      var href = '/admin/chat/' + d.channelId;
+      var href = (document.documentElement.getAttribute('data-chat-base') || '/admin/chat') + '/' + d.channelId;
       if (HubRT.activeChannel !== d.channelId) toast({ title: m.userName, body: preview(m), href: href });
       notify(m.userName, preview(m), href, 'chat-' + d.channelId);
     },

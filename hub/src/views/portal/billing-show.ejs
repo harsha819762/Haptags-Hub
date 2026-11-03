@@ -1,0 +1,11 @@
+<div class="crumbs no-print"><a href="/portal/billing">Billing</a> / <%= doc.number %></div>
+<div class="page-head no-print">
+  <div><h1><%= DOC_TYPES[doc.type].label %> <span class="mono" style="font-size:.7em"><%= doc.number %></span> <%- h.badge(doc.type === 'receipt' ? 'paid' : doc.status === 'open' ? 'sent' : doc.status, doc.type === 'receipt' ? 'Paid' : doc.status === 'open' ? 'Open' : null) %></h1><div class="sub">For <%= doc.bill_name %> · <%= h.inr(doc.totals.total) %></div></div>
+  <div class="actions">
+    <button class="btn" type="button" data-print><%- h.icon('printer', 16) %> Print / Save as PDF</button>
+  </div>
+</div>
+<div class="paper-wrap"><%- include('../partials/bill-paper', { doc: doc }) %></div>
+
+
+<script src="/static/js/builder.js?v=1" defer></script>

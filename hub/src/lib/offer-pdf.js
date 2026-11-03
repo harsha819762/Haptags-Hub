@@ -216,7 +216,7 @@ async function renderOfferPdf(content) {
   const [logo, signature] = await Promise.all([image('logo', content.company.logo_file_id), image('signature', content.company.signature_file_id)]);
   const pdf = new PDFDocument({
     size: 'A4', margin: 0, bufferPages: true, autoFirstPage: false,
-    info: { Title: `${content.title} ${content.reference}`, Author: content.company.legal_name, Subject: content.subject, Creator: 'Haptags Hub' },
+    info: { Title: `${content.title} ${content.reference}`, Author: content.company.legal_name, Subject: content.subject, Creator: 'Haptags Portal' },
   });
   for (const [name, data] of Object.entries(FONTS)) pdf.registerFont(name, data);
   const chunks = [];

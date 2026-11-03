@@ -9,15 +9,15 @@
     <div class="sub"><%= type === 'invoice' ? 'Rule 46 tax invoices, numbered per financial year. Finalised invoices are locked.' : type === 'proforma' ? 'Quotations and proformas. Not tax invoices; convert one when the client confirms.' : 'Corrections to finalised tax invoices (Rule 53). Create one from the invoice it adjusts.' %></div>
   </div>
   <div class="actions">
-    <% if (newKind) { %><a class="btn" href="/invoices/docs/new?kind=<%= newKind %>"><%- h.icon('plus', 16) %> New <%= newKind === 'invoice' ? 'tax invoice' : 'proforma' %></a><% } else { %>
-      <a class="btn btn-ghost" href="/invoices/docs/new?kind=debit_note"><%- h.icon('plus', 16) %> Debit note</a>
-      <a class="btn" href="/invoices/docs/new?kind=credit_note"><%- h.icon('plus', 16) %> Credit note</a>
+    <% if (newKind) { %><a class="btn" href="/team/gst/docs/new?kind=<%= newKind %>"><%- h.icon('plus', 16) %> New <%= newKind === 'invoice' ? 'tax invoice' : 'proforma' %></a><% } else { %>
+      <a class="btn btn-ghost" href="/team/gst/docs/new?kind=debit_note"><%- h.icon('plus', 16) %> Debit note</a>
+      <a class="btn" href="/team/gst/docs/new?kind=credit_note"><%- h.icon('plus', 16) %> Credit note</a>
     <% } %>
   </div>
 </div>
 
 <nav class="tabs">
-  <% tabs.forEach(function (t) { %><a href="<%= h.qs('/invoices/docs', Object.assign({}, keep, { status: t[0] })) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %>
+  <% tabs.forEach(function (t) { %><a href="<%= h.qs('/team/gst/docs', Object.assign({}, keep, { status: t[0] })) %>" class="<%= status === t[0] ? 'active' : '' %>"><%= t[1] %></a><% }) %>
 </nav>
 <form method="get" class="gst-list-filters mb-16">
   <input type="hidden" name="type" value="<%= type %>"><input type="hidden" name="status" value="<%= status %>">
@@ -26,7 +26,7 @@
   <input type="date" name="from" value="<%= from || '' %>" aria-label="From date">
   <input type="date" name="to" value="<%= to || '' %>" aria-label="To date">
   <button class="btn btn-ghost btn-sm" type="submit">Filter</button>
-  <% if (q || clientId || from || to) { %><a class="btn-link small" href="<%= h.qs('/invoices/docs', { type: type, status: status }) %>">Clear</a><% } %>
+  <% if (q || clientId || from || to) { %><a class="btn-link small" href="<%= h.qs('/team/gst/docs', { type: type, status: status }) %>">Clear</a><% } %>
 </form>
 
 <div class="card">
@@ -41,9 +41,9 @@
     <tbody>
       <% rows.forEach(function (d) { const st = g.displayStatus(d, today); %>
       <tr class="<%= st === 'cancelled' ? 'is-cancelled' : '' %>">
-        <td><a class="strong mono" href="/invoices/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="sub"><%= type === 'notes' ? g.kindLabel(d.kind) : (d.subject || '') %></span></td>
+        <td><a class="strong mono" href="/team/gst/docs/<%= d.id %>"><%= g.docLabel(d) %></a><span class="sub"><%= type === 'notes' ? g.kindLabel(d.kind) : (d.subject || '') %></span></td>
         <td class="nowrap"><%= h.date(d.issue_date) %><% if (d.kind === 'invoice' && d.due_date && d.number) { %><span class="sub <%= st === 'overdue' ? 'down' : '' %>">Due <%= h.date(d.due_date) %></span><% } %></td>
-        <td><% if (d.hub_client_id) { %><a href="/invoices/clients/<%= d.hub_client_id %>"><%= d.bill_name %></a><% } else { %><%= d.bill_name %><% } %><span class="sub mono"><%= d.bill_gstin || (d.client_type === 'export' ? d.bill_country : 'Unregistered') %></span></td>
+        <td><% if (d.hub_client_id) { %><a href="/team/gst/clients/<%= d.hub_client_id %>"><%= d.bill_name %></a><% } else { %><%= d.bill_name %><% } %><span class="sub mono"><%= d.bill_gstin || (d.client_type === 'export' ? d.bill_country : 'Unregistered') %></span></td>
         <td class="hide-sm small"><%= d.supply_type === 'intra' ? 'CGST+SGST' : d.supply_type === 'inter' ? 'IGST' : 'Export' %><span class="sub"><%= d.pos_name %> (<%= d.pos_code %>)</span></td>
         <td class="num"><%= g.money(d.total, d.currency) %><% if (d.currency !== 'INR') { %><span class="sub"><%= h.inr(d.inr_total) %></span><% } %></td>
         <% if (type === 'invoice') { %><td class="num <%= d.number && Number(d.balance) > 0 && st !== 'cancelled' ? 'strong' : 'muted' %>"><%= d.number && st !== 'cancelled' ? g.money(Math.max(0, d.balance), d.currency) : '—' %></td><% } %>
@@ -52,6 +52,6 @@
       <% }) %>
     </tbody>
   </table></div>
-  <%- include('../../partials/pager', { pagerBase: '/invoices/docs', pagerQuery: Object.assign({}, keep, { status: status }) }) %>
+  <%- include('../../partials/pager', { pagerBase: '/team/gst/docs', pagerQuery: Object.assign({}, keep, { status: status }) }) %>
   <% } %>
 </div>

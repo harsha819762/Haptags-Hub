@@ -1,0 +1,39 @@
+<div class="page-head"><div><h1>Clients</h1><div class="sub"><%= clients.length %> <%= archived ? 'archived' : 'active' %> client<%= clients.length === 1 ? '' : 's' %></div></div>
+  <div class="actions">
+    <% if (manage) { %><div class="seg"><a href="/team/clients" class="<%= archived ? '' : 'active' %>">Active</a><a href="/team/clients?show=archived" class="<%= archived ? 'active' : '' %>">Archived<%= archivedCount ? ' (' + archivedCount + ')' : '' %></a></div><% } %>
+    <% if (manage && !archived) { %><a class="btn" href="#quick-add"><%- h.icon('plus', 16) %> Add client</a><% } %>
+  </div></div>
+
+<% if (manage && !archived) { %>
+<form id="quick-add" method="post" action="/team/clients" class="card card-pad mb-16" novalidate>
+  <%- include('../partials/csrf') %>
+  <div class="row" style="flex-wrap:wrap;align-items:flex-end;gap:10px">
+    <div class="field grow" style="margin:0;min-width:180px"><label for="qa-name">Company</label><input id="qa-name" name="name" type="text" maxlength="190" placeholder="e.g. LVS" required></div>
+    <div class="field grow" style="margin:0;min-width:160px"><label for="qa-contact">Contact person <span class="muted">(optional)</span></label><input id="qa-contact" name="contact_name" type="text" maxlength="190" placeholder="Name"></div>
+    <div class="field grow" style="margin:0;min-width:200px"><label for="qa-email">Their email</label><input id="qa-email" name="contact_email" type="email" placeholder="name@company.com"></div>
+    <div class="field grow" style="margin:0;min-width:160px"><label for="qa-proj">First project</label><input id="qa-proj" name="first_project" type="text" maxlength="190" placeholder="e.g. Website"></div>
+    <input type="hidden" name="send_invite" value="1">
+    <button class="btn" type="submit"><%- h.icon('plus', 16) %> Add</button>
+  </div>
+  <div class="hint mt-8">Add a contact and project to invite them to the client portal straight away. <a href="/team/clients/new">Need GSTIN, address or phone?</a></div>
+</form>
+<% } %>
+<form method="get" action="/team/clients" class="search-big" role="search"><%- h.icon('search', 18) %><input type="search" name="q" value="<%= q %>" placeholder="Search clients, contacts or emails…" aria-label="Search clients"><button class="btn" type="submit">Search</button></form>
+<div class="card">
+  <% if (!clients.length) { %><div class="empty"><div class="art"><%- h.icon('clients', 28) %></div><b><%= archived ? 'No archived clients' : 'No clients found' %></b></div><% } else { %>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Client</th><th>Contact</th><th class="num">Active projects</th><% if (showMoney) { %><th class="num">Owes</th><% } %><th></th></tr></thead>
+    <tbody>
+      <% clients.forEach(function (c) { %>
+      <tr>
+        <td><a class="strong" href="/team/clients/<%= c.id %>"><%= c.name %></a><span class="sub"><%= [c.city, c.state].filter(Boolean).join(', ') %></span></td>
+        <td><%= c.contact_name || '—' %><span class="sub"><%= c.email || '' %></span></td>
+        <td class="num"><%= c.active_projects %> <span class="muted small">/ <%= c.total_projects %></span></td>
+        <% if (showMoney) { %><td class="num <%= Number(c.owed) ? 'late' : '' %>"><%= Number(c.owed) ? h.inr(c.owed) : '—' %></td><% } %>
+        <td class="right nowrap"><a class="btn btn-ghost btn-sm" href="/team/clients/<%= c.id %>">Open</a>
+          <% if (manage) { %><form method="post" action="/team/clients/<%= c.id %>/<%= archived ? 'restore' : 'archive' %>" class="inline" <%- archived ? '' : 'data-confirm="Archive ' + h.esc(c.name) + '? Their people will be signed out and can’t sign in until you restore it."' %>><%- include('../partials/csrf') %><button class="btn btn-ghost btn-sm" type="submit"><%= archived ? 'Restore' : 'Archive' %></button></form><% } %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table></div><% } %>
+</div>

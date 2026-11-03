@@ -523,7 +523,7 @@ async function renderPdf(bundle, { copies = ['original'] } = {}) {
       Title: `${docTitle(doc)} ${doc.number || '(draft)'}`,
       Author: supplier.legal_name,
       Subject: `${docTitle(doc)} for ${doc.bill_name}`,
-      Creator: 'Haptags Hub',
+      Creator: 'Haptags Portal',
     },
   });
   pdf.registerFont('Regular', FONTS.Regular);

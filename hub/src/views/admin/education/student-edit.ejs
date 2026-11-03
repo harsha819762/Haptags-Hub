@@ -1,6 +1,6 @@
-<div class="crumbs"><a href="/admin/education/students">Students</a> / <a href="/admin/education/students/<%= form.id %>"><%= form.name %></a> / Edit</div>
+<div class="crumbs"><a href="/team/education/students">Students</a> / <a href="/team/education/students/<%= form.id %>"><%= form.name %></a> / Edit</div>
 <div class="page-head"><h1>Edit student</h1></div>
-<form method="post" action="/admin/education/students/<%= form.id %>" class="card card-pad" style="max-width:900px" novalidate>
+<form method="post" action="/team/education/students/<%= form.id %>" class="card card-pad" style="max-width:900px" novalidate>
   <%- include('../../partials/csrf') %>
   <div class="form-grid">
     <div class="field"><label for="name">Full name *</label><input id="name" name="name" type="text" value="<%= form.name || '' %>" <%- errors.name ? 'aria-invalid="true"' : '' %>><% if (errors.name) { %><div class="error"><%= errors.name %></div><% } %></div>
@@ -16,5 +16,5 @@
     <div class="field"><label for="status">Status</label><select id="status" name="status"><option value="active" <%= h.selected(form.status, 'active') %>>Active</option><option value="inactive" <%= h.selected(form.status, 'inactive') %>>Completed / left</option></select></div>
     <div class="field full"><label for="notes">Notes</label><textarea id="notes" name="notes" rows="3"><%= form.notes || '' %></textarea></div>
   </div>
-  <div class="form-actions"><button class="btn" type="submit">Save</button><a class="btn btn-ghost" href="/admin/education/students/<%= form.id %>">Cancel</a></div>
+  <div class="form-actions"><button class="btn" type="submit">Save</button><a class="btn btn-ghost" href="/team/education/students/<%= form.id %>">Cancel</a></div>
 </form>

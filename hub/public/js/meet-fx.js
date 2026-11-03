@@ -1,5 +1,5 @@
 /*
- * Haptags Hub: meeting background effects (blur and replacement), all on the user's device.
+ * Haptags Portal: meeting background effects (blur and replacement), all on the user's device.
  * MediaPipe's selfie segmenter finds the person in each camera frame; we draw the background
  * (blurred video or an image) and the person on top into a canvas, and send the canvas stream.
  */

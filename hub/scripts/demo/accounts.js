@@ -3,16 +3,16 @@
 // Local demo data so every screen has something to show. Refuses to run against MySQL/production.
 // Usage: npm run seed-demo   (then sign in as demo@haptags.local / demo-password-123)
 
-const config = require('../src/config');
-const { db, migrate } = require('../src/db');
-const { hashPassword } = require('../src/lib/auth');
-const { getSettings, setSettings } = require('../src/lib/settings');
-const { createInvoice, issueInvoice, recordPayment, replaceItems, nextNumber } = require('../src/lib/billing');
-const { computeTotals } = require('../src/lib/money');
-const { createLead } = require('../src/lib/leads');
-const { nowSql, todayIST, addDays, addMonths, randomToken, istToUtc, addMinutesSql } = require('../src/lib/util');
-const chat = require('../src/lib/chat');
-const { createMeeting } = require('../src/lib/meetings');
+const config = require('../../src/config');
+const { db, migrate } = require('../../src/db');
+const { hashPassword } = require('../../src/lib/auth');
+const { getSettings, setSettings } = require('../../src/lib/settings');
+const { createInvoice, issueInvoice, recordPayment, replaceItems, nextNumber } = require('../../src/lib/billing');
+const { computeTotals } = require('../../src/lib/money');
+const { createLead } = require('../../src/lib/leads');
+const { nowSql, todayIST, addDays, addMonths, randomToken, istToUtc, addMinutesSql } = require('../../src/lib/util');
+const chat = require('../../src/lib/chat');
+const { createMeeting } = require('../../src/lib/meetings');
 
 if (config.isProd || config.db.client !== 'better-sqlite3') {
   console.error('seed-demo only runs against the local SQLite database.');
@@ -132,7 +132,7 @@ async function main() {
   // Education: two programs and a few students at different stages.
   const [webId] = await db('programs').insert({ name: 'Full-stack web internship', kind: 'internship', fee: 1180000, fee_includes_gst: true, duration: '8 weeks', is_active: true, created_at: now, updated_at: now });
   const [aiId] = await db('programs').insert({ name: 'AI & automation bootcamp', kind: 'training', fee: 590000, fee_includes_gst: true, duration: '4 weeks', is_active: true, created_at: now, updated_at: now });
-  const { enroll } = require('../src/lib/education');
+  const { enroll } = require('../../src/lib/education');
   const kids = [
     ['Divya Nair', 'RV College of Engineering', 'B.E. CSE, 3rd year', webId, 1180000, 2, 1180000],
     ['Arjun Patil', 'PES University', 'B.Tech ISE, 4th year', webId, 1180000, 2, 590000],
@@ -148,7 +148,7 @@ async function main() {
   }
 
   // Finance: six months of a realistic current-account statement.
-  const { importStatement } = require('../src/lib/finance');
+  const { importStatement } = require('../../src/lib/finance');
   const lines = ['Date,Narration,Chq./Ref.No.,Value Dt,Withdrawal Amt.,Deposit Amt.,Closing Balance'];
   let bal = 250000;
   const fmt = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(2, 4)}`;

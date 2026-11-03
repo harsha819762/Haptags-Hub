@@ -13,13 +13,13 @@ async function main() {
   await ensureOwner();
   const app = require('./src/app');
   app.listen(config.port, () => {
-    console.log(`Haptags Hub running on ${config.baseUrl} (port ${config.port}, db: ${config.db.client})`);
+    console.log(`Haptags Portal running on ${config.baseUrl} (port ${config.port}, db: ${config.db.client})`);
   });
   startScheduler();
   startMeetingReminders();
 }
 
 main().catch((err) => {
-  console.error('Failed to start Haptags Hub:', err);
+  console.error('Failed to start Haptags Portal:', err);
   process.exit(1);
 });

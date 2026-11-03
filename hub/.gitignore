@@ -1,5 +1,9 @@
 node_modules/
 .env
+.env.*
+!.env.example
 data/*.sqlite*
-*.log
 data/backups/
+*.log
+*.zip
+*.tmp

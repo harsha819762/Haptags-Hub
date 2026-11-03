@@ -55,7 +55,8 @@
 .gst-supply.inter { background: var(--blue-50); color: var(--blue-700); }
 .gst-supply.export { background: var(--violet-bg); color: var(--violet); }
 .gst-lines-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.gst-lines { width: 100%; border-collapse: collapse; min-width: 980px; }
+.gst-lines { width: 100%; border-collapse: collapse; min-width: 1080px; }
+.gst-lines th:nth-child(2), .gst-lines td:nth-child(2) { min-width: 200px; }
 .gst-lines th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); text-align: left; padding: 0 5px 8px; font-weight: 600; white-space: nowrap; }
 .gst-lines td { padding: 4px 5px; vertical-align: top; }
 .gst-lines input, .gst-lines select, .gst-lines textarea { padding: 8px 9px; font-size: 14px; }
@@ -142,3 +143,8 @@
   .gst-lines td.c-amt + td.c-amt::before { content: 'Tax'; }
   .gst-lines td.c-rm { text-align: right; }
 }
+
+/* ----- Dark mode (the company view's light/dark switch) ----- */
+[data-theme=dark] .gst-brand, [data-theme=dark] .gst-doc-name, [data-theme=dark] .gst-declaration { color: var(--text); }
+[data-theme=dark] .gst-doc-head, [data-theme=dark] .gst-declaration { border-color: var(--border-strong); }
+[data-theme=dark] .gst-sticky-actions { background: rgba(10, 17, 32, .94); }

@@ -1,0 +1,69 @@
+<%
+  // The printable document. Server-rendered for saved documents; the builder's script updates the [data-b] parts live.
+  const T = doc.totals;
+  const isReceipt = doc.type === 'receipt';
+  const showTax = Number(doc.gst_rate) > 0;
+  const addr = [settings.address, [settings.city, settings.pincode].filter(Boolean).join(' '), settings.state].filter(Boolean).join(', ');
+%>
+<article class="paper" id="paper" data-type="<%= doc.type %>">
+  <% if (doc.type === 'invoice' && doc.status === 'paid') { %><div class="paid-watermark">PAID</div><% } %>
+  <header class="paper-head">
+    <div class="seller">
+      <img src="/static/img/haptags-mark.webp" alt="" class="seller-logo">
+      <div>
+        <b><%= settings.legal_name %></b>
+        <div class="small muted"><%= addr %></div>
+        <div class="small muted"><%= settings.email %> · <%= settings.phone %></div>
+        <% if (settings.gstin) { %><div class="small muted">GSTIN: <%= settings.gstin %></div><% } %>
+      </div>
+    </div>
+    <div class="paper-title">
+      <h2 data-b="title"><%= isReceipt ? 'RECEIPT' : doc.type === 'quotation' ? 'QUOTATION' : 'INVOICE' %></h2>
+      <div class="small"><span class="muted">No.</span> <b data-b="number"><%= doc.number || 'Auto' %></b></div>
+      <div class="small"><span class="muted">Date</span> <b data-b="issue_date"><%= h.date(doc.issue_date) %></b></div>
+      <div class="small" data-b-show="due" <%- (!doc.due_date || isReceipt) ? 'hidden' : '' %>><span class="muted" data-b="due_label"><%= doc.type === 'quotation' ? 'Valid until' : 'Due' %></span> <b data-b="due_date"><%= doc.due_date ? h.date(doc.due_date) : '' %></b></div>
+    </div>
+  </header>
+
+  <section class="paper-to">
+    <div class="label" data-b="to_label"><%= isReceipt ? 'Received from' : 'Bill to' %></div>
+    <b data-b="bill_name"><%= doc.bill_name || 'Client name' %></b>
+    <div class="small" data-b="bill_address"><%= doc.bill_address || '' %></div>
+    <div class="small muted" data-b="bill_contact"><%= [doc.bill_email, doc.bill_phone].filter(Boolean).join(' · ') %></div>
+    <div class="small muted" data-b-show="gstin" <%- doc.bill_gstin ? '' : 'hidden' %>>GSTIN: <span data-b="bill_gstin"><%= doc.bill_gstin || '' %></span></div>
+  </section>
+
+  <table class="paper-items">
+    <thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+    <tbody data-b="items">
+      <% T.lines.forEach(function (l, i) { %>
+      <tr><td><%= i + 1 %></td><td><%= l.description %></td><td class="num"><%= l.quantity %></td><td class="num"><%= h.inr(l.rate) %></td><td class="num"><%= h.inr(l.amount) %></td></tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="paper-bottom">
+    <div class="paper-left">
+      <div data-b-show="receipt" <%- isReceipt ? '' : 'hidden' %> class="paid-box">
+        <div class="paid-stamp">PAID</div>
+        <div class="small"><span class="muted">Payment method</span> <b data-b="pay_method"><%= doc.pay_method || '—' %></b></div>
+        <div class="small" data-b-show="ref" <%- doc.pay_ref ? '' : 'hidden' %>><span class="muted">Reference</span> <b data-b="pay_ref"><%= doc.pay_ref || '' %></b></div>
+      </div>
+      <div class="small" data-b-show="notes" <%- doc.notes ? '' : 'hidden' %>><div class="label">Notes</div><div data-b="notes" style="white-space:pre-wrap"><%= doc.notes || '' %></div></div>
+      <div class="small mt-8" data-b-show="payto" data-has="<%= (settings.upi_id || settings.bank_account_number) ? 1 : 0 %>" <%- (isReceipt || !(settings.upi_id || settings.bank_account_number)) ? 'hidden' : '' %>>
+        <div class="label">Pay to</div>
+        <% if (settings.upi_id) { %><div>UPI: <b><%= settings.upi_id %></b></div><% } %>
+        <% if (settings.bank_account_number) { %><div><%= settings.bank_name %> · A/c <b><%= settings.bank_account_number %></b> · IFSC <b><%= settings.bank_ifsc %></b></div><% } %>
+      </div>
+    </div>
+    <div class="paper-totals" data-b="totals">
+      <div><span>Subtotal</span><b><%= h.inr(T.subtotal) %></b></div>
+      <% if (T.discount) { %><div><span>Discount</span><b>− <%= h.inr(T.discount) %></b></div><% } %>
+      <% if (T.cgst) { %><div><span>CGST (<%= Number(doc.gst_rate) / 2 %>%)</span><b><%= h.inr(T.cgst) %></b></div><div><span>SGST (<%= Number(doc.gst_rate) / 2 %>%)</span><b><%= h.inr(T.sgst) %></b></div><% } %>
+      <% if (T.igst) { %><div><span>IGST (<%= Number(doc.gst_rate) %>%)</span><b><%= h.inr(T.igst) %></b></div><% } %>
+      <div class="grand"><span><%= isReceipt ? 'Amount received' : 'Total' %></span><b><%= h.inr(T.total) %></b></div>
+    </div>
+  </div>
+  <div class="small words"><span class="muted">In words:</span> <b data-b="words"><%= h.words(T.total) %></b></div>
+  <footer class="paper-foot small muted" data-b="foot"><%= isReceipt ? 'Thank you — payment received with thanks.' : doc.type === 'quotation' ? 'This quotation is valid until the date shown. Thank you for considering us.' : 'Thank you for your business.' %></footer>
+</article>

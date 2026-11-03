@@ -5,10 +5,10 @@
   const val = function (k) { return client[k] || ''; };
 %>
 <%- include('../_nav', { active: 'clients' }) %>
-<div class="crumbs"><a href="/invoices/clients">Clients</a> / <%= client.id ? client.name : 'New' %></div>
+<div class="crumbs"><a href="/team/gst/clients">Clients</a> / <%= client.id ? client.name : 'New' %></div>
 <div class="page-head"><div><h1><%= client.id ? 'Edit client' : 'New client' %></h1><div class="sub">For a registered business, the GSTIN fills in the state and PAN.</div></div></div>
 
-<form method="post" action="<%= client.id ? '/invoices/clients/' + client.id : '/invoices/clients' %>" class="card card-pad gst-narrow" data-client-form novalidate>
+<form method="post" action="<%= client.id ? '/team/gst/clients/' + client.id : '/team/gst/clients' %>" class="card card-pad gst-narrow" data-client-form novalidate>
   <%- include('../../partials/csrf') %>
   <fieldset class="gst-choice">
     <legend>Client type</legend>
@@ -53,6 +53,6 @@
   <div class="form-actions">
     <button class="btn" type="submit"><%- h.icon('check', 16) %> Save client</button>
     <% if (!client.id) { %><button class="btn btn-ghost" type="submit" name="then" value="invoice">Save &amp; create invoice</button><% } %>
-    <a class="btn-link" href="<%= client.id ? '/invoices/clients/' + client.id : '/invoices/clients' %>">Cancel</a>
+    <a class="btn-link" href="<%= client.id ? '/team/gst/clients/' + client.id : '/team/gst/clients' %>">Cancel</a>
   </div>
 </form>

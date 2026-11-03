@@ -7,7 +7,8 @@ const {
   verifyPassword, hashPassword, passwordProblem, signIn, homeFor, createPasswordLink, findByPasswordToken,
 } = require('../lib/auth');
 const { sendMail } = require('../lib/mailer');
-const { nowSql, str } = require('../lib/util');
+const google = require('../lib/google');
+const { nowSql, str, randomToken, safeEqual } = require('../lib/util');
 
 const router = express.Router();
 
@@ -30,11 +31,52 @@ router.post('/login', loginLimiter, async (req, res) => {
       title: 'Sign in', email, next: safeNext(req.body.next) || '', error: 'That email and password don’t match an active account.',
     });
   }
+  await finishSignIn(req, res, user, req.body.next);
+});
+
+/** Signs the user in and sends them where they were going, if that page is theirs to see. */
+async function finishSignIn(req, res, user, next) {
   await db('users').where({ id: user.id }).update({ last_login_at: nowSql() });
   signIn(req, user);
-  const target = safeNext(req.body.next);
+  const target = safeNext(next);
   const allowed = target && (user.role === 'client' ? target.startsWith('/portal') || target.startsWith('/i/') || target.startsWith('/q/') : true);
   res.redirect(allowed ? target : homeFor(user));
+}
+
+// ---- Sign in with Google (only for people who already have an account) ----
+
+const googleFailed = (req, res, error, status = 401) => res.status(status).render('auth/login', { title: 'Sign in', email: '', next: '', error });
+
+router.get('/auth/google', (req, res, next) => {
+  if (!google.enabled()) return next();
+  if (req.user) return res.redirect(homeFor(req.user));
+  const state = randomToken(16);
+  const nonce = randomToken(16);
+  req.session.google = { state, nonce, next: safeNext(req.query.next) || '', at: Date.now() };
+  res.redirect(google.authUrl({ state, nonce }));
+});
+
+router.get('/auth/google/callback', loginLimiter, async (req, res, next) => {
+  if (!google.enabled()) return next();
+  const pending = req.session.google;
+  delete req.session.google;
+  if (req.query.error) return googleFailed(req, res, 'Google sign-in was cancelled.', 400);
+  const fresh = pending && Date.now() - pending.at < 10 * 60 * 1000;
+  if (!fresh || typeof req.query.state !== 'string' || !safeEqual(req.query.state, pending.state) || typeof req.query.code !== 'string') {
+    return googleFailed(req, res, 'That Google sign-in link has expired. Please try again.', 400);
+  }
+  let who;
+  try {
+    who = await google.verifiedIdentity(req.query.code, pending.nonce);
+  } catch (err) {
+    if (err instanceof google.GoogleError) return googleFailed(req, res, err.message);
+    throw err;
+  }
+  const user = await db('users').where({ email: who.email }).first();
+  if (!user || !user.is_active) {
+    return googleFailed(req, res, `No active account uses ${who.email}. Sign in with the email your Haptags contact invited, or ask them for an invite.`);
+  }
+  await finishSignIn(req, res, user, pending.next);
 });
 
 router.post('/logout', (req, res) => {
@@ -53,7 +95,7 @@ router.post('/forgot', loginLimiter, async (req, res) => {
     const link = await createPasswordLink(user.id);
     await sendMail({
       to: user.email,
-      subject: 'Reset your Haptags Hub password',
+      subject: 'Reset your Haptags Portal password',
       related: ['user', user.id],
       heading: 'Reset your password',
       lines: [`Hi ${user.name},`, 'Use the button below to choose a new password. The link works for 7 days.', 'If you didn’t ask for this, you can ignore this email.'],

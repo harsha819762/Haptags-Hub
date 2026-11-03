@@ -155,7 +155,7 @@ async function save(req, res, { kind, id = null }) {
   } else {
     req.flash('success', 'Draft saved.');
   }
-  return res.redirect(`/invoices/docs/${docId}`);
+  return res.redirect(`/team/gst/docs/${docId}`);
 }
 
 router.post('/', async (req, res) => save(req, res, { kind: C.KINDS[req.body.kind] ? req.body.kind : 'invoice' }));
@@ -191,7 +191,7 @@ router.get('/:id/edit', async (req, res, next) => {
   if (!doc || doc.discarded_at) return next();
   if (doc.status !== 'draft') {
     req.flash('error', `${doc.number} is finalised and locked. Correct it with a credit or debit note.`);
-    return res.redirect(`/invoices/docs/${doc.id}`);
+    return res.redirect(`/team/gst/docs/${doc.id}`);
   }
   const lines = await docs.getLines(doc.id);
   res.render('gst/documents/form', await formData(doc.kind, { ...doc, exchange_rate: Number(doc.exchange_rate), lines }));
@@ -200,7 +200,7 @@ router.get('/:id/edit', async (req, res, next) => {
 router.post('/:id', async (req, res, next) => {
   const doc = await load(req);
   if (!doc) return next();
-  if (doc.status !== 'draft' || doc.discarded_at) return res.redirect(`/invoices/docs/${doc.id}`);
+  if (doc.status !== 'draft' || doc.discarded_at) return res.redirect(`/team/gst/docs/${doc.id}`);
   return save(req, res, { kind: doc.kind, id: doc.id });
 });
 
@@ -209,7 +209,7 @@ router.post('/:id/finalise', async (req, res, next) => {
   if (!doc) return next();
   const number = await docs.finalise(doc.id, actor(req));
   req.flash('success', `${C.KINDS[doc.kind].label} ${number} finalised and locked.`);
-  res.redirect(`/invoices/docs/${doc.id}`);
+  res.redirect(`/team/gst/docs/${doc.id}`);
 });
 
 router.post('/:id/cancel', async (req, res, next) => {
@@ -217,7 +217,7 @@ router.post('/:id/cancel', async (req, res, next) => {
   if (!doc) return next();
   await docs.cancel(doc.id, str(req.body.reason, 255), actor(req));
   req.flash('success', `${doc.number} cancelled. The number stays used and the record is kept.`);
-  res.redirect(`/invoices/docs/${doc.id}`);
+  res.redirect(`/team/gst/docs/${doc.id}`);
 });
 
 router.post('/:id/recipient', async (req, res, next) => {
@@ -226,7 +226,7 @@ router.post('/:id/recipient', async (req, res, next) => {
   const r = await docs.editRecipient(doc.id, req.body, actor(req));
   const done = [r.changed && `${doc.number || 'The draft'} now shows the corrected name and address`, r.clientUpdated && 'the client is updated for future invoices'].filter(Boolean);
   req.flash('success', done.length ? `${done.join(', and ')}.`.replace(/^t/, 'T') : 'Nothing was changed.');
-  res.redirect(`/invoices/docs/${doc.id}`);
+  res.redirect(`/team/gst/docs/${doc.id}`);
 });
 
 router.post('/:id/discard', async (req, res, next) => {
@@ -234,7 +234,7 @@ router.post('/:id/discard', async (req, res, next) => {
   if (!doc) return next();
   await docs.discard(doc.id, actor(req));
   req.flash('success', 'Draft discarded.');
-  res.redirect(`/invoices/docs?type=${typeOf(doc.kind)}`);
+  res.redirect(`/team/gst/docs?type=${typeOf(doc.kind)}`);
 });
 
 router.post('/:id/convert', async (req, res, next) => {
@@ -242,7 +242,7 @@ router.post('/:id/convert', async (req, res, next) => {
   if (!doc) return next();
   const invoiceId = await docs.convertProforma(doc.id, actor(req));
   req.flash('success', `Tax invoice drafted from ${doc.number}. Check the date and details, then finalise it.`);
-  res.redirect(`/invoices/docs/${invoiceId}`);
+  res.redirect(`/team/gst/docs/${invoiceId}`);
 });
 
 router.get('/:id/pdf', async (req, res, next) => {
@@ -265,7 +265,7 @@ router.post('/:id/email', async (req, res, next) => {
     to: req.body.to, cc: req.body.cc, subject: str(req.body.subject, 200), message: str(req.body.message, 5000), duplicate: req.body.duplicate === '1',
   }, actor(req));
   req.flash(ok ? 'success' : 'error', ok ? `${docTitle(doc)} ${doc.number} emailed with the PDF attached.` : 'The email could not be sent. Check the SMTP settings; the attempt is in the audit log.');
-  res.redirect(`/invoices/docs/${doc.id}`);
+  res.redirect(`/team/gst/docs/${doc.id}`);
 });
 
 router.post('/:id/payments', async (req, res, next) => {
@@ -273,7 +273,7 @@ router.post('/:id/payments', async (req, res, next) => {
   if (!doc) return next();
   const { invoice } = await recordPayment(doc.id, req.body, actor(req));
   req.flash('success', invoice.status === 'paid' ? `Payment recorded. ${doc.number} is fully paid.` : 'Payment recorded.');
-  res.redirect(`/invoices/docs/${doc.id}#payments`);
+  res.redirect(`/team/gst/docs/${doc.id}#payments`);
 });
 
 // The e-invoice (IRP) request for this document, ready for when e-invoicing is switched on.

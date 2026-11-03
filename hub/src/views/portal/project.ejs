@@ -6,7 +6,19 @@
 <section class="card card-pad mb-16">
   <div class="row-between mb-8"><b>Overall progress</b><b><%= project.progress %>%</b></div>
   <div class="progress <%= project.status === 'completed' ? 'done' : '' %>" style="height:12px"><span style="width:<%= project.progress %>%"></span></div>
+  <% if (steps.total) { %><div class="small muted mt-8"><%= steps.done %> of <%= steps.total %> steps completed</div><% } %>
 </section>
+<% if (reviews.length) { %>
+<section class="card approve-card mb-16" id="approvals">
+  <div class="card-head"><h3>Waiting for your approval</h3><span class="muted small"><%= reviews.length %></span></div>
+  <ul class="list">
+    <% reviews.forEach(function (t) { %>
+    <li><div class="grow"><a class="title" href="/portal/tasks/<%= t.id %>"><%= t.title %></a><span class="meta"><%= t.description ? (t.description.length > 90 ? t.description.slice(0, 90) + '…' : t.description) : 'Ready for your review' %></span></div><a class="btn btn-sm" href="/portal/tasks/<%= t.id %>">Review &amp; approve</a></li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+<script src="/static/js/files.js?v=1" defer></script>
 <div class="split">
   <div class="stack">
     <section class="card">
@@ -18,18 +30,31 @@
     </section>
   </div>
   <div class="stack">
+    <% if (milestones.length) { %>
     <section class="card">
       <div class="card-head"><h3>Milestones</h3></div>
-      <% if (!milestones.length) { %><div class="empty">Milestones will appear here.</div><% } %>
+      <% if (!milestones.length) { %><div class="empty" style="padding:28px"><b>No milestones yet</b>Your plan will appear here.</div><% } %>
       <% milestones.forEach(function (m) { %>
       <div class="ms <%= m.status %>"><span class="dot"><% if (m.status === 'done') { %><%- h.icon('check', 12) %><% } %></span><span class="t"><%= m.title %><% if (m.due_date) { %><span class="small muted"> · <%= h.date(m.due_date) %></span><% } %></span><span class="small muted"><%= m.status === 'doing' ? 'In progress' : '' %></span></div>
       <% }) %>
     </section>
-    <% if (links.length) { %>
-    <section class="card"><div class="card-head"><h3>Files & links</h3></div><div class="card-body">
-      <% links.forEach(function (l) { %><p class="mb-8"><a href="<%= l.url %>" target="_blank" rel="noopener noreferrer"><%- h.icon('link', 14) %> <%= l.label %></a></p><% }) %>
-    </div></section>
     <% } %>
+    <section class="card" id="files">
+      <div class="card-head"><h3>Files &amp; links</h3><label class="btn btn-ghost btn-sm" style="cursor:pointer"><%- h.icon('upload', 14) %> Upload<input type="file" data-upload="/portal/projects/<%= project.id %>/files" hidden></label></div>
+      <% if (!files.length && !links.length) { %><div class="dropzone" data-drop-upload="/portal/projects/<%= project.id %>/files"><%- h.icon('paperclip', 22) %><b>Drop a file here</b><span>Designs, contracts, anything — up to 8 MB</span></div><% } %>
+      <ul class="list">
+        <% files.forEach(function (f) { %>
+        <li><span class="ic blue ficon"><%- h.icon(f.url ? 'link' : 'paperclip', 15) %></span>
+          <div class="grow"><a class="title" href="<%= f.url || '/portal/files/' + f.id %>" <%- f.url ? 'target="_blank" rel="noopener noreferrer"' : '' %>><%= f.label %></a><span class="meta"><%= f.url ? 'Link' : (f.size > 1048576 ? (f.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round((f.size || 0) / 1024)) + ' KB') %> · <%= f.by_name || 'You' %> · <%= h.ago(f.created_at) %></span></div>
+          <form method="post" action="/portal/files/<%= f.id %>/delete" data-confirm="Remove this file?"><%- include('../partials/csrf') %><button class="x-btn" aria-label="Remove"><%- h.icon('x', 14) %></button></form></li>
+        <% }) %>
+        <% links.forEach(function (l) { %><li><span class="ic blue ficon"><%- h.icon('link', 15) %></span><div class="grow"><a class="title" href="<%= l.url %>" target="_blank" rel="noopener noreferrer"><%= l.label %></a><span class="meta">Link from Haptags</span></div></li><% }) %>
+      </ul>
+      <form method="post" action="/portal/projects/<%= project.id %>/links" class="card-body add-link">
+        <%- include('../partials/csrf') %>
+        <input type="text" name="label" placeholder="Label (optional)" aria-label="Link label"><input type="url" name="url" placeholder="https://…" aria-label="Link address" required><button class="btn btn-ghost btn-sm" type="submit">Add link</button>
+      </form>
+    </section>
     <% if (invoices.length) { %>
     <section class="card"><div class="card-head"><h3>Invoices</h3></div><ul class="list">
       <% invoices.forEach(function (i) { %><li><div class="grow"><a class="title mono" href="/i/<%= i.public_token %>"><%= i.number %></a><span class="meta"><%= h.date(i.issue_date) %></span></div><span class="small"><%= h.inrShort(i.total) %></span><%- h.badge(i.status) %></li><% }) %>

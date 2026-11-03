@@ -1,10 +1,25 @@
-<div class="page-head"><div><h1>Projects</h1></div></div>
-<div class="card">
-  <% if (!projects.length) { %><div class="empty">No projects yet.</div><% } else { %>
-  <ul class="list">
-    <% projects.forEach(function (p) { %>
-    <li><div class="grow"><a class="title" href="/portal/projects/<%= p.id %>"><%= p.name %></a><span class="meta"><%= h.service(p.service) || '' %><%= p.due_date ? ' · target ' + h.date(p.due_date) : '' %></span></div>
-      <div class="progress <%= p.status === 'completed' ? 'done' : '' %>" style="width:120px"><span style="width:<%= p.progress %>%"></span></div><%- h.badge(p.status) %></li>
-    <% }) %>
-  </ul><% } %>
+<%
+  const today = new Date().toISOString().slice(0, 10);
+  const done = projects.filter(function (p) { return p.status === 'completed'; }).length;
+%>
+<div class="page-head">
+  <div><h1>Projects</h1><div class="sub"><%= projects.length %> project<%= projects.length === 1 ? '' : 's' %> · <%= done %> completed. Open one to see its tasks.</div></div>
+  <div class="actions"><a class="btn" href="/portal/projects/new"><%- h.icon('plus', 16) %> New project</a></div>
 </div>
+
+<% if (!projects.length) { %>
+<div class="card"><div class="empty"><div class="art"><%- h.icon('projects', 28) %></div><b>No projects yet</b><p>Add your first project and track every task from here.</p><a class="btn btn-sm" href="/portal/projects/new">New project</a></div></div>
+<% } else { %>
+<div class="card plist">
+  <div class="plist-head"><span>Project</span><span>Status</span><span>Progress</span><span>Target date</span></div>
+  <% projects.forEach(function (p) { const late = p.due_date && String(p.due_date).slice(0, 10) < today && p.status !== 'completed'; %>
+  <a class="plist-row" href="/portal/projects/<%= p.id %>">
+    <span class="pl-name"><b><%= p.name %></b><small><%= h.service(p.service) || 'Project' %></small></span>
+    <span class="pl-status"><%- h.badge(p.status) %></span>
+    <span class="pl-progress"><span class="progress <%= p.status === 'completed' ? 'done' : '' %>"><span style="width:<%= p.progress %>%"></span></span><em><%= p.progress %>%</em></span>
+    <span class="pl-date <%= late ? 'late' : '' %>"><%= p.due_date ? h.date(p.due_date) : '—' %></span>
+    <span class="pl-go"><%- h.icon('arrow', 16) %></span>
+  </a>
+  <% }) %>
+</div>
+<% } %>

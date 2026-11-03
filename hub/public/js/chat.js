@@ -1,4 +1,4 @@
-/* Haptags Hub: team chat. Messages are rendered with textContent only (never innerHTML). */
+/* Haptags Portal: team chat. Messages are rendered with textContent only (never innerHTML). */
 (function () {
   'use strict';
 
@@ -6,6 +6,7 @@
   if (!dataEl || !window.HubRT) return;
   var data = JSON.parse(dataEl.textContent);
   var me = data.me;
+  var BASE = data.base || '/admin/chat';
   var channelId = data.channelId;
   var RT = window.HubRT;
 
@@ -121,7 +122,7 @@
     } else {
       if (m.body) { var b = el('div', 'cmsg-body'); b.appendChild(richText(m.body)); main.appendChild(b); }
       if (m.file) {
-        var url = '/admin/chat/files/' + m.file.id;
+        var url = BASE + '/files/' + m.file.id;
         if (m.file.image) {
           var ia = el('a', 'cmsg-img'); ia.href = url; ia.target = '_blank'; ia.rel = 'noopener';
           var img = el('img'); img.src = url; img.alt = m.file.name; img.loading = 'lazy';
@@ -196,7 +197,7 @@
   function markRead() {
     if (document.visibilityState !== 'visible' || !messages.length) return;
     clearTimeout(readTimer);
-    readTimer = setTimeout(function () { RT.post('/admin/chat/' + channelId + '/read', { id: messages[messages.length - 1].id }); }, 600);
+    readTimer = setTimeout(function () { RT.post(BASE + '/' + channelId + '/read', { id: messages[messages.length - 1].id }); }, 600);
   }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible') { markRead(); RT.activeChannel = channelId; }
@@ -226,7 +227,7 @@
   moreBtn.addEventListener('click', function () {
     if (!messages.length) return;
     moreBtn.disabled = true;
-    fetch('/admin/chat/' + channelId + '/messages?before=' + messages[0].id, { headers: { accept: 'application/json' } })
+    fetch(BASE + '/' + channelId + '/messages?before=' + messages[0].id, { headers: { accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (res) {
         var h = scroller.scrollHeight;
@@ -242,7 +243,7 @@
 
   function catchUp() {
     var last = messages.length ? messages[messages.length - 1].id : 0;
-    fetch('/admin/chat/' + channelId + '/messages?after=' + last, { headers: { accept: 'application/json' } })
+    fetch(BASE + '/' + channelId + '/messages?after=' + last, { headers: { accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (res) { res.messages.forEach(incoming); });
   }
@@ -275,7 +276,7 @@
     grow();
     if (input.value.trim() && Date.now() - lastTyping > 3000) {
       lastTyping = Date.now();
-      RT.post('/admin/chat/' + channelId + '/typing');
+      RT.post(BASE + '/' + channelId + '/typing');
     }
   });
   input.addEventListener('keydown', function (e) {
@@ -293,7 +294,7 @@
     input.value = ''; grow();
     try { sessionStorage.removeItem(draftKey); } catch (e) { /* storage off */ }
     lastTyping = 0;
-    RT.post('/admin/chat/' + channelId + '/messages', { body: text })
+    RT.post(BASE + '/' + channelId + '/messages', { body: text })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Not sent'); return j; }); })
       .then(function (res) { incoming(res.message); })
       .catch(function (err) {
@@ -310,7 +311,7 @@
     if (file.size > MAX) { RT.toast({ title: 'File too large', body: 'Files can be up to 8 MB. Share a Drive link for bigger ones.', tone: 'important' }); return; }
     var name = file.name || ('pasted-' + Date.now() + '.png');
     typingEl.textContent = 'Uploading ' + name + '…';
-    fetch('/admin/chat/' + channelId + '/files', {
+    fetch(BASE + '/' + channelId + '/files', {
       method: 'POST', credentials: 'same-origin', body: file,
       headers: { 'content-type': file.type || 'application/octet-stream', 'x-file-name': encodeURIComponent(name), 'x-csrf-token': RT.csrf },
     })
@@ -337,7 +338,7 @@
     var del = e.target.closest('[data-delete]');
     if (del) {
       if (!window.confirm('Delete this message for everyone?')) return;
-      RT.post('/admin/chat/messages/' + del.getAttribute('data-delete') + '/delete').then(function (r) { return r.json(); }).then(function (res) { if (res.message) replace(res.message); });
+      RT.post(BASE + '/messages/' + del.getAttribute('data-delete') + '/delete').then(function (r) { return r.json(); }).then(function (res) { if (res.message) replace(res.message); });
       return;
     }
     var ed = e.target.closest('[data-edit]');
@@ -357,7 +358,7 @@
     function commit() {
       var text = ta.value.trim();
       if (!text || text === m.body) return replace(m);
-      RT.post('/admin/chat/messages/' + m.id + '/edit', { body: text }).then(function (r) { return r.json(); }).then(function (res) { replace(res.message || m); });
+      RT.post(BASE + '/messages/' + m.id + '/edit', { body: text }).then(function (r) { return r.json(); }).then(function (res) { replace(res.message || m); });
     }
     save.addEventListener('click', commit);
     ta.addEventListener('keydown', function (ev) {

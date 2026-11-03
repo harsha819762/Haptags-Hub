@@ -48,7 +48,7 @@ router.post('/', async (req, res) => {
     await audit(actor(req), { entity: 'item', id, action: 'created', summary: `Service ${item.name} (SAC ${item.sac}, ${item.gst_rate}%) added` }, trx);
   });
   req.flash('success', `${item.name} added to the catalog.`);
-  res.redirect('/invoices/items');
+  res.redirect('/team/gst/items');
 });
 
 router.get('/:id/edit', async (req, res, next) => {
@@ -67,7 +67,7 @@ router.post('/:id', async (req, res, next) => {
     await audit(actor(req), { entity: 'item', id: current.id, action: 'edited', summary: `Service ${item.name} updated`, changes: diff({ ...current, gst_rate: Number(current.gst_rate) }, item, FIELDS) }, trx);
   });
   req.flash('success', 'Service saved. Documents already written keep their own lines.');
-  res.redirect('/invoices/items');
+  res.redirect('/team/gst/items');
 });
 
 router.post('/:id/active', async (req, res, next) => {
@@ -76,7 +76,7 @@ router.post('/:id/active', async (req, res, next) => {
   const active = req.body.active === '1';
   await db('gst_items').where({ id: item.id }).update({ is_active: active, updated_at: nowSql() });
   await audit(actor(req), { entity: 'item', id: item.id, action: active ? 'reactivated' : 'deactivated', summary: `Service ${item.name} ${active ? 'shown again' : 'hidden'}` });
-  res.redirect('/invoices/items');
+  res.redirect('/team/gst/items');
 });
 
 module.exports = router;

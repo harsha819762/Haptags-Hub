@@ -1,8 +1,8 @@
 <%- include('../_nav', { active: 'reports' }) %>
-<div class="crumbs"><a href="/invoices/reports">Reports</a> / Outstanding</div>
+<div class="crumbs"><a href="/team/gst/reports">Reports</a> / Outstanding</div>
 <div class="page-head">
   <div><h1>Outstanding receivables</h1><div class="sub">As of <%= h.date(report.today) %> · <%= report.items.length %> open invoice<%= report.items.length === 1 ? '' : 's' %> · <%= h.inr(report.totals.total) %></div></div>
-  <div class="actions"><a class="btn btn-ghost" href="/invoices/reports/outstanding.xlsx"><%- h.icon('download', 16) %> Excel</a><a class="btn btn-ghost" href="/invoices/reports/outstanding.csv">CSV</a></div>
+  <div class="actions"><a class="btn btn-ghost" href="/team/gst/reports/outstanding.xlsx"><%- h.icon('download', 16) %> Excel</a><a class="btn btn-ghost" href="/team/gst/reports/outstanding.csv">CSV</a></div>
 </div>
 
 <div class="stats">
@@ -15,7 +15,7 @@
   <div class="table-wrap"><table class="table">
     <thead><tr><th>Client</th><% report.buckets.forEach(function (b) { %><th class="num"><%= b[1] %></th><% }) %><th class="num">Total</th></tr></thead>
     <tbody>
-      <% report.clients.forEach(function (c) { %><tr><td><a class="strong" href="/invoices/clients/<%= c.hub %>"><%= c.name %></a><span class="sub"><%= c.count %> invoice<%= c.count === 1 ? '' : 's' %></span></td><% report.buckets.forEach(function (b) { %><td class="num <%= b[0] !== 'current' && c[b[0]] ? 'down' : '' %>"><%= c[b[0]] ? h.inr(c[b[0]]) : '—' %></td><% }) %><td class="num strong"><%= h.inr(c.total) %></td></tr><% }) %>
+      <% report.clients.forEach(function (c) { %><tr><td><a class="strong" href="/team/gst/clients/<%= c.hub %>"><%= c.name %></a><span class="sub"><%= c.count %> invoice<%= c.count === 1 ? '' : 's' %></span></td><% report.buckets.forEach(function (b) { %><td class="num <%= b[0] !== 'current' && c[b[0]] ? 'down' : '' %>"><%= c[b[0]] ? h.inr(c[b[0]]) : '—' %></td><% }) %><td class="num strong"><%= h.inr(c.total) %></td></tr><% }) %>
       <tr><td class="strong">Total</td><% report.buckets.forEach(function (b) { %><td class="num strong"><%= h.inr(report.totals[b[0]]) %></td><% }) %><td class="num strong"><%= h.inr(report.totals.total) %></td></tr>
     </tbody>
   </table></div>
@@ -28,7 +28,7 @@
   <div class="table-wrap"><table class="table">
     <thead><tr><th>Invoice</th><th>Client</th><th>Due</th><th class="num">Days late</th><th class="num">Total</th><th class="num">Balance</th><th>Status</th></tr></thead>
     <tbody><% report.items.forEach(function (d) { %>
-      <tr><td><a class="strong mono" href="/invoices/docs/<%= d.id %>"><%= d.number %></a><span class="sub"><%= h.date(d.issue_date) %></span></td><td><%= d.bill_name %></td><td class="nowrap"><%= d.due_date ? h.date(d.due_date) : '—' %></td><td class="num <%= d.days > 0 ? 'down' : 'muted' %>"><%= d.days > 0 ? d.days : '—' %></td><td class="num"><%= g.money(d.total, d.currency) %></td><td class="num strong"><%= g.money(d.balance, d.currency) %><% if (d.currency !== 'INR') { %><span class="sub"><%= h.inr(d.inrBalance) %></span><% } %></td><td><%- g.badge(d.status) %></td></tr>
+      <tr><td><a class="strong mono" href="/team/gst/docs/<%= d.id %>"><%= d.number %></a><span class="sub"><%= h.date(d.issue_date) %></span></td><td><%= d.bill_name %></td><td class="nowrap"><%= d.due_date ? h.date(d.due_date) : '—' %></td><td class="num <%= d.days > 0 ? 'down' : 'muted' %>"><%= d.days > 0 ? d.days : '—' %></td><td class="num"><%= g.money(d.total, d.currency) %></td><td class="num strong"><%= g.money(d.balance, d.currency) %><% if (d.currency !== 'INR') { %><span class="sub"><%= h.inr(d.inrBalance) %></span><% } %></td><td><%- g.badge(d.status) %></td></tr>
     <% }) %></tbody>
   </table></div>
 </section>

@@ -1,6 +1,6 @@
 'use strict';
 
-// Education → Offer letters: internship offer letters for students, mounted at /admin/education/offers.
+// Education → Offer letters: internship offer letters for students, mounted at /team/education/offers.
 
 const express = require('express');
 const { db } = require('../../db');
@@ -65,7 +65,7 @@ async function save(req, res, { id = null, student, programId }) {
   } else {
     req.flash('success', 'Draft saved.');
   }
-  return res.redirect(`/admin/education/offers/${offerId}`);
+  return res.redirect(`/team/education/offers/${offerId}`);
 }
 
 router.post('/', async (req, res, next) => {
@@ -91,7 +91,7 @@ router.get('/:id/edit', async (req, res, next) => {
   if (!letter) return next();
   if (letter.status !== 'draft') {
     req.flash('error', `${letter.number} is issued, so its wording is fixed. Make a revised copy to change it.`);
-    return res.redirect(`/admin/education/offers/${letter.id}`);
+    return res.redirect(`/team/education/offers/${letter.id}`);
   }
   res.render('admin/education/offer-form', {
     title: `Edit offer letter for ${letter.candidate_name}`, tab: 'offers', student: await findStudent(letter.client_id), letter, errors: {}, nextNumber: await offers.previewOfferNumber(),
@@ -101,7 +101,7 @@ router.get('/:id/edit', async (req, res, next) => {
 router.post('/:id', async (req, res, next) => {
   const letter = await load(req);
   if (!letter) return next();
-  if (letter.status !== 'draft') return res.redirect(`/admin/education/offers/${letter.id}`);
+  if (letter.status !== 'draft') return res.redirect(`/team/education/offers/${letter.id}`);
   return save(req, res, { id: letter.id, student: await findStudent(letter.client_id), programId: letter.program_id });
 });
 
@@ -110,7 +110,7 @@ router.post('/:id/issue', async (req, res, next) => {
   if (!letter) return next();
   const number = await offers.issue(letter.id, req.user.id);
   req.flash('success', `Offer letter ${number} issued.`);
-  res.redirect(`/admin/education/offers/${letter.id}`);
+  res.redirect(`/team/education/offers/${letter.id}`);
 });
 
 router.get('/:id/pdf', async (req, res, next) => {
@@ -128,7 +128,7 @@ router.post('/:id/email', async (req, res, next) => {
   if (!letter) return next();
   const ok = await offers.emailLetter(letter.id, { to: str(req.body.to, 190), message: str(req.body.message, 5000), pdf: await pdfFor(letter) }, req.user.id);
   req.flash(ok ? 'success' : 'error', ok ? 'Offer letter emailed with the PDF attached.' : 'The email could not be sent. Check the email settings; the attempt is in the history.');
-  res.redirect(`/admin/education/offers/${letter.id}`);
+  res.redirect(`/team/education/offers/${letter.id}`);
 });
 
 router.post('/:id/withdraw', async (req, res, next) => {
@@ -136,7 +136,7 @@ router.post('/:id/withdraw', async (req, res, next) => {
   if (!letter) return next();
   await offers.withdraw(letter.id, str(req.body.reason, 255), req.user.id);
   req.flash('success', `${letter.number} withdrawn. The student’s link now shows that the offer is no longer open.`);
-  res.redirect(`/admin/education/offers/${letter.id}`);
+  res.redirect(`/team/education/offers/${letter.id}`);
 });
 
 router.post('/:id/revise', async (req, res, next) => {
@@ -144,7 +144,7 @@ router.post('/:id/revise', async (req, res, next) => {
   if (!letter) return next();
   const id = await offers.revise(letter.id, req.user.id);
   req.flash('success', `Revised copy of ${letter.number || 'the draft'} created. Edit it and issue it; withdraw the old one if it has been sent.`);
-  res.redirect(`/admin/education/offers/${id}/edit`);
+  res.redirect(`/team/education/offers/${id}/edit`);
 });
 
 router.post('/:id/delete', async (req, res, next) => {
@@ -152,18 +152,18 @@ router.post('/:id/delete', async (req, res, next) => {
   if (!letter) return next();
   if (letter.status !== 'draft') {
     req.flash('error', 'Issued letters are kept. Withdraw it instead.');
-    return res.redirect(`/admin/education/offers/${letter.id}`);
+    return res.redirect(`/team/education/offers/${letter.id}`);
   }
   await db('offer_letters').where({ id: letter.id }).del();
   req.flash('success', 'Draft deleted.');
-  res.redirect(`/admin/education/students/${letter.client_id}#offers`);
+  res.redirect(`/team/education/students/${letter.client_id}#offers`);
 });
 
 // A rule the user can fix (dates, missing email…): show it and go back.
 router.use((err, req, res, next) => {
   if (!err.offer) return next(err);
   req.flash('error', err.message);
-  res.redirect(back(req, '/admin/education/offers'));
+  res.redirect(back(req, '/team/education/offers'));
 });
 
 module.exports = router;

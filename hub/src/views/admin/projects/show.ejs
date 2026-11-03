@@ -13,6 +13,25 @@
 
 <div class="split">
   <div class="stack">
+    <section class="card" id="tasks">
+      <div class="card-head"><h3>Tasks</h3><span class="muted small"><%= tasks.filter(function (t) { return t.status === 'done'; }).length %>/<%= tasks.length %> completed · the client manages these on their board</span></div>
+      <% if (!tasks.length) { %><div class="empty" style="padding:24px">No tasks yet.</div><% } else { %>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Due</th><th>Assigned to</th></tr></thead>
+        <tbody>
+          <% var TL = { todo: ['To do', 'grey'], doing: ['In progress', 'blue'], review: ['Under review', 'amber'], done: ['Completed', 'green'] }; %>
+          <% tasks.forEach(function (t) { %>
+          <tr>
+            <td class="strong"><%= t.title %><% if (Number(t.comments)) { %><span class="sub"><%= t.comments %> comment<%= Number(t.comments) === 1 ? '' : 's' %></span><% } %></td>
+            <td><span class="badge tone-<%= TL[t.status][1] %>"><%= TL[t.status][0] %></span></td>
+            <td><%= h.humanize(t.priority) %></td>
+            <td class="nowrap"><%= t.due_date ? h.date(t.due_date) : '—' %></td>
+            <td><%= t.assignee || '—' %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table></div><% } %>
+    </section>
     <section class="card" id="updates">
       <div class="card-head"><h3>Updates</h3><span class="muted small">Client-visible updates appear in their portal</span></div>
       <div class="card-body">

@@ -1,7 +1,7 @@
 <%- include('../_nav', { active: 'items' }) %>
 <div class="page-head">
   <div><h1>Services</h1><div class="sub">Saved lines with their SAC code and GST rate. Pick them on an invoice, or type a custom line.</div></div>
-  <div class="actions"><a class="btn" href="/invoices/items/new"><%- h.icon('plus', 16) %> New service</a></div>
+  <div class="actions"><a class="btn" href="/team/gst/items/new"><%- h.icon('plus', 16) %> New service</a></div>
 </div>
 <div class="card">
   <div class="table-wrap"><table class="table">
@@ -9,13 +9,13 @@
     <tbody>
       <% items.forEach(function (it) { %>
       <tr class="<%= it.is_active ? '' : 'is-cancelled' %>">
-        <td><a class="strong" href="/invoices/items/<%= it.id %>/edit"><%= it.name %></a><span class="sub"><%= it.description || '' %></span></td>
+        <td><a class="strong" href="/team/gst/items/<%= it.id %>/edit"><%= it.name %></a><span class="sub"><%= it.description || '' %></span></td>
         <td class="mono"><%= it.sac %></td>
         <td><%= it.unit %></td>
         <td class="num"><%= Number(it.rate) ? h.inr(it.rate) : '—' %></td>
         <td class="num"><%= Number(it.gst_rate) %>%</td>
         <td class="right">
-          <form method="post" action="/invoices/items/<%= it.id %>/active" class="inline"><%- include('../../partials/csrf') %><input type="hidden" name="active" value="<%= it.is_active ? '0' : '1' %>"><button class="btn-link small" type="submit"><%= it.is_active ? 'Hide' : 'Show' %></button></form>
+          <form method="post" action="/team/gst/items/<%= it.id %>/active" class="inline"><%- include('../../partials/csrf') %><input type="hidden" name="active" value="<%= it.is_active ? '0' : '1' %>"><button class="btn-link small" type="submit"><%= it.is_active ? 'Hide' : 'Show' %></button></form>
         </td>
       </tr>
       <% }) %>

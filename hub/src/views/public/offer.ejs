@@ -1,7 +1,7 @@
 <% const first = letter.candidate_name.split(/\s+/)[0]; %>
 <div class="doc-actions no-print">
   <div class="row">
-    <% if (isStaff) { %><a class="btn btn-ghost btn-sm" href="/admin/education/offers/<%= letter.id %>">← Back to Hub</a><% } %>
+    <% if (isStaff) { %><a class="btn btn-ghost btn-sm" href="/team/education/offers/<%= letter.id %>">← Back to Hub</a><% } %>
     <% if (letter.status === 'draft') { %><span class="badge tone-amber">Draft preview: not visible to the student yet</span><% } %>
   </div>
   <div class="row">

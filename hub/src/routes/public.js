@@ -33,7 +33,7 @@ function looksLikeSpam(body) {
 
 router.get('/', (req, res) => {
   if (req.user) return res.redirect(homeFor(req.user));
-  res.render('public/home', { title: 'Haptags Hub' });
+  res.render('public/home', { title: 'Haptags Portal' });
 });
 
 router.get('/start', (req, res) => {
@@ -189,9 +189,9 @@ router.post('/i/:token/report-payment', payLimiter, async (req, res, next) => {
     subject: `Verify payment: ${formatINR(amount)} from ${client.name} (${inv.number})`,
     related: ['invoice', inv.id],
     heading: 'A client reported a payment',
-    lines: ['Check your bank/UPI statement, then confirm the payment in Haptags Hub so the invoice is marked paid.'],
+    lines: ['Check your bank/UPI statement, then confirm the payment in the Haptags Portal so the invoice is marked paid.'],
     rows: [['Client', client.name], ['Invoice', inv.number], ['Amount', formatINR(amount)], ['Method', method === 'upi' ? 'UPI' : 'Bank transfer'], ['Reference', reference]],
-    button: { label: 'Review payment', url: `${config.baseUrl}/admin/payments?status=pending` },
+    button: { label: 'Review payment', url: `${config.baseUrl}${process.env.ENABLE_ADMIN === '1' ? '/admin/payments?status=pending' : '/team/billing'}` },
   });
   req.flash('success', 'Thank you! We’ll confirm your payment shortly and email you a receipt.');
   res.redirect(`/i/${inv.public_token}`);
