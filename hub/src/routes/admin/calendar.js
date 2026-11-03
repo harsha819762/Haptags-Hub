@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
     ? M.meetingsFor(req.user.id, { from: istToUtc(gridStart, '00:00'), to: istToUtc(gridEnd, '00:00') })
     : db('meetings as m').where('m.status', 'scheduled').where('m.starts_at', '>=', istToUtc(gridStart, '00:00'))
       .where('m.starts_at', '<', istToUtc(gridEnd, '00:00')).orderBy('m.starts_at').select('m.*');
-  const [meetings, projects, followUps, holidays] = await Promise.all([
+  const [meetings, projects, followUps, holidays, leave] = await Promise.all([
     meetingQuery,
     db('projects as p').join('clients as c', 'c.id', 'p.client_id').whereIn('p.status', ['planning', 'in_progress', 'review'])
       .whereBetween('p.due_date', [gridStart, gridEnd]).select('p.id', 'p.name', 'p.due_date', 'c.name as client_name'),
@@ -43,6 +43,10 @@ router.get('/', async (req, res) => {
       .modify((q) => { if (mine) q.where((w) => w.where('assigned_to', req.user.id).orWhereNull('assigned_to')); })
       .select('id', 'name', 'company', 'next_follow_up'),
     H.between(gridStart, gridEnd, { observances }),
+    db('leave_requests as l').join('users as u', 'u.id', 'l.user_id').where('l.status', 'approved')
+      .where('l.start_date', '<', gridEnd).where('l.end_date', '>=', gridStart)
+      .modify((q) => { if (mine) q.where('l.user_id', req.user.id); })
+      .select('l.start_date', 'l.end_date', 'l.half_day', 'u.name'),
   ]);
 
   const days = {};
@@ -53,6 +57,13 @@ router.get('/', async (req, res) => {
   }
   for (const p of projects) add(String(p.due_date).slice(0, 10), { kind: 'project', title: `Due: ${p.name}`, href: `/admin/projects/${p.id}` });
   for (const l of followUps) add(String(l.next_follow_up).slice(0, 10), { kind: 'lead', title: `Follow up: ${l.company || l.name}`, href: `/admin/leads/${l.id}` });
+  for (const l of leave) {
+    const start = String(l.start_date).slice(0, 10);
+    const end = String(l.end_date).slice(0, 10);
+    for (let d = start < gridStart ? gridStart : start; d <= end && d < gridEnd; d = addDays(d, 1)) {
+      add(d, { kind: 'leave', title: `${l.name} on leave${l.half_day ? ' (half day)' : ''}`, href: '/team/leave' });
+    }
+  }
   for (const list of Object.values(days)) list.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
   const holidaysByDay = {};
   for (const hd of holidays) (holidaysByDay[String(hd.date).slice(0, 10)] = holidaysByDay[String(hd.date).slice(0, 10)] || []).push(hd);
