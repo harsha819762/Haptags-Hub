@@ -24,6 +24,28 @@
     if (dialog.hasAttribute('data-open') && dialog.showModal) dialog.showModal();
   }
 
+  // ---- Edit or delete a task (pencil on a board card) ----
+  var editDialog = document.getElementById('task-edit');
+  if (editDialog) {
+    var form = editDialog.querySelector('[data-edit-form]');
+    var del = editDialog.querySelector('[data-delete-btn]');
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('.edit-task'); if (!btn) return;
+      e.preventDefault();
+      var id = btn.getAttribute('data-task-id');
+      form.action = '/team/tasks/' + id + '/edit';
+      del.setAttribute('formaction', '/team/tasks/' + id + '/delete');
+      form.elements.title.value = btn.getAttribute('data-title') || '';
+      form.elements.due_date.value = btn.getAttribute('data-due') || '';
+      form.elements.priority.value = btn.getAttribute('data-priority') || 'normal';
+      editDialog.showModal();
+      form.elements.title.focus();
+      form.elements.title.select();
+    });
+    // Deleting doesn't need a title, so skip the form's required check for that button.
+    del.addEventListener('click', function () { form.elements.title.required = false; setTimeout(function () { form.elements.title.required = true; }, 0); });
+  }
+
   // ---- Project board ----
   var board = document.getElementById('board');
   if (!board) return;

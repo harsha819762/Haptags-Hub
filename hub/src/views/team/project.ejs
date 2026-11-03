@@ -53,7 +53,7 @@
         <% if (!cards.length) { %><div class="col-empty">Nothing here</div><% } %>
         <% cards.forEach(function (t) { const late = t.due_date && String(t.due_date).slice(0, 10) < today && t.status !== 'done'; const aid = assignedId(t); const aname = aid ? team.find(function (m) { return m.id === aid; }).name : t.assignee; %>
         <article class="bcard task" draggable="true" data-id="<%= t.id %>">
-          <div class="task-top"><a class="bt" href="/team/tasks/<%= t.id %>"><%= t.title %></a></div>
+          <div class="task-top"><a class="bt" href="/team/tasks/<%= t.id %>"><%= t.title %></a><button class="x edit-task" type="button" title="Edit or delete" aria-label="Edit or delete “<%= t.title %>”" data-task-id="<%= t.id %>" data-title="<%= t.title %>" data-due="<%= t.due_date ? String(t.due_date).slice(0, 10) : '' %>" data-priority="<%= t.priority || 'normal' %>"><%- h.icon('edit', 15) %></button></div>
           <div class="task-chips"><% if (t.priority === 'high') { %><span class="chip chip-red">High priority</span><% } %><% if (t.due_date) { %><span class="chip <%= late ? 'chip-red' : '' %>"><%- h.icon('calendar', 12) %> <%= h.date(t.due_date) %></span><% } %><% if (Number(t.comments)) { %><span class="chip"><%- h.icon('chat', 12) %> <%= t.comments %></span><% } %></div>
           <div class="assign">
             <span class="avatar sm <%= aname ? '' : 'unset' %>" aria-hidden="true"><%= initials(aname) %></span>
@@ -104,3 +104,21 @@
     <% } %>
   </div>
 </div>
+
+<dialog class="modal" id="task-edit" aria-labelledby="task-edit-title">
+  <form method="post" action="" data-edit-form>
+    <%- include('../partials/csrf') %>
+    <div class="modal-head"><h2 id="task-edit-title">Edit task</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="te-title">Title *</label><input id="te-title" name="title" type="text" maxlength="255" required></div>
+      <div class="form-grid">
+        <div class="field"><label for="te-due">Due date</label><input id="te-due" name="due_date" type="date"></div>
+        <div class="field"><label for="te-priority">Priority</label><select id="te-priority" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select></div>
+      </div>
+    </div>
+    <div class="modal-foot" style="justify-content:space-between">
+      <button class="btn btn-ghost danger-text" type="submit" formaction="" data-delete-btn data-confirm-click="Delete this task? Its comments and attachments are deleted too, and this can’t be undone."><%- h.icon('trash', 16) %> Delete task</button>
+      <span class="row" style="gap:10px"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit"><%- h.icon('check', 16) %> Save</button></span>
+    </div>
+  </form>
+</dialog>

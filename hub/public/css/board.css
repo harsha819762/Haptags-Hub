@@ -83,3 +83,8 @@ a.chip:hover { text-decoration: none; filter: brightness(.96); }
 .project-board .bcard .bm { margin: 2px 0 10px; }
 .project-board .progress { height: 6px; }
 .page-head .actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.task .task-top .edit-task { flex: none; }
+.task .task-top .edit-task:hover { background: var(--blue-50, #eaf3ff); color: var(--blue-600); }
+.danger-text { color: var(--red); }
+.danger-text:hover { color: var(--red); background: var(--red-bg); }
+.task .x.edit-task { opacity: .6; } .task:hover .x.edit-task, .task .x.edit-task:focus-visible { opacity: 1; }

@@ -458,6 +458,37 @@ router.post('/tasks/:id/status', loadTask, async (req, res) => {
   res.redirect(req.body.back === 'project' ? `/team/projects/${t.project_id}` : `/team/tasks/${t.id}`);
 });
 
+// Edit a task's title, due date and priority (the pencil on a board card).
+router.post('/tasks/:id/edit', loadTask, async (req, res) => {
+  const t = req.task;
+  const title = str(req.body.title, 255);
+  if (!title) {
+    req.flash('error', 'A task needs a title.');
+    return res.redirect(`/team/projects/${t.project_id}#board-title`);
+  }
+  await db('project_tasks').where({ id: t.id }).update({
+    title,
+    due_date: /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null,
+    priority: ['low', 'normal', 'high'].includes(req.body.priority) ? req.body.priority : t.priority,
+    updated_at: nowSql(),
+  });
+  req.flash('success', 'Task updated.');
+  res.redirect(req.body.back === 'task' ? `/team/tasks/${t.id}` : `/team/projects/${t.project_id}#board-title`);
+});
+
+// Delete a task, with its comments and attachments. Project progress follows.
+router.post('/tasks/:id/delete', loadTask, async (req, res) => {
+  const t = req.task;
+  await db.transaction(async (trx) => {
+    await trx('task_comments').where({ task_id: t.id }).del();
+    await trx('project_files').where({ task_id: t.id }).del();
+    await trx('project_tasks').where({ id: t.id }).del();
+  });
+  await syncProgress(t.project_id);
+  req.flash('success', `Task “${t.title}” deleted.`);
+  res.redirect(`/team/projects/${t.project_id}#board-title`);
+});
+
 // Drag and drop on the project board: { column } in, the project's new progress out.
 router.post('/tasks/:id/move', loadTask, async (req, res) => {
   const t = req.task;

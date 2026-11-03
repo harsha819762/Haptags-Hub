@@ -274,3 +274,41 @@ test('every column has its own add box: tasks land in that column, projects in t
   const sam = await new Browser().login('sam@test.local', 'staff-password-1');
   assert.doesNotMatch((await sam.get('/team/projects?view=board')).text, /data-phase=/, 'staff don’t get New project');
 });
+
+test('a task can be renamed, rescheduled or deleted from its card', async () => {
+  const sam = await new Browser().login('sam@test.local', 'staff-password-1');
+  const page = (await sam.get(`/team/projects/${world.project}`)).text;
+  assert.match(page, /class="x edit-task"[^>]*data-task-id="\d+"/, 'every card has an edit button');
+  assert.match(page, /id="task-edit"/);
+
+  await sam.post(`/team/projects/${world.project}/tasks`, { title: 'Typo titel', status: 'doing' });
+  const t = await db('project_tasks').where({ title: 'Typo titel' }).first();
+  let r = await sam.post(`/team/tasks/${t.id}/edit`, { title: 'Fixed title', due_date: '2026-12-01', priority: 'high' });
+  assert.equal(r.status, 302);
+  let row = await db('project_tasks').where({ id: t.id }).first();
+  assert.equal(row.title, 'Fixed title');
+  assert.equal(String(row.due_date).slice(0, 10), '2026-12-01');
+  assert.equal(row.priority, 'high');
+  assert.equal(row.status, 'doing', 'stays in its column');
+
+  await sam.post(`/team/tasks/${t.id}/edit`, { title: '   ', priority: 'low' });
+  assert.equal((await db('project_tasks').where({ id: t.id }).first()).title, 'Fixed title', 'an empty title is refused');
+
+  await db('task_comments').insert({ task_id: t.id, user_id: world.sam, body: 'note', created_at: NOW });
+  r = await sam.post(`/team/tasks/${t.id}/delete`, {});
+  assert.equal(r.status, 302);
+  assert.equal(await db('project_tasks').where({ id: t.id }).first(), undefined);
+  assert.equal((await db('task_comments').where({ task_id: t.id })).length, 0, 'its comments go too');
+  const left = await db('project_tasks').where({ project_id: world.project });
+  const p = await db('projects').where({ id: world.project }).first();
+  assert.equal(p.progress, Math.round((left.filter((x) => x.status === 'done').length / left.length) * 100), 'progress follows');
+
+  const other = left[0];
+  const priya = await new Browser().login('priya@test.local', 'staff-password-1');
+  await priya.get('/portal');
+  assert.equal((await priya.post(`/team/tasks/${other.id}/delete`, {})).status, 404, 'clients can’t delete');
+  const fresh = new Browser(); await fresh.login('sam@test.local', 'staff-password-1');
+  fresh.csrf = 'wrong';
+  assert.equal((await fresh.post(`/team/tasks/${other.id}/delete`, {})).status, 403, 'CSRF is required');
+  assert.ok(await db('project_tasks').where({ id: other.id }).first());
+});
