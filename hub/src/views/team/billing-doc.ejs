@@ -24,4 +24,4 @@
 </dialog>
 <% } %>
 <div class="paper-wrap"><%- include('../partials/bill-paper', { doc: doc }) %></div>
-<script src="/static/js/builder.js?v=1" defer></script>
+<script src="/static/js/builder.js?v=<%= h.v('js/builder.js') %>" defer></script>

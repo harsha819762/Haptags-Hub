@@ -6,7 +6,7 @@
     <div class="no-print" style="max-width:860px;margin:0 auto"><%- include('../partials/flash') %></div>
     <%- body %>
   </div>
-  <script src="/static/js/app.js?v=8" defer></script>
-  <script src="/static/js/pay.js?v=1" defer></script>
+  <script src="/static/js/app.js?v=<%= h.v('js/app.js') %>" defer></script>
+  <script src="/static/js/pay.js?v=<%= h.v('js/pay.js') %>" defer></script>
 </body>
 </html>

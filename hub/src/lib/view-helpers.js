@@ -24,7 +24,27 @@ const TONES = {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Cache-busting for /static files: the version is a short hash of the file's contents, so a deploy that
+// changes a script or stylesheet gives it a new address and browsers fetch it again, while unchanged files
+// stay cached (static files are cached for 7 days in production).
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
+const assetHashes = new Map();
+function assetVersion(rel) {
+  if (!assetHashes.has(rel)) {
+    let v = 'x';
+    try { v = crypto.createHash('sha1').update(fs.readFileSync(path.join(PUBLIC_DIR, rel))).digest('hex').slice(0, 10); } catch { /* missing file: fixed value */ }
+    if (process.env.NODE_ENV !== 'production') return v; // in development, always read the file as it is now
+    assetHashes.set(rel, v);
+  }
+  return assetHashes.get(rel);
+}
+
 module.exports = {
+  /** Version for a file under public/, e.g. h.v('js/app.js'). */
+  v: assetVersion,
   inr: money.formatINR,
   inrShort: money.formatINRShort,
   inrCompact: money.formatINRCompact,

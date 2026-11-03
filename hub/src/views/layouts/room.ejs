@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="en-IN">
 <head><%- include('../partials/head') %>
-<link rel="stylesheet" href="/static/css/room.css?v=1">
+<link rel="stylesheet" href="/static/css/room.css?v=<%= h.v('css/room.css') %>">
 </head>
 <body class="room-page">
 <%- body %>
 <div class="toasts" data-toasts aria-live="polite"></div>
-<script src="/static/js/app.js?v=8" defer></script>
-<script src="/static/js/rt.js?v=1" defer></script>
-<script src="/static/js/meet-fx.js?v=1" defer></script>
-<script src="/static/js/meet.js?v=2" defer></script>
+<script src="/static/js/app.js?v=<%= h.v('js/app.js') %>" defer></script>
+<script src="/static/js/rt.js?v=<%= h.v('js/rt.js') %>" defer></script>
+<script src="/static/js/meet-fx.js?v=<%= h.v('js/meet-fx.js') %>" defer></script>
+<script src="/static/js/meet.js?v=<%= h.v('js/meet.js') %>" defer></script>
 </body>
 </html>

@@ -312,3 +312,13 @@ test('a task can be renamed, rescheduled or deleted from its card', async () => 
   assert.equal((await fresh.post(`/team/tasks/${other.id}/delete`, {})).status, 403, 'CSRF is required');
   assert.ok(await db('project_tasks').where({ id: other.id }).first());
 });
+
+test('scripts and stylesheets are addressed by a hash of their contents, so a deploy reaches cached browsers', async () => {
+  const sam = await new Browser().login('sam@test.local', 'staff-password-1');
+  const page = (await sam.get(`/team/projects/${world.project}`)).text;
+  const hash = (file) => crypto.createHash('sha1').update(fs.readFileSync(path.join(__dirname, '..', 'public', file))).digest('hex').slice(0, 10);
+  for (const file of ['js/projects.js', 'js/app.js', 'css/board.css', 'css/app.css']) {
+    assert.ok(page.includes(`/static/${file}?v=${hash(file)}`), `${file} carries its content hash`);
+  }
+  assert.doesNotMatch(page, /\/static\/(js|css)\/[\w-]+\.(js|css)\?v=\d{1,3}"/, 'no hand-typed version numbers left');
+});
