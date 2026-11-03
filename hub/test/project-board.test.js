@@ -322,3 +322,74 @@ test('scripts and stylesheets are addressed by a hash of their contents, so a de
   }
   assert.doesNotMatch(page, /\/static\/(js|css)\/[\w-]+\.(js|css)\?v=\d{1,3}"/, 'no hand-typed version numbers left');
 });
+
+test('owners and admins edit a project’s details; staff can’t', async () => {
+  const owner = await new Browser().login('owner@test.local', 'owner-password-1');
+  const [pid] = await db('projects').insert({ client_id: world.acme, name: 'Old name', status: 'planning', progress: 0, budget: 0, created_at: NOW, updated_at: NOW });
+  const page = (await owner.get(`/team/projects/${pid}`)).text;
+  assert.match(page, /data-dialog="#project-edit"/, 'Edit project button');
+  assert.match(page, /id="pe-name"[^>]*value="Old name"/);
+
+  let r = await owner.post(`/team/projects/${pid}/edit`, {
+    name: 'New name', client_id: String(world.acme), service: 'website-development', start_date: '2026-11-01', due_date: '2026-12-15', status: 'in_progress', description: 'Five pages and a blog',
+  });
+  assert.equal(r.location, `/team/projects/${pid}`);
+  let p = await db('projects').where({ id: pid }).first();
+  assert.deepEqual([p.name, p.service, String(p.start_date).slice(0, 10), String(p.due_date).slice(0, 10), p.status, p.description],
+    ['New name', 'website-development', '2026-11-01', '2026-12-15', 'in_progress', 'Five pages and a blog']);
+
+  for (const bad of [{ name: '' }, { start_date: '2026-12-20', due_date: '2026-12-01' }, { service: 'made-up', name: 'Still fine' }]) {
+    r = await owner.post(`/team/projects/${pid}/edit`, { name: 'New name', client_id: String(world.acme), ...bad });
+    if (bad.service) assert.equal((await db('projects').where({ id: pid }).first()).service, null, 'unknown services are dropped');
+    else assert.equal(r.location, `/team/projects/${pid}?edit=1`, JSON.stringify(bad));
+  }
+  assert.match((await owner.get(`/team/projects/${pid}?edit=1`)).text, /id="project-edit"[^>]*data-open/, 'the form reopens after an error');
+
+  await owner.post(`/team/projects/${pid}/edit`, { name: 'Done deal', client_id: String(world.acme), status: 'completed' });
+  p = await db('projects').where({ id: pid }).first();
+  assert.equal(p.progress, 100);
+
+  // Moving it to another client removes the old client's people from it.
+  const [other] = await db('clients').insert({ name: 'Other Co', status: 'active', created_at: NOW, updated_at: NOW });
+  await db('project_members').insert({ project_id: pid, user_id: world.clientUser, created_at: NOW });
+  await owner.post(`/team/projects/${pid}/edit`, { name: 'Done deal', client_id: String(other), status: 'completed' });
+  assert.equal((await db('projects').where({ id: pid }).first()).client_id, other);
+  assert.equal((await db('project_members').where({ project_id: pid })).length, 0);
+
+  const sam = await new Browser().login('sam@test.local', 'staff-password-1');
+  assert.doesNotMatch((await sam.get(`/team/projects/${pid}`)).text, /data-dialog="#project-edit"/);
+  assert.equal((await sam.post(`/team/projects/${pid}/edit`, { name: 'Hacked', client_id: String(world.acme) })).status, 403);
+  assert.equal((await sam.post(`/team/projects/${pid}/delete`, { confirm_name: 'Done deal' })).status, 403);
+  world.editedProject = pid;
+});
+
+test('deleting a project needs its name typed, removes its work, and is refused while it has invoices', async () => {
+  const owner = await new Browser().login('owner@test.local', 'owner-password-1');
+  const [pid] = await db('projects').insert({ client_id: world.acme, name: 'Throwaway', status: 'planning', progress: 0, budget: 0, created_at: NOW, updated_at: NOW });
+  const [tid] = await db('project_tasks').insert({ project_id: pid, title: 'T', status: 'todo', priority: 'normal', created_at: NOW, updated_at: NOW });
+  await db('task_comments').insert({ task_id: tid, user_id: world.sam, body: 'c', created_at: NOW });
+  const [fid] = await db('files').insert({ name: 'a.txt', mime: 'text/plain', size: 1, data: Buffer.from('a'), created_at: NOW });
+  await db('project_files').insert({ project_id: pid, file_id: fid, label: 'a.txt', created_at: NOW });
+  await db('project_updates').insert({ project_id: pid, body: 'hello', client_visible: true, created_at: NOW });
+  const inv = { client_id: world.acme, project_id: pid, issue_date: '2026-11-01', due_date: '2026-11-08', created_at: NOW, updated_at: NOW };
+  const [draft] = await db('invoices').insert({ ...inv, status: 'draft', public_token: crypto.randomBytes(16).toString('hex') });
+
+  await owner.get(`/team/projects/${pid}`);
+  let r = await owner.post(`/team/projects/${pid}/delete`, { confirm_name: 'throw away' });
+  assert.equal(r.location, `/team/projects/${pid}?edit=1`);
+  assert.ok(await db('projects').where({ id: pid }).first(), 'a wrong name deletes nothing');
+
+  const [issued] = await db('invoices').insert({ ...inv, status: 'sent', number: 'HT/26-27/9001', public_token: crypto.randomBytes(16).toString('hex') });
+  r = await owner.post(`/team/projects/${pid}/delete`, { confirm_name: 'Throwaway' });
+  assert.ok(await db('projects').where({ id: pid }).first(), 'a project with issued invoices is kept');
+  assert.match((await owner.get(`/team/projects/${pid}`)).text, /has invoices \(HT\/26-27\/9001\)/);
+  await db('invoices').where({ id: issued }).update({ project_id: null });
+
+  r = await owner.post(`/team/projects/${pid}/delete`, { confirm_name: '  throwaway ' });
+  assert.equal(r.location, '/team/projects');
+  assert.equal(await db('projects').where({ id: pid }).first(), undefined);
+  for (const [table, where] of [['project_tasks', { project_id: pid }], ['task_comments', { task_id: tid }], ['project_files', { project_id: pid }], ['project_updates', { project_id: pid }], ['files', { id: fid }]]) {
+    assert.equal((await db(table).where(where)).length, 0, `${table} cleared`);
+  }
+  assert.equal((await db('invoices').where({ id: draft }).first()).project_id, null, 'the draft invoice is kept, just unlinked');
+});

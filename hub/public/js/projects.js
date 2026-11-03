@@ -24,6 +24,10 @@
     if (dialog.hasAttribute('data-open') && dialog.showModal) dialog.showModal();
   }
 
+  // ---- Edit project dialog: reopens after a validation error (?edit=1) ----
+  var projectEdit = document.getElementById('project-edit');
+  if (projectEdit && projectEdit.hasAttribute('data-open') && projectEdit.showModal) projectEdit.showModal();
+
   // ---- Edit or delete a task (pencil on a board card) ----
   var editDialog = document.getElementById('task-edit');
   if (editDialog) {

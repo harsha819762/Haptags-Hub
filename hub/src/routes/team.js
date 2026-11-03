@@ -393,7 +393,12 @@ router.get('/projects/:id', async (req, res, next) => {
     db('invoices').where({ project_id: project.id }).whereNot('status', 'draft').orderBy('id', 'desc'),
   ]);
   const team = await db('users').whereIn('role', ['owner', 'admin', 'staff']).where({ is_active: true }).orderBy('name').select('id', 'name');
-  res.render('team/project', { title: project.name, styles: ['board'], scripts: ['projects'], project, tasks, updates, files, invoices, team, TASK_LABEL, TASK_STATUS });
+  const canManage = ['owner', 'admin'].includes(req.user.role);
+  const clients = canManage ? await db('clients').where({ segment: 'business' }).where((w) => w.where({ status: 'active' }).orWhere({ id: project.client_id })).orderBy('name').select('id', 'name') : [];
+  res.render('team/project', {
+    title: project.name, styles: ['board'], scripts: ['projects'], project, tasks, updates, files, invoices, team, TASK_LABEL, TASK_STATUS,
+    canManage, clients, SERVICES: require('../lib/constants').SERVICES, openEdit: canManage && req.query.edit === '1',
+  });
 });
 
 router.post('/projects/:id/tasks', async (req, res, next) => {
@@ -411,6 +416,72 @@ router.post('/projects/:id/tasks', async (req, res, next) => {
   await syncProgress(project.id);
   req.flash('success', `Task added to ${TASK_LABEL[TASK_STATUS.includes(req.body.status) ? req.body.status : 'todo']}.`);
   res.redirect(`/team/projects/${project.id}#board-title`);
+});
+
+// ---- Edit or delete a project (owners and admins) ----
+const { SERVICES } = require('../lib/constants');
+const PROJECT_STATUSES_ALL = ['planning', 'in_progress', 'review', 'on_hold', 'completed', 'cancelled'];
+const isoDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null);
+
+router.post('/projects/:id/edit', requireAdmin, async (req, res, next) => {
+  const project = await db('projects').where({ id: int(req.params.id, 0) }).first();
+  if (!project) return next();
+  const name = str(req.body.name, 190);
+  const client = await db('clients').where({ id: int(req.body.client_id, project.client_id), segment: 'business' }).first();
+  const start = isoDate(req.body.start_date);
+  const due = isoDate(req.body.due_date);
+  const problem = !name ? 'Give the project a name.' : !client ? 'Pick which client this project is for.'
+    : start && due && due < start ? 'The target date can’t be before the start date.' : null;
+  if (problem) {
+    req.flash('error', problem);
+    return res.redirect(`/team/projects/${project.id}?edit=1`);
+  }
+  const status = PROJECT_STATUSES_ALL.includes(req.body.status) ? req.body.status : project.status;
+  const service = SERVICES.some((s) => s[0] === req.body.service) ? req.body.service : null;
+  const moved = client.id !== project.client_id;
+  await db.transaction(async (trx) => {
+    await trx('projects').where({ id: project.id }).update({
+      name, client_id: client.id, service, description: str(req.body.description, 5000) || null, start_date: start, due_date: due, status,
+      ...(status === 'completed' ? { progress: 100 } : {}), updated_at: nowSql(),
+    });
+    // People at the old client lose access to a project that now belongs to someone else.
+    if (moved) {
+      const outsiders = await trx('users').where({ role: 'client' }).whereNot({ client_id: client.id }).pluck('id');
+      if (outsiders.length) await trx('project_members').where({ project_id: project.id }).whereIn('user_id', outsiders).del();
+    }
+  });
+  req.flash('success', `Project details saved${moved ? `. It now belongs to ${client.name}` : ''}.`);
+  res.redirect(`/team/projects/${project.id}`);
+});
+
+router.post('/projects/:id/delete', requireAdmin, async (req, res, next) => {
+  const project = await db('projects').where({ id: int(req.params.id, 0) }).first();
+  if (!project) return next();
+  const typed = (str(req.body.confirm_name, 190) || '').trim().toLowerCase();
+  if (typed !== project.name.trim().toLowerCase()) {
+    req.flash('error', 'Type the project’s name exactly to delete it.');
+    return res.redirect(`/team/projects/${project.id}?edit=1`);
+  }
+  // Invoices are tax records: a project that has issued any is cancelled, never deleted.
+  const billed = await db('invoices').where({ project_id: project.id }).whereNot('status', 'draft').first();
+  if (billed) {
+    req.flash('error', `“${project.name}” has invoices (${billed.number || 'issued'}), so it can’t be deleted. Set its status to Cancelled instead.`);
+    return res.redirect(`/team/projects/${project.id}`);
+  }
+  await db.transaction(async (trx) => {
+    const taskIds = await trx('project_tasks').where({ project_id: project.id }).pluck('id');
+    if (taskIds.length) await trx('task_comments').whereIn('task_id', taskIds).del();
+    const fileIds = (await trx('project_files').where({ project_id: project.id }).whereNotNull('file_id').pluck('file_id')).filter(Boolean);
+    await trx('project_files').where({ project_id: project.id }).del();
+    if (fileIds.length) await trx('files').whereIn('id', fileIds).del();
+    for (const table of ['project_tasks', 'milestones', 'project_updates', 'project_links', 'project_members']) {
+      await trx(table).where({ project_id: project.id }).del();
+    }
+    for (const table of ['invoices', 'retainers', 'tickets']) await trx(table).where({ project_id: project.id }).update({ project_id: null });
+    await trx('projects').where({ id: project.id }).del();
+  });
+  req.flash('success', `Project “${project.name}” and its tasks, files and updates were deleted.`);
+  res.redirect('/team/projects');
 });
 
 router.post('/projects/:id/status', async (req, res, next) => {

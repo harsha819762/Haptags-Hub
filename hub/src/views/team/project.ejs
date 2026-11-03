@@ -10,6 +10,7 @@
     <form method="post" action="/team/projects/<%= project.id %>/status" class="row" style="flex-wrap:nowrap"><%- include('../partials/csrf') %>
       <select name="status" aria-label="Project status" data-autosubmit><% PSTATUS.forEach(function (s) { %><option value="<%= s %>" <%= project.status === s ? 'selected' : '' %>><%= h.humanize(s) %></option><% }) %></select>
     </form>
+    <% if (canManage) { %><button class="btn btn-ghost" type="button" data-dialog="#project-edit"><%- h.icon('edit', 16) %> Edit project</button><% } %>
   </div>
 </div>
 
@@ -122,3 +123,33 @@
     </div>
   </form>
 </dialog>
+
+<% if (canManage) { const day = function (v) { return v ? String(v).slice(0, 10) : ''; }; %>
+<dialog class="modal" id="project-edit" aria-labelledby="project-edit-title"<%= openEdit ? ' data-open' : '' %>>
+  <form method="post" action="/team/projects/<%= project.id %>/edit">
+    <%- include('../partials/csrf') %>
+    <div class="modal-head"><h2 id="project-edit-title">Edit project</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="pe-name">Project name *</label><input id="pe-name" name="name" type="text" maxlength="190" required value="<%= project.name %>"></div>
+      <div class="form-grid">
+        <div class="field"><label for="pe-client">Client *</label><select id="pe-client" name="client_id" required><% clients.forEach(function (c) { %><option value="<%= c.id %>" <%= c.id === project.client_id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+        <div class="field"><label for="pe-service">Service</label><select id="pe-service" name="service"><option value="">—</option><% SERVICES.forEach(function (sv) { %><option value="<%= sv[0] %>" <%= project.service === sv[0] ? 'selected' : '' %>><%= sv[1] %></option><% }) %></select></div>
+        <div class="field"><label for="pe-start">Start date</label><input id="pe-start" name="start_date" type="date" value="<%= day(project.start_date) %>"></div>
+        <div class="field"><label for="pe-due">Target date</label><input id="pe-due" name="due_date" type="date" value="<%= day(project.due_date) %>"></div>
+        <div class="field full"><label for="pe-status">Status</label><select id="pe-status" name="status"><% PSTATUS.forEach(function (st) { %><option value="<%= st %>" <%= project.status === st ? 'selected' : '' %>><%= h.humanize(st) %></option><% }) %></select></div>
+      </div>
+      <div class="field"><label for="pe-desc">Description</label><textarea id="pe-desc" name="description" rows="3" maxlength="5000" placeholder="What this project covers"><%= project.description || '' %></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit"><%- h.icon('check', 16) %> Save changes</button></div>
+  </form>
+  <form method="post" action="/team/projects/<%= project.id %>/delete" class="danger-zone">
+    <%- include('../partials/csrf') %>
+    <b>Delete this project</b>
+    <p class="small muted">Deletes the project with all its tasks, comments, files, updates and milestones. This can’t be undone. Invoices are never deleted: a project with invoices can only be set to Cancelled.</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <input name="confirm_name" type="text" maxlength="190" required autocomplete="off" placeholder="Type “<%= project.name %>” to confirm" aria-label="Type the project name to confirm" style="flex:1;min-width:200px">
+      <button class="btn btn-danger-solid" type="submit"><%- h.icon('trash', 16) %> Delete project</button>
+    </div>
+  </form>
+</dialog>
+<% } %>

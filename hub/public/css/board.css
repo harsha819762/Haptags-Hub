@@ -88,3 +88,8 @@ a.chip:hover { text-decoration: none; filter: brightness(.96); }
 .danger-text { color: var(--red); }
 .danger-text:hover { color: var(--red); background: var(--red-bg); }
 .task .x.edit-task { opacity: .6; } .task:hover .x.edit-task, .task .x.edit-task:focus-visible { opacity: 1; }
+.danger-zone { margin: 0; padding: 16px 20px 18px; border-top: 1px solid var(--border); background: var(--red-bg); }
+.danger-zone b { color: var(--red); font-family: var(--font-head); }
+.danger-zone p { margin: 4px 0 10px; }
+.btn-danger-solid { background: var(--red); color: #fff; }
+.btn-danger-solid:hover { background: #a3172f; }
