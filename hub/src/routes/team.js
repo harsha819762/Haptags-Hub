@@ -38,7 +38,8 @@ router.use(async (req, res, next) => {
     ['/team/sales', 'trophy', 'Sales'],
     ['/team/support', 'tickets', 'Support', false, openTickets],
     ['/team/chat', 'chat', 'Chat & Calls', false, chatUnread],
-    ['/team/chat/meetings', 'calendar', 'Meetings'],
+    ['/team/calendar', 'calendar', 'Calendar'],
+    ['/team/chat/meetings', 'video', 'Meetings'],
     ['/team/leave', 'clock', 'Leave', false, leaveWaiting],
     ['/team/people', 'team', 'Team'],
   ];
@@ -820,6 +821,7 @@ router.get('/billing/:id', async (req, res, next) => {
 router.use('/people', require('./team-people'));
 router.use('/sales', require('./team-sales'));
 router.use('/leave', require('./team-leave'));
+router.use('/calendar', require('./team-calendar'));
 router.use('/finance', requireAdmin, require('./team-finance'));
 // GST tax invoices, and students with their fee invoices and internship offer letters (owners and admins: both handle money).
 router.use('/gst', requireAdmin, require('./gst'));

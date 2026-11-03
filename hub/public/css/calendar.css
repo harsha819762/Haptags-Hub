@@ -1,0 +1,65 @@
+/* Team calendar: month grid with festivals and holidays highlighted. Own class names (tcal-*) so the
+   older calendar styles in workspace.css and portal.css don't apply. */
+:root {
+  --hol-bg: #fff1e0; --hol-edge: #f59e0b; --hol-text: #9a3412;
+  --fest-bg: #fffbea; --fest-edge: #facc15; --fest-text: #854d0e;
+  --c-meeting: #16a34a; --c-task: #007af5; --c-project: #7c3aed; --c-leave: #64748b;
+}
+[data-theme=dark] {
+  --hol-bg: #3a2410; --hol-edge: #f59e0b; --hol-text: #fdba74;
+  --fest-bg: #2e2a12; --fest-edge: #ca8a04; --fest-text: #fde68a;
+}
+
+.tcal-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font: 600 13px var(--font-body); }
+.chip-toggle:hover { text-decoration: none; border-color: var(--hol-edge); }
+.chip-toggle .tick { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--border-strong); display: grid; place-items: center; }
+.chip-toggle.on { background: var(--fest-bg); border-color: var(--fest-edge); color: var(--fest-text); }
+.chip-toggle.on .tick { background: var(--hol-edge); border-color: var(--hol-edge); color: #fff; }
+
+.tcal { overflow: hidden; padding: 0; }
+.tcal-head, .tcal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.tcal-head span { padding: 9px 8px; text-align: center; font: 700 11.5px var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.tcal-day { min-height: 112px; padding: 6px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 3px; min-width: 0; position: relative; }
+.tcal-day:nth-child(7n) { border-right: 0; }
+.tcal-day.weekend { background: var(--surface-2); }
+.tcal-day.out { opacity: .5; }
+.tcal-day.festival { background: var(--fest-bg); box-shadow: inset 0 3px 0 var(--fest-edge); }
+.tcal-day.holiday { background: var(--hol-bg); box-shadow: inset 0 3px 0 var(--hol-edge); }
+.tcal-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.tcal-day .n { font: 650 13px var(--font-body); color: var(--text-2); width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; flex: none; }
+.tcal-day.holiday .n { color: var(--hol-text); }
+.tcal-day.today .n { background: var(--blue); color: #fff; }
+.off-tag { font: 700 10px var(--font-body); letter-spacing: .04em; text-transform: uppercase; color: var(--hol-text); background: color-mix(in srgb, var(--hol-edge) 22%, transparent); padding: 2px 6px; border-radius: 99px; white-space: nowrap; }
+
+.hol { display: flex; align-items: center; gap: 4px; font: 650 11.5px/1.3 var(--font-body); padding: 2px 6px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hol svg { flex: none; }
+.hol.k-public, .hol.k-company { color: var(--hol-text); background: color-mix(in srgb, var(--hol-edge) 20%, transparent); }
+.hol.k-observance { color: var(--fest-text); background: color-mix(in srgb, var(--fest-edge) 22%, transparent); }
+
+.tcal .ev { --c: var(--grey); display: block; padding: 2px 6px; border-radius: 6px; font: 600 11.5px/1.35 var(--font-body); background: color-mix(in srgb, var(--c) 13%, transparent); color: var(--c); border-left: 3px solid var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcal .ev:hover { text-decoration: none; filter: brightness(.94); }
+.tcal .ev.k-meeting { --c: var(--c-meeting); } .tcal .ev.k-task { --c: var(--c-task); } .tcal .ev.k-project { --c: var(--c-project); } .tcal .ev.k-leave { --c: var(--c-leave); }
+[data-theme=dark] .tcal .ev { color: color-mix(in srgb, var(--c) 55%, white); }
+.tcal .more { font-size: 11.5px; color: var(--text-3); padding-left: 4px; }
+
+.tcal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; color: var(--text-2); }
+.tcal-legend .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c, var(--grey)); }
+.tcal-legend .sw.holiday { background: var(--hol-edge); } .tcal-legend .sw.festival { background: var(--fest-edge); }
+.tcal-legend .sw.k-meeting { --c: var(--c-meeting); } .tcal-legend .sw.k-task { --c: var(--c-task); } .tcal-legend .sw.k-project { --c: var(--c-project); } .tcal-legend .sw.k-leave { --c: var(--c-leave); }
+
+.hol-row { border-left: 4px solid transparent; }
+.hol-row.hr-public, .hol-row.hr-company { border-left-color: var(--hol-edge); }
+.hol-row.hr-observance { border-left-color: var(--fest-edge); }
+
+/* Phones: the grid stays seven columns; names give way to coloured bars so every day still shows what's on. */
+@media (max-width: 760px) {
+  .tcal-day { min-height: 70px; padding: 3px; }
+  .tcal-day .n { width: 22px; height: 22px; font-size: 12px; }
+  .off-tag { display: none; }
+  .hol, .tcal .ev { font-size: 0; padding: 0; height: 6px; border-left-width: 0; border-radius: 99px; }
+  .hol svg { display: none; }
+  .hol.k-public, .hol.k-company { background: var(--hol-edge); } .hol.k-observance { background: var(--fest-edge); }
+  .tcal .ev { background: var(--c); }
+  .tcal .more { font-size: 10px; padding: 0; }
+}

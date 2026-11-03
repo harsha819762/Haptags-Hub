@@ -1,0 +1,104 @@
+<%
+  const keep = function (extra) {
+    return h.qs('/team/calendar', Object.assign({ month: month === today.slice(0, 7) ? '' : month, scope: mine ? 'mine' : '', festivals: festivals ? '' : '0' }, extra || {}));
+  };
+  const kindLabel = function (hd) { return hd.kind === 'company' ? 'Company holiday · office closed' : hd.kind === 'public' ? 'Public holiday' : 'Festival / observance'; };
+  const weekday = function (ds) { return new Date(ds + 'T00:00:00Z').toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'UTC' }); };
+  const MAX = 3;
+%>
+<div class="page-head">
+  <div><h1>Calendar</h1><div class="sub">Festivals and holidays, meetings, project and task deadlines, and who’s on leave. India time.</div></div>
+  <div class="actions">
+    <a class="btn btn-ghost" href="<%= keep({ month: prev }) %>" aria-label="Previous month"><%- h.icon('back', 16) %></a>
+    <a class="btn btn-ghost" href="<%= keep({ month: '' }) %>">Today</a>
+    <a class="btn btn-ghost" href="<%= keep({ month: next }) %>" aria-label="Next month"><%- h.icon('arrow', 16) %></a>
+    <a class="btn" href="/team/chat/meetings/new"><%- h.icon('plus', 16) %> Meeting</a>
+  </div>
+</div>
+
+<div class="tcal-bar">
+  <h2 class="mb-0"><%= label %></h2>
+  <div class="row" style="gap:10px;flex-wrap:wrap">
+    <div class="seg" role="group" aria-label="Whose items">
+      <a class="<%= mine ? '' : 'active' %>" href="<%= keep({ scope: '' }) %>" <%- mine ? '' : 'aria-current="page"' %>>Whole team</a>
+      <a class="<%= mine ? 'active' : '' %>" href="<%= keep({ scope: 'mine' }) %>" <%- mine ? 'aria-current="page"' : '' %>>Mine</a>
+    </div>
+    <a class="chip-toggle <%= festivals ? 'on' : '' %>" href="<%= keep({ festivals: festivals ? '0' : '' }) %>" aria-pressed="<%= festivals %>"><span class="tick"><%- festivals ? h.icon('check', 12) : '' %></span> Festivals</a>
+  </div>
+</div>
+
+<div class="card tcal">
+  <div class="tcal-head"><% ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(function (d) { %><span><%= d %></span><% }) %></div>
+  <div class="tcal-grid">
+    <% grid.forEach(function (d) { const extra = Math.max(0, d.items.length - MAX); %>
+    <div class="tcal-day<%= d.inMonth ? '' : ' out' %><%= d.today ? ' today' : '' %><%= d.weekend ? ' weekend' : '' %><%= d.tone ? ' ' + d.tone : '' %>" data-date="<%= d.date %>">
+      <div class="tcal-top"><span class="n"><%= d.day %></span><% if (d.tone === 'holiday') { %><span class="off-tag">Holiday</span><% } %></div>
+      <% d.holidays.forEach(function (hd) { %>
+      <span class="hol k-<%= hd.kind %>" title="<%= hd.name %> · <%= kindLabel(hd) %><%= hd.tentative ? ' · date may change' : '' %>"><%- h.icon(hd.kind === 'observance' ? 'smile' : 'zap', 11) %> <%= hd.name %><%= hd.tentative ? '*' : '' %></span>
+      <% }) %>
+      <% d.items.slice(0, MAX).forEach(function (it) { %>
+      <a class="ev k-<%= it.kind %>" href="<%= it.href %>" title="<%= (it.time ? it.time + ' · ' : '') + it.title + (it.sub ? ' · ' + it.sub : '') %>"><% if (it.time) { %><b><%= it.time %></b> <% } %><%= it.title %></a>
+      <% }) %>
+      <% if (extra) { %><span class="more">+<%= extra %> more</span><% } %>
+    </div>
+    <% }) %>
+  </div>
+</div>
+<div class="tcal-legend small">
+  <span><i class="sw holiday"></i>Holiday (office closed)</span>
+  <% if (festivals) { %><span><i class="sw festival"></i>Festival</span><% } %>
+  <span><i class="sw k-meeting"></i>Meeting</span>
+  <span><i class="sw k-task"></i>Task due</span>
+  <span><i class="sw k-project"></i>Project due</span>
+  <span><i class="sw k-leave"></i>On leave</span>
+  <span class="muted">* date may change</span>
+</div>
+
+<div class="split mt-16" id="holidays">
+  <section class="card">
+    <div class="card-head"><h3>Festivals &amp; holidays in <%= label %></h3></div>
+    <% if (!monthHolidays.length) { %><div class="empty" style="padding:22px">No festivals or holidays this month<%= festivals ? '' : ' (festivals are hidden)' %>.</div><% } else { %>
+    <ul class="list">
+      <% monthHolidays.forEach(function (hd) { const ds = String(hd.date).slice(0, 10); %>
+      <li class="hol-row hr-<%= hd.kind %>">
+        <div class="meeting-time"><b><%= Number(ds.slice(8)) %> <%= label.split(' ')[0].slice(0, 3) %></b><span><%= weekday(ds) %></span></div>
+        <div class="grow"><span class="title"><%= hd.name %></span><span class="meta"><%= kindLabel(hd) %><%= hd.note ? ' · ' + hd.note : '' %><%= hd.tentative ? ' · date may change' : '' %></span></div>
+        <% if (canManage && hd.source === 'company') { %>
+        <form method="post" action="/team/calendar/holidays/<%= hd.id %>/delete" data-confirm="Remove <%= hd.name %> from the calendar?"><%- include('../partials/csrf') %><button class="icon-btn" type="submit" aria-label="Remove <%= hd.name %>"><%- h.icon('trash', 15) %></button></form>
+        <% } %>
+      </li>
+      <% }) %>
+    </ul><% } %>
+  </section>
+
+  <div class="stack">
+    <section class="card">
+      <div class="card-head"><h3>Coming up</h3></div>
+      <% if (!upcoming.length) { %><div class="empty" style="padding:22px">Nothing in the next two months.</div><% } else { %>
+      <ul class="list"><% upcoming.forEach(function (hd) { const ds = String(hd.date).slice(0, 10); %>
+        <li class="hol-row hr-<%= hd.kind %>"><div class="grow"><span class="title"><%= hd.name %></span><span class="meta"><%= weekday(ds) %> <%= h.date(ds) %> · <%= kindLabel(hd) %></span></div><a class="small" href="<%= keep({ month: ds.slice(0, 7) }) %>#holidays">View</a></li>
+      <% }) %></ul><% } %>
+    </section>
+    <% if (canManage) { %>
+    <section class="card card-pad">
+      <h3 class="mt-0">Add a company holiday</h3>
+      <form method="post" action="/team/calendar/holidays" class="stack" style="gap:10px">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="month" value="<%= month %>">
+        <div class="form-grid">
+          <div class="field mb-0"><label for="hd-date">Date</label><input id="hd-date" name="date" type="date" required value="<%= month === today.slice(0, 7) ? today : month + '-01' %>"></div>
+          <div class="field mb-0"><label for="hd-name">Name</label><input id="hd-name" name="name" type="text" maxlength="190" required placeholder="e.g. Haptags Foundation Day"></div>
+        </div>
+        <div class="field mb-0"><label for="hd-note">Note <span class="muted">(optional)</span></label><input id="hd-note" name="note" type="text" maxlength="255" placeholder="e.g. Office closed"></div>
+        <button class="btn" type="submit"><%- h.icon('plus', 15) %> Add holiday</button>
+      </form>
+      <% if (feedOn) { %>
+      <form method="post" action="/team/calendar/holidays/sync" class="mt-16"><%- include('../partials/csrf') %><input type="hidden" name="month" value="<%= month %>">
+        <button class="btn btn-ghost btn-sm" type="submit"><%- h.icon('zap', 14) %> Refresh festival list</button>
+        <span class="small muted"><%= syncedAt ? 'Updated ' + h.ago(syncedAt) : 'Not fetched yet' %> from Google’s Holidays in India calendar.</span>
+      </form>
+      <% } %>
+    </section>
+    <% } %>
+  </div>
+</div>
