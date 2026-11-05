@@ -590,4 +590,17 @@ test('one-off: the cancelled LVS 0001 is removed and CMR becomes HTG/26-27/0001'
   await migration.up(db);
   assert.equal((await docRow(cmr.id)).number, 'HTG/26-27/0001');
   assert.match((await b.get(`/team/gst/docs/${cmr.id}`)).text, /HTG\/26-27\/0001/);
+
+  // 5 Nov: LVS BUILDERS LLP should have been 0001, so it swaps numbers with CMR.
+  const swap = require('../src/migrations/027_gst_lvs_first');
+  const lvsId = ids['LVS BUILDERS LLP'];
+  await swap.up(db);
+  assert.deepEqual([(await docRow(lvsId)).number, (await docRow(lvsId)).seq], ['HTG/26-27/0001', 1]);
+  assert.deepEqual([(await docRow(cmr.id)).number, (await docRow(cmr.id)).seq], ['HTG/26-27/0002', 2]);
+  assert.equal(await previewNumber('HTG', today), 'HTG/26-27/0003');
+  assert.match((await db('gst_audit').where({ entity_id: lvsId, action: 'renumbered' }).first()).summary, /from HTG\/26-27\/0002 to HTG\/26-27\/0001/);
+  assert.ok(listBackups().some((k) => k.name.startsWith('gst-before-lvs-first-')));
+  assert.equal((await db.raw("select name from sqlite_master where type = 'trigger' and name like 'gst_%'")).length, 4);
+  await swap.up(db);
+  assert.equal((await docRow(lvsId)).number, 'HTG/26-27/0001', 'running it again changes nothing');
 });
