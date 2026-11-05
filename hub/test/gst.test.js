@@ -591,15 +591,20 @@ test('one-off: the cancelled LVS 0001 is removed and CMR becomes HTG/26-27/0001'
   assert.equal((await docRow(cmr.id)).number, 'HTG/26-27/0001');
   assert.match((await b.get(`/team/gst/docs/${cmr.id}`)).text, /HTG\/26-27\/0001/);
 
-  // 5 Nov: LVS BUILDERS LLP should have been 0001, so it swaps numbers with CMR.
-  const swap = require('../src/migrations/027_gst_lvs_first');
+  // 5 Nov: LVS BUILDERS LLP should have been 0001, so it swaps numbers with CMR. Live, CMR's 0001 was
+  // cancelled, which 027 refused and 028 accepts (it stays cancelled).
   const lvsId = ids['LVS BUILDERS LLP'];
+  await b.post(`/team/gst/docs/${cmr.id}/cancel`, { reason: 'Raised by mistake' });
+  await require('../src/migrations/027_gst_lvs_first').up(db);
+  assert.equal((await docRow(lvsId)).number, 'HTG/26-27/0002', '027 leaves a cancelled CMR 0001 alone');
+  const swap = require('../src/migrations/028_gst_lvs_first_again');
   await swap.up(db);
+  assert.equal((await docRow(cmr.id)).status, 'cancelled');
   assert.deepEqual([(await docRow(lvsId)).number, (await docRow(lvsId)).seq], ['HTG/26-27/0001', 1]);
   assert.deepEqual([(await docRow(cmr.id)).number, (await docRow(cmr.id)).seq], ['HTG/26-27/0002', 2]);
   assert.equal(await previewNumber('HTG', today), 'HTG/26-27/0003');
   assert.match((await db('gst_audit').where({ entity_id: lvsId, action: 'renumbered' }).first()).summary, /from HTG\/26-27\/0002 to HTG\/26-27\/0001/);
-  assert.ok(listBackups().some((k) => k.name.startsWith('gst-before-lvs-first-')));
+  assert.ok(listBackups().some((k) => k.name.startsWith('gst-before-lvs-first-again-')));
   assert.equal((await db.raw("select name from sqlite_master where type = 'trigger' and name like 'gst_%'")).length, 4);
   await swap.up(db);
   assert.equal((await docRow(lvsId)).number, 'HTG/26-27/0001', 'running it again changes nothing');
