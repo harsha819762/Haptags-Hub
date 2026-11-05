@@ -2,6 +2,7 @@
 <div class="page-head no-print">
   <div><h1><%= DOC_LABEL[doc.type] %> <span class="mono" style="font-size:.7em"><%= doc.number %></span></h1><div class="sub">For <%= doc.client_name %> · <%= h.inr(doc.totals.total) %></div></div>
   <div class="actions">
+    <button class="btn btn-ghost" type="button" data-dialog="#number-dialog"><%- h.icon('edit', 16) %> Edit number</button>
     <button class="btn" type="button" data-print><%- h.icon('printer', 16) %> Print / Save as PDF</button>
     <% if (doc.type === 'quotation') { %><a class="btn btn-ghost" href="/team/billing/new?type=invoice&from=<%= doc.id %>">Turn into invoice</a><% } %>
     <% if (doc.type === 'invoice' && doc.status === 'open') { %><button class="btn btn-success" type="button" data-dialog="#paid-dialog"><%- h.icon('check', 16) %> Mark as paid</button><% } %>
@@ -9,6 +10,17 @@
     <form method="post" action="/team/billing/<%= doc.id %>/delete" class="inline" data-confirm="Delete this document?"><%- include('../partials/csrf') %><button class="btn btn-danger" type="submit"><%- h.icon('trash', 15) %></button></form>
   </div>
 </div>
+<dialog class="modal" id="number-dialog" aria-labelledby="number-title">
+  <form method="post" action="/team/billing/<%= doc.id %>/number">
+    <%- include('../partials/csrf') %>
+    <div class="modal-head"><h2 id="number-title">Edit <%= DOC_LABEL[doc.type].toLowerCase() %> number</h2><button class="icon-btn" type="button" data-close aria-label="Close"><%- h.icon('x') %></button></div>
+    <div class="modal-body">
+      <div class="field mb-0"><label for="doc-number">Number</label><input id="doc-number" name="number" type="text" class="mono" maxlength="40" value="<%= doc.number %>" required>
+        <div class="hint">Must be unique. New <%= DOC_LABEL[doc.type].toLowerCase() %>s carry on from the highest number in the series.</div></div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn" type="submit">Save number</button></div>
+  </form>
+</dialog>
 <% if (doc.type === 'invoice' && doc.status === 'open') { %>
 <dialog class="modal" id="paid-dialog" aria-labelledby="paid-title">
   <form method="post" action="/team/billing/<%= doc.id %>/paid">

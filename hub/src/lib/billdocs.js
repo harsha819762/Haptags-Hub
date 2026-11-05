@@ -15,12 +15,26 @@ const ymdOk = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null);
 const asList = (v) => (Array.isArray(v) ? v : v === undefined ? [] : [v]);
 const taxMode = (gst, igst) => (Number(gst) === 0 ? 'none' : igst ? 'inter' : 'intra');
 
-/** Next number for a document type, e.g. INV/26-27/0003. */
+/** Next number for a document type, e.g. INV/26-27/0003: one past the highest in the series, so hand-edited numbers don't break it. */
 async function nextDocNumber(type, issueDate) {
   const base = `${DOC_TYPES[type].prefix}/${financialYear(issueDate)}/`;
-  const last = await db('billing_docs').where({ type }).where('number', 'like', `${base}%`).orderBy('id', 'desc').first();
-  const seq = last ? Number(last.number.slice(base.length)) + 1 : 1;
+  const numbers = await db('billing_docs').where({ type }).where('number', 'like', `${base}%`).pluck('number');
+  const seq = numbers.reduce((max, n) => {
+    const tail = n.slice(base.length);
+    return /^\d+$/.test(tail) ? Math.max(max, Number(tail)) : max;
+  }, 0) + 1;
   return `${base}${String(seq).padStart(4, '0')}`;
+}
+
+/** Checks a hand-typed document number. Returns { number } or { error }. */
+async function checkDocNumber(type, value, exceptId) {
+  const number = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!number) return { error: 'Enter a number.' };
+  if (number.length > 40) return { error: 'Keep the number to 40 characters or fewer.' };
+  if (!/^[A-Za-z0-9/_.-][A-Za-z0-9 /_.-]*$/.test(number)) return { error: 'Use letters, digits, spaces and / - _ . only.' };
+  const taken = await db('billing_docs').where({ type, number }).whereNot('id', exceptId || 0).first();
+  if (taken) return { error: `${DOC_TYPES[type].label} ${number} already exists.` };
+  return { number };
 }
 
 /** Stored row -> everything the document view needs, with totals recomputed from the lines. */
@@ -81,4 +95,4 @@ async function markInvoicePaid(row, { today, payMethod, payRef }) {
   return { id: Array.isArray(rid) ? rid[0] : rid, number };
 }
 
-module.exports = { DOC_TYPES, PAY_METHODS, ymdOk, nextDocNumber, presentDoc, previewDoc, parseDocForm, saveDoc, markInvoicePaid };
+module.exports = { DOC_TYPES, PAY_METHODS, ymdOk, nextDocNumber, checkDocNumber, presentDoc, previewDoc, parseDocForm, saveDoc, markInvoicePaid };

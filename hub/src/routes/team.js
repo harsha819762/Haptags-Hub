@@ -825,6 +825,19 @@ router.post('/billing/:id/accept', async (req, res, next) => {
   res.redirect(`/team/billing/${row.id}`);
 });
 
+// Change a document's number, e.g. to continue a series started outside the Hub. Numbers stay unique per type.
+router.post('/billing/:id/number', async (req, res, next) => {
+  const row = await db('billing_docs').where({ id: int(req.params.id, 0) }).first();
+  if (!row) return next();
+  const check = await B.checkDocNumber(row.type, req.body.number, row.id);
+  if (check.error) req.flash('error', check.error);
+  else if (check.number !== row.number) {
+    await db('billing_docs').where({ id: row.id }).update({ number: check.number });
+    req.flash('success', `${DOC_LABEL[row.type]} ${row.number} is now ${check.number}.`);
+  }
+  res.redirect(`/team/billing/${row.id}`);
+});
+
 router.post('/billing/:id/delete', async (req, res) => {
   await db('billing_docs').where({ id: int(req.params.id, 0) }).del();
   req.flash('success', 'Document deleted.');

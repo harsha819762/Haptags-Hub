@@ -23,6 +23,7 @@ const { ensureOwner } = require('../src/lib/bootstrap');
 const { hashPassword } = require('../src/lib/auth');
 const { inviteUser } = require('../src/lib/invites');
 const { ensureClientGroup } = require('../src/lib/clientchat');
+const B = require('../src/lib/billdocs');
 
 let server;
 let base;
@@ -164,6 +165,25 @@ test('billing is read-only for clients: no creating, paying-off or deleting docu
   const paru = await signIn('paru@lvs.test', 'client-password-1');
   assert.doesNotMatch((await paru.get('/portal/billing')).text, /INV\/T\/0001/);
   assert.equal((await paru.get(`/portal/billing/${docId}`)).status, 404);
+});
+
+test('the team can edit a document number: unique per type, and new numbers carry on after it', async () => {
+  const team = await signIn('owner@test.local', 'owner-password-1');
+  const doc = (n) => ({
+    client_id: world.lvs, type: 'invoice', number: n, issue_date: '2026-11-01', bill_name: 'LVS', items: JSON.stringify([{ description: 'Work', quantity: 1, rate: 100000 }]),
+    gst_rate: 18, igst: false, discount: 0, total: 118000, status: 'open', created_at: NOW,
+  });
+  const [a] = await db('billing_docs').insert(doc('INV/26-27/0040'));
+  const [b] = await db('billing_docs').insert(doc('INV/26-27/0041'));
+  assert.match((await team.get(`/team/billing/${a}`)).text, /Edit number/);
+  await team.post(`/team/billing/${a}/number`, { number: 'INV/26-27/0041' });
+  assert.equal((await db('billing_docs').where({ id: a }).first()).number, 'INV/26-27/0040', 'a taken number is refused');
+  await team.post(`/team/billing/${b}/number`, { number: 'INV/26-27/0090' });
+  assert.equal((await db('billing_docs').where({ id: b }).first()).number, 'INV/26-27/0090');
+  assert.equal(await B.nextDocNumber('invoice', '2026-11-05'), 'INV/26-27/0091');
+  const staff = await signIn('sam@test.local', 'staff-password-1');
+  assert.equal((await staff.post(`/team/billing/${a}/number`, { number: 'X1' })).status, 403);
+  await db('billing_docs').whereIn('id', [a, b]).del();
 });
 
 test('each client company has exactly one group chat, and nothing else', async () => {
