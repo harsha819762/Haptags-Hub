@@ -65,15 +65,20 @@
       </div>
     </section>
 
-    <section class="card card-pad">
-      <h3>Exports (LUT)</h3>
-      <p class="small muted mt-0">Export invoices are issued without IGST under your Letter of Undertaking (Form GST RFD-11). File a fresh LUT each financial year.</p>
-      <div class="form-grid">
-        <%- f('lut_number', 'LUT ARN', { mono: true, max: 40, full: true, placeholder: 'e.g. AD290326012345X' }) %>
-        <%- f('lut_valid_from', 'Valid from', { type: 'date' }) %>
-        <%- f('lut_valid_until', 'Valid until', { type: 'date', hint: 'Usually 31 March.' }) %>
-      </div>
-    </section>
+    <%# Without an LUT the box stays folded away; it opens once one is entered. %>
+    <% const hasLut = form.lut_number || form.lut_valid_from || form.lut_valid_until || errors.lut_number || errors.lut_valid_from || errors.lut_valid_until; %>
+    <details class="small muted" <%= hasLut ? 'open' : '' %>>
+      <summary style="cursor:pointer">I have an LUT for export invoices…</summary>
+      <section class="card card-pad mt-8">
+        <h3>Exports (LUT)</h3>
+        <p class="small muted mt-0">Export invoices are issued without IGST under your Letter of Undertaking (Form GST RFD-11). File a fresh LUT each financial year.</p>
+        <div class="form-grid">
+          <%- f('lut_number', 'LUT ARN', { mono: true, max: 40, full: true, placeholder: 'e.g. AD290326012345X' }) %>
+          <%- f('lut_valid_from', 'Valid from', { type: 'date' }) %>
+          <%- f('lut_valid_until', 'Valid until', { type: 'date', hint: 'Usually 31 March.' }) %>
+        </div>
+      </section>
+    </details>
 
     <section class="card card-pad">
       <h3>Authorised signatory</h3>
